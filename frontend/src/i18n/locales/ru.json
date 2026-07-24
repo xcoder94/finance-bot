@@ -1,0 +1,183 @@
+{
+  "nav": {
+    "home": "Главная",
+    "analytics": "Аналитика",
+    "history": "История",
+    "settings": "Настройки"
+  },
+  "auth": {
+    "unauthorized": "Ошибка аутентификации",
+    "notOnboarded": "Сначала запустите бота",
+    "removedFromFamily": "Вас удалили из семейного бюджета",
+    "networkError": "Не удалось подключиться к серверу",
+    "retry": "Повторить"
+  },
+  "placeholder": {
+    "comingSoon": "Скоро"
+  },
+  "settings": {
+    "role": "Роль",
+    "roles": {
+      "owner": "Владелец",
+      "member": "Участник"
+    },
+    "firstName": "Имя",
+    "language": "Язык",
+    "wallets": "Кошельки",
+    "categoriesIncome": "Категории доходов",
+    "categoriesExpense": "Категории расходов",
+    "addWallet": "Добавить кошелёк",
+    "addCategory": "Добавить категорию",
+    "addSubcategory": "Добавить подкатегорию",
+    "delete": "Удалить",
+    "confirmDelete": "Удалить этот элемент?",
+    "confirmDeleteParentWithSubcategories": "Категория и {{count}} вложенных подкатегорий будут удалены",
+    "nameLabel": "Название",
+    "currencyLabel": "Валюта",
+    "nameRequired": "Введите название",
+    "nameTooLong": "Название не должно превышать 50 символов",
+    "loadError": "Не удалось загрузить настройки",
+    "submitError": "Не удалось сохранить изменения",
+    "members": "Участники семьи",
+    "inviteLink": "Ссылка-приглашение",
+    "copyLink": "Скопировать",
+    "linkCopied": "Скопировано"
+  },
+  "home": {
+    "title": "Мои финансы",
+    "summary": "Сводка",
+    "income": "Доход",
+    "expense": "Расход",
+    "balance": "Остаток",
+    "quickActions": "Быстрые действия",
+    "addIncome": "Добавить доход",
+    "addExpense": "Добавить расход",
+    "addTransfer": "Добавить перевод",
+    "comingSoon": "Скоро",
+    "recentTransactions": "Последние операции",
+    "noTransactions": "Пока нет операций",
+    "transfer": "Перевод",
+    "loadError": "Не удалось загрузить данные",
+    "previousMonth": "Предыдущий месяц",
+    "nextMonth": "Следующий месяц",
+    "loading": "Загрузка"
+  },
+  "addIncome": {
+    "title": "Добавление дохода"
+  },
+  "addExpense": {
+    "title": "Добавление расхода",
+    "subcategoryCreateError": "Не удалось подготовить подкатегорию. Проверьте подключение и повторите попытку."
+  },
+  "addTransfer": {
+    "title": "Перевод / обмен валюты"
+  },
+  "addTransaction": {
+    "dateTime": "Дата и время",
+    "amount": "Сумма",
+    "amountWithCurrency": "Сумма ({{currency}})",
+    "wallet": "Кошелёк",
+    "category": "Категория",
+    "subcategory": "Подкатегория",
+    "commentOptional": "Комментарий (необязательно)",
+    "sourceWallet": "Кошелёк-источник",
+    "destinationWallet": "Кошелёк-получатель",
+    "rateLabel": "Курс (UZS за 1 USD)",
+    "walletWillReceive": "Получит кошелёк",
+    "cancel": "Отменить",
+    "add": "Добавить",
+    "loadError": "Не удалось загрузить данные",
+    "submitError": "Не удалось сохранить операцию",
+    "successTitle": "Операция добавлена",
+    "goHome": "На главную",
+    "addAnother": "Добавить ещё",
+    "invalidDateTime": "Введите корректную дату и время",
+    "amountTooLong": "Сумма не должна превышать 10 цифр"
+  },
+  "history": {
+    "title": "История операций",
+    "tabMonth": "Месяц",
+    "tabRange": "Диапазон",
+    "dateFrom": "С",
+    "dateTo": "По",
+    "transfer": "Перевод",
+    "exchange": "Обмен валюты",
+    "loadMore": "Показать ещё",
+    "invalidDate": "Введите корректную дату",
+    "invalidRange": "Дата «С» не может быть позже даты «По»",
+    "detailTitle": "Детали операции",
+    "edit": "Редактировать",
+    "delete": "Удалить",
+    "close": "Закрыть",
+    "confirmDelete": "Удалить эту операцию?",
+    "deleteError": "Не удалось удалить операцию",
+    "destinationAmount": "Получено: {{amount}}"
+  },
+  "editIncome": {
+    "title": "Редактирование дохода"
+  },
+  "editExpense": {
+    "title": "Редактирование расхода"
+  },
+  "editTransfer": {
+    "title": "Редактирование перевода"
+  },
+  "editTransaction": {
+    "save": "Сохранить"
+  },
+  "analytics": {
+    "title": "Аналитика",
+    "expensesByCategory": "Расходы по категориям",
+    "incomeByCategory": "Доходы по категориям",
+    "monthlyTrend": "Доход и расход по месяцам",
+    "summaryTitle": "Сводка за месяц",
+    "transferNet": "Переводы (нетто)",
+    "netChange": "Итоговое изменение",
+    "averageDailyExpense": "Средний расход в день",
+    "weekdayExpenses": "Расходы по дням недели",
+    "noData": "Нет данных за выбранный период",
+    "other": "Прочее",
+    "weekdayMon": "Пн",
+    "weekdayTue": "Вт",
+    "weekdayWed": "Ср",
+    "weekdayThu": "Чт",
+    "weekdayFri": "Пт",
+    "weekdaySat": "Сб",
+    "weekdaySun": "Вс",
+    "categoriesTitle": "Расходы по категориям",
+    "backToAnalytics": "← Аналитика",
+    "backToCategories": "← Категории",
+    "compactUnits": {
+      "thousand": "тыс",
+      "million": "млн",
+      "billion": "млрд"
+    }
+  },
+  "defaultEntities": {
+    "card_uzs": "Карта сум",
+    "cash_uzs": "Наличный сум",
+    "card_usd": "Карта USD",
+    "cash_usd": "Наличный USD",
+    "salary": "Зарплата",
+    "side_job": "Подработка",
+    "gifts": "Подарки",
+    "income_other": "Прочее",
+    "food": "Еда",
+    "entertainment": "Развлечения",
+    "transport": "Транспорт",
+    "home": "Дом",
+    "expense_other": "Прочее",
+    "groceries": "Продукты",
+    "lunch": "Обед",
+    "drinks_water": "Вода и напитки",
+    "cafe": "Кафе",
+    "playstation": "Playstation",
+    "cinema": "Кино",
+    "subscriptions": "Подписки",
+    "taxi": "Такси",
+    "fuel": "Топливо",
+    "rent": "Аренда",
+    "utilities": "Коммуналка",
+    "subcategory_other": "Другое"
+  }
+}

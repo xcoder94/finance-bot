@@ -1,0 +1,10 @@
+# Extra safety net for secrets — .gitignore already covers most of this,
+# this file is a hard block specifically for AI access.
+
+.env
+.env.local
+backend/.env
+frontend/.env.local
+**/*.pem
+**/*.key
+frontend/.env.development

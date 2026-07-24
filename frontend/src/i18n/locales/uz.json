@@ -1,0 +1,183 @@
+{
+  "nav": {
+    "home": "Bosh sahifa",
+    "analytics": "Analitika",
+    "history": "Tarix",
+    "settings": "Sozlamalar"
+  },
+  "auth": {
+    "unauthorized": "Autentifikatsiya xatosi",
+    "notOnboarded": "Avval botni ishga tushiring",
+    "removedFromFamily": "Siz oila byudjetidan olib tashlangansiz",
+    "networkError": "Serverga ulanib bo'lmadi",
+    "retry": "Qayta urinish"
+  },
+  "placeholder": {
+    "comingSoon": "Tez orada"
+  },
+  "settings": {
+    "role": "Rol",
+    "roles": {
+      "owner": "Egasi",
+      "member": "A'zo"
+    },
+    "firstName": "Ism",
+    "language": "Til",
+    "wallets": "Hamyonlar",
+    "categoriesIncome": "Daromad kategoriyalari",
+    "categoriesExpense": "Xarajat kategoriyalari",
+    "addWallet": "Hamyon qo'shish",
+    "addCategory": "Kategoriya qo'shish",
+    "addSubcategory": "Pastki kategoriya qo'shish",
+    "delete": "O'chirish",
+    "confirmDelete": "Ushbu elementni o'chirish?",
+    "confirmDeleteParentWithSubcategories": "Kategoriya va {{count}} ta pastki kategoriya o'chiriladi",
+    "nameLabel": "Nomi",
+    "currencyLabel": "Valyuta",
+    "nameRequired": "Nomni kiriting",
+    "nameTooLong": "Nom 50 ta belgidan oshmasligi kerak",
+    "loadError": "Sozlamalarni yuklab bo'lmadi",
+    "submitError": "O'zgarishlarni saqlab bo'lmadi",
+    "members": "Oila a'zolari",
+    "inviteLink": "Taklif havolasi",
+    "copyLink": "Nusxalash",
+    "linkCopied": "Nusxalandi"
+  },
+  "home": {
+    "title": "Mening moliyam",
+    "summary": "Xulosa",
+    "income": "Daromad",
+    "expense": "Xarajat",
+    "balance": "Qoldiq",
+    "quickActions": "Tezkor amallar",
+    "addIncome": "Daromad qo'shish",
+    "addExpense": "Xarajat qo'shish",
+    "addTransfer": "O'tkazma qo'shish",
+    "comingSoon": "Tez orada",
+    "recentTransactions": "So'nggi operatsiyalar",
+    "noTransactions": "Hozircha operatsiyalar yo'q",
+    "transfer": "O'tkazma",
+    "loadError": "Ma'lumotlarni yuklab bo'lmadi",
+    "previousMonth": "Oldingi oy",
+    "nextMonth": "Keyingi oy",
+    "loading": "Yuklanmoqda"
+  },
+  "addIncome": {
+    "title": "Daromad qo'shish"
+  },
+  "addExpense": {
+    "title": "Xarajat qo'shish",
+    "subcategoryCreateError": "Pastki kategoriyani tayyorlab bo'lmadi. Ulanishni tekshirib, qayta urinib ko'ring."
+  },
+  "addTransfer": {
+    "title": "O'tkazma / valyuta almashinuvi"
+  },
+  "addTransaction": {
+    "dateTime": "Sana va vaqt",
+    "amount": "Summa",
+    "amountWithCurrency": "Summa ({{currency}})",
+    "wallet": "Hamyon",
+    "category": "Kategoriya",
+    "subcategory": "Pastki kategoriya",
+    "commentOptional": "Izoh (ixtiyoriy)",
+    "sourceWallet": "Manba hamyon",
+    "destinationWallet": "Qabul qiluvchi hamyon",
+    "rateLabel": "Kurs (1 USD uchun UZS)",
+    "walletWillReceive": "Hamyon oladi",
+    "cancel": "Bekor qilish",
+    "add": "Qo'shish",
+    "loadError": "Ma'lumotlarni yuklab bo'lmadi",
+    "submitError": "Operatsiyani saqlab bo'lmadi",
+    "successTitle": "Operatsiya qo'shildi",
+    "goHome": "Bosh sahifaga",
+    "addAnother": "Yana qo'shish",
+    "invalidDateTime": "To'g'ri sana va vaqtni kiriting",
+    "amountTooLong": "Summa 10 ta raqamdan oshmasligi kerak"
+  },
+  "history": {
+    "title": "Operatsiyalar tarixi",
+    "tabMonth": "Oy",
+    "tabRange": "Oraliq",
+    "dateFrom": "Dan",
+    "dateTo": "Gacha",
+    "transfer": "O'tkazma",
+    "exchange": "Valyuta almashinuvi",
+    "loadMore": "Yana ko'rsatish",
+    "invalidDate": "To'g'ri sanani kiriting",
+    "invalidRange": "«Dan» sanasi «Gacha» sanasidan keyin bo'lishi mumkin emas",
+    "detailTitle": "Operatsiya tafsilotlari",
+    "edit": "Tahrirlash",
+    "delete": "O'chirish",
+    "close": "Yopish",
+    "confirmDelete": "Ushbu operatsiyani o'chirish?",
+    "deleteError": "Operatsiyani o'chirib bo'lmadi",
+    "destinationAmount": "Qabul qilindi: {{amount}}"
+  },
+  "editIncome": {
+    "title": "Daromadni tahrirlash"
+  },
+  "editExpense": {
+    "title": "Xarajatni tahrirlash"
+  },
+  "editTransfer": {
+    "title": "O'tkazmani tahrirlash"
+  },
+  "editTransaction": {
+    "save": "Saqlash"
+  },
+  "analytics": {
+    "title": "Analitika",
+    "expensesByCategory": "Kategoriyalar bo'yicha xarajatlar",
+    "incomeByCategory": "Kategoriyalar bo'yicha daromadlar",
+    "monthlyTrend": "Oylar bo'yicha daromad va xarajat",
+    "summaryTitle": "Oy xulosasi",
+    "transferNet": "O'tkazmalar (netto)",
+    "netChange": "Yakuniy o'zgarish",
+    "averageDailyExpense": "Kunlik o'rtacha xarajat",
+    "weekdayExpenses": "Hafta kunlari bo'yicha xarajatlar",
+    "noData": "Tanlangan davr uchun ma'lumot yo'q",
+    "other": "Boshqalar",
+    "weekdayMon": "Du",
+    "weekdayTue": "Se",
+    "weekdayWed": "Ch",
+    "weekdayThu": "Pa",
+    "weekdayFri": "Ju",
+    "weekdaySat": "Sh",
+    "weekdaySun": "Ya",
+    "categoriesTitle": "Kategoriyalar bo'yicha xarajatlar",
+    "backToAnalytics": "← Analitika",
+    "backToCategories": "← Kategoriyalar",
+    "compactUnits": {
+      "thousand": "ming",
+      "million": "mln",
+      "billion": "mlrd"
+    }
+  },
+  "defaultEntities": {
+    "card_uzs": "So'm kartasi",
+    "cash_uzs": "Naqd so'm",
+    "card_usd": "USD kartasi",
+    "cash_usd": "Naqd USD",
+    "salary": "Ish haqi",
+    "side_job": "Qo'shimcha ish",
+    "gifts": "Sovg'alar",
+    "income_other": "Boshqa daromad",
+    "food": "Ovqat",
+    "entertainment": "Ko'ngilochar",
+    "transport": "Transport",
+    "home": "Uy",
+    "expense_other": "Boshqa xarajat",
+    "groceries": "Oziq-ovqat",
+    "lunch": "Tushlik",
+    "drinks_water": "Suv va ichimliklar",
+    "cafe": "Kafe",
+    "playstation": "Playstation",
+    "cinema": "Kino",
+    "subscriptions": "Obunalar",
+    "taxi": "Taksi",
+    "fuel": "Yoqilg'i",
+    "rent": "Ijara",
+    "utilities": "Kommunal to'lovlar",
+    "subcategory_other": "Boshqa"
+  }
+}

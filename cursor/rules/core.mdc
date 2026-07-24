@@ -1,0 +1,14 @@
+---
+description: Core project context for Family Finance Tracker — always applies
+alwaysApply: true
+---
+
+# Family Finance Tracker — core context
+
+- Telegram bot + Mini App for family finance tracking. Full spec: `docs/PRD.md` — treat it as source of truth. If a request conflicts with it, flag the conflict, don't silently override.
+- Stack: FastAPI + Aiogram (backend), React + Vite + TypeScript + TelegramUI (frontend), PostgreSQL, monorepo (`backend/`, `frontend/`, `shared/`, `docs/`).
+- Task files in `docs/tasks/*.md` define scope and acceptance criteria for each build step. Implement exactly what the current task file specifies — don't scope-creep into later tasks' work.
+- Documentation (`docs/**/*.md`) is written in English. Conversation with the user is in Russian — don't switch this.
+- Never assume a package, API, or library version exists from training data. Verify installed version (`pip show`, `npm list`) or check current docs before using it — especially for `@tma.js/sdk-react` (correct current package; `@telegram-apps/sdk-react` is deprecated, never suggest it).
+- Before creating new files or restructuring existing ones, confirm the location matches the monorepo structure already in place.
+- If a task's acceptance criteria can't be met without a decision not yet made in `docs/PRD.md` or the task file, stop and ask — don't invent a default silently.

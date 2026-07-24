@@ -1,0 +1,15 @@
+---
+description: Backend conventions for FastAPI/Aiogram/PostgreSQL work
+globs: backend/**
+alwaysApply: false
+---
+
+# Backend rules
+
+- FastAPI for the API, Aiogram for the Telegram bot, PostgreSQL as the database.
+- Every API request must pass through Telegram `initData` validation (see `docs/tasks/01-auth-telegram.md`) before touching business logic — no endpoint skips this unless explicitly marked public in its task file.
+- Role logic (Owner vs Member, PRD §3) is enforced server-side on every write — never trust the frontend to hide a button as the only protection.
+- All monetary amounts are integers, no floats, no cents — per PRD §6. This applies to USD too.
+- Two separate category tables (`income_categories`, `expense_categories`), not one shared table with a type discriminator — per PRD §5, already decided.
+- Bot token and DB credentials come from environment variables (`.env`), never hardcoded, never logged.
+- Category/wallet delete logic follows the confirm-with-count pattern from PRD §7 — check for referencing transactions before hard delete.

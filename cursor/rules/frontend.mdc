@@ -1,0 +1,15 @@
+---
+description: Frontend conventions for React/Vite/TelegramUI work
+globs: frontend/**
+alwaysApply: false
+---
+
+# Frontend rules
+
+- React + Vite + TypeScript + TelegramUI. State management: Zustand — no Redux, no Context-as-global-store pattern.
+- Linter: Oxlint, not ESLint. Don't add ESLint config or suggest ESLint rules.
+- Telegram SDK: `@tma.js/sdk-react` only. If you see `@telegram-apps/sdk-react` anywhere (old code, suggestions, docs), flag it as deprecated — don't use it.
+- i18n: `react-i18next` with `ru.json` / `uz.json` dictionaries. UI chrome (labels, buttons) is localized; user-entered data (categories, comments) is never auto-translated — per PRD §9.
+- Transfer's live calculator (amount ↔ rate → result, both directions) must recalculate on every keystroke, not on blur/submit — per PRD §4.4.
+- Analytics screen is lazy-loaded (route-level code splitting) — it's the heaviest part of the bundle, per PRD §10 performance requirement.
+- Match UI to what's already prototyped in `docs/design/` where it exists — don't redesign without flagging it first.
