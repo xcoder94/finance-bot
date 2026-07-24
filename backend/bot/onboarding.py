@@ -10,11 +10,15 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
     Message,
+    ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import MINI_APP_URL
 from app.db import async_session_factory
 from app.models.expense_category import ExpenseCategory
 from app.models.family_budget import FamilyBudget
@@ -118,6 +122,11 @@ MESSAGES: dict[str, dict[str, str]] = {
 
 SUPPORTED_LANGUAGES = frozenset({"ru", "uz"})
 
+OPEN_APP_BUTTON: dict[str, str] = {
+    "ru": "💰 Запустить приложение",
+    "uz": "💰 Ilovani ochish",
+}
+
 
 class OnboardingStates(StatesGroup):
     choosing_language = State()
@@ -145,6 +154,22 @@ def language_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="O'zbekcha", callback_data="lang:uz"),
             ]
         ]
+    )
+
+
+def open_app_keyboard(language: str) -> ReplyKeyboardMarkup:
+    lang = language if language in SUPPORTED_LANGUAGES else "ru"
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text=OPEN_APP_BUTTON[lang],
+                    web_app=WebAppInfo(url=MINI_APP_URL),
+                )
+            ]
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
     )
 
 
@@ -351,7 +376,8 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
     else:
         welcome = t("welcome_member", language)
 
-    await callback.message.edit_text(welcome)
+    await callback.message.answer(welcome, reply_markup=open_app_keyboard(language))
+    await callback.message.delete()
     await state.clear()
     await callback.answer()
 

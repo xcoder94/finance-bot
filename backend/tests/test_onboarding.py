@@ -151,7 +151,7 @@ class TestLanguageCallbackSessionOrdering:
                 async def __aexit__(self, *_args: object) -> None:
                     return None
 
-            message = SimpleNamespace(edit_text=AsyncMock())
+            message = SimpleNamespace(answer=AsyncMock(), delete=AsyncMock())
             callback = SimpleNamespace(
                 from_user=SimpleNamespace(id=123),
                 message=message,
@@ -185,7 +185,11 @@ class TestLanguageCallbackSessionOrdering:
                 await language_callback(callback, state, bot)
 
             bot.get_me.assert_not_awaited()
-            message.edit_text.assert_awaited_once_with(MESSAGES["welcome_owner"]["ru"])
+            message.answer.assert_awaited_once()
+            answer_args, answer_kwargs = message.answer.await_args
+            assert answer_args[0] == MESSAGES["welcome_owner"]["ru"]
+            assert "reply_markup" in answer_kwargs
+            message.delete.assert_awaited_once()
 
         asyncio.run(_run())
 
