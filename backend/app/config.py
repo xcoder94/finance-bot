@@ -15,6 +15,12 @@ MINI_APP_URL = os.environ["MINI_APP_URL"]
 if not MINI_APP_URL:
     raise RuntimeError("MINI_APP_URL environment variable is empty")
 
+PARSER_PROVIDER = os.environ.get("PARSER_PROVIDER") or None
+PARSER_API_KEY = os.environ.get("PARSER_API_KEY") or None
+PARSER_MODEL = os.environ.get("PARSER_MODEL") or None
+DAILY_MODEL_CALL_LIMIT = int(os.environ.get("DAILY_MODEL_CALL_LIMIT", "50"))
+DAILY_UNPARSED_LIMIT = int(os.environ.get("DAILY_UNPARSED_LIMIT", "20"))
+
 
 def asyncpg_dsn() -> str:
     """Convert SQLAlchemy async URL to an asyncpg-compatible DSN."""
