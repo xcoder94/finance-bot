@@ -22,12 +22,6 @@ function normalizePathname(pathname: string): string {
 }
 
 function fallbackPath(pathname: string): string {
-  if (pathname.startsWith('/analytics/categories/')) {
-    return '/analytics/categories'
-  }
-  if (pathname === '/analytics/categories') {
-    return '/analytics'
-  }
   if (pathname.startsWith('/edit-')) {
     return '/history'
   }

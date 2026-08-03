@@ -115,6 +115,8 @@ type PeriodFilterControlsProps = {
   onRangeFromTouched: () => void
   onRangeToTouched: () => void
   rangeOrderInvalid: boolean
+  monthSelectorClassName?: string
+  periodHint?: string
 }
 
 export function PeriodFilterControls({
@@ -131,6 +133,8 @@ export function PeriodFilterControls({
   onRangeFromTouched,
   onRangeToTouched,
   rangeOrderInvalid,
+  monthSelectorClassName = 'home-page__month-selector',
+  periodHint,
 }: PeriodFilterControlsProps) {
   const { t } = useTranslation()
   const [rangeInitialized, setRangeInitialized] = useState(false)
@@ -170,21 +174,26 @@ export function PeriodFilterControls({
       </div>
 
       {periodTab === 'month' ? (
-        <div className="home-page__month-selector">
+        <div className={monthSelectorClassName}>
           <button
             type="button"
-            className="home-month-nav__button"
+            className="home-month-nav__button analytics-page__month-nav"
             aria-label={t('home.previousMonth')}
             onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, -1))}
           >
             ‹
           </button>
-          <Text weight="2" className="home-page__month-label">
-            {formatMonthLabel(selectedMonth)}
-          </Text>
+          <div className="analytics-page__month-label-wrap">
+            <Text weight="2" className="home-page__month-label analytics-page__month-label">
+              {formatMonthLabel(selectedMonth)}
+            </Text>
+            {periodHint ? (
+              <Text className="analytics-page__period-hint">{periodHint}</Text>
+            ) : null}
+          </div>
           <button
             type="button"
-            className="home-month-nav__button"
+            className="home-month-nav__button analytics-page__month-nav"
             aria-label={t('home.nextMonth')}
             onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, 1))}
           >

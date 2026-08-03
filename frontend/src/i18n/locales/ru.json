@@ -160,6 +160,7 @@
     "title": "Аналитика",
     "tabCharts": "Графики",
     "tabHistory": "История",
+    "sharedPeriodHint": "Период общий для обеих вкладок",
     "expensesByCategory": "Расходы по категориям",
     "incomeByCategory": "Доходы по категориям",
     "monthlyTrend": "Доход и расход по месяцам",

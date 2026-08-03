@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react'
-import { SegmentedControl, Text, Title } from '@telegram-apps/telegram-ui'
+import { Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 
 import {
   fetchExpensesByCategory,
@@ -19,7 +18,6 @@ import {
 import { CategoryDonutChart } from '../../components/analytics/CategoryDonutChart'
 import { TrendChart } from '../../components/analytics/TrendChart'
 import { WeekdayBarChart } from '../../components/analytics/WeekdayBarChart'
-import { PeriodFilterControls } from '../../components/PeriodFilterControls'
 import { useAnalyticsContext } from '../../contexts/AnalyticsContext'
 import { useAuthStore } from '../../store/authStore'
 import {
@@ -40,8 +38,6 @@ import { formatShortMonthKey } from '../../utils/periodFilter'
 import { formatCurrency } from '../../utils/formatCurrency'
 import type { PerCurrencySummary } from '../../api/home'
 
-const CURRENCIES = ['UZS', 'USD'] as const
-
 function getSummaryEntry(
   summary: SummaryResponse | null,
   currency: PerCurrencySummary['currency'],
@@ -59,27 +55,13 @@ function getSummaryEntry(
   }
 }
 
-export function AnalyticsMainPage() {
+export function AnalyticsChartsContent() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const familyId = useAuthStore((state) => state.user?.familyBudgetId ?? '')
   const {
-    periodTab,
-    setPeriodTab,
     selectedMonth,
-    setSelectedMonth,
-    rangeFrom,
-    setRangeFrom,
-    rangeTo,
-    setRangeTo,
-    rangeFromTouched,
-    setRangeFromTouched,
-    rangeToTouched,
-    setRangeToTouched,
     currency,
-    setCurrency,
     range,
-    rangeOrderInvalid,
     rangeFetchEnabled,
     fetchKey,
     rangeKey,
@@ -215,10 +197,6 @@ export function AnalyticsMainPage() {
     }))
   }, [summaryData, currency, t])
 
-  const canDrillDown =
-    categoriesFetch.state.status === 'success' &&
-    expensesFetch.state.status === 'success' &&
-    expenseSlices.length > 0
   const expenseDonutLoading =
     categoriesFetch.state.status === 'loading' || expensesFetch.state.status === 'loading'
   const expenseDonutError =
@@ -247,135 +225,98 @@ export function AnalyticsMainPage() {
   }
 
   return (
-    <div className="page-content home-page analytics-page">
-      <Title level="1" weight="2" className="home-page__title">
-        {t('analytics.title')}
-      </Title>
+    <div className="analytics-page__cards">
+      <AnalyticsCard
+        title={t('analytics.expensesByCategory')}
+        loading={expenseDonutLoading}
+        error={expenseDonutError}
+        onRetry={retryExpenseDonut}
+      >
+        <CategoryDonutChart
+          slices={expenseSlices}
+          emptyMessage={t('analytics.noData')}
+        />
+      </AnalyticsCard>
 
-      <PeriodFilterControls
-        periodTab={periodTab}
-        onPeriodTabChange={setPeriodTab}
-        selectedMonth={selectedMonth}
-        onSelectedMonthChange={setSelectedMonth}
-        rangeFrom={rangeFrom}
-        rangeTo={rangeTo}
-        onRangeFromChange={setRangeFrom}
-        onRangeToChange={setRangeTo}
-        rangeFromTouched={rangeFromTouched}
-        rangeToTouched={rangeToTouched}
-        onRangeFromTouched={() => setRangeFromTouched(true)}
-        onRangeToTouched={() => setRangeToTouched(true)}
-        rangeOrderInvalid={rangeOrderInvalid}
-      />
-
-      <div className="segmented-control-wrap home-page__currency-toggle">
-        <SegmentedControl>
-          {CURRENCIES.map((item) => (
-            <SegmentedControl.Item
-              key={item}
-              selected={currency === item}
-              onClick={() => setCurrency(item)}
-            >
-              {item}
-            </SegmentedControl.Item>
-          ))}
-        </SegmentedControl>
-      </div>
-
-      <div className="analytics-page__cards">
+      {showIncomeDonut ? (
         <AnalyticsCard
-          title={t('analytics.expensesByCategory')}
-          loading={expenseDonutLoading}
-          error={expenseDonutError}
-          onRetry={retryExpenseDonut}
-          onClick={canDrillDown ? () => navigate('/analytics/categories') : undefined}
+          title={t('analytics.incomeByCategory')}
+          loading={incomeDonutLoading}
+          error={incomeDonutError}
+          onRetry={retryIncomeDonut}
         >
           <CategoryDonutChart
-            slices={expenseSlices}
+            slices={incomeSlices}
             emptyMessage={t('analytics.noData')}
           />
         </AnalyticsCard>
+      ) : null}
 
-        {showIncomeDonut ? (
-          <AnalyticsCard
-            title={t('analytics.incomeByCategory')}
-            loading={incomeDonutLoading}
-            error={incomeDonutError}
-            onRetry={retryIncomeDonut}
-          >
-            <CategoryDonutChart
-              slices={incomeSlices}
-              emptyMessage={t('analytics.noData')}
-            />
-          </AnalyticsCard>
-        ) : null}
+      <AnalyticsCard
+        title={t('analytics.monthlyTrend')}
+        loading={trendFetch.state.status === 'loading'}
+        error={trendFetch.state.status === 'error'}
+        onRetry={trendFetch.retry}
+      >
+        <TrendChart
+          rows={trendRows}
+          incomeLabel={t('home.income')}
+          expenseLabel={t('home.expense')}
+        />
+      </AnalyticsCard>
 
-        <AnalyticsCard
-          title={t('analytics.monthlyTrend')}
-          loading={trendFetch.state.status === 'loading'}
-          error={trendFetch.state.status === 'error'}
-          onRetry={trendFetch.retry}
-        >
-          <TrendChart
-            rows={trendRows}
-            incomeLabel={t('home.income')}
-            expenseLabel={t('home.expense')}
-          />
-        </AnalyticsCard>
-
-        <AnalyticsCard
-          title={t('analytics.summaryTitle')}
-          loading={summaryFetch.state.status === 'loading'}
-          error={summaryFetch.state.status === 'error'}
-          onRetry={summaryFetch.retry}
-        >
-          <div className="analytics-summary">
-            <div className="home-summary__row">
-              <div className="home-metric-card">
-                <Text className="home-metric-card__label">{t('home.income')}</Text>
-                <MetricValue className="home-metric-card__value home-metric-card__value--income">
-                  {formatCurrency(summaryEntry.income, currency)}
-                </MetricValue>
-              </div>
-              <div className="home-metric-card">
-                <Text className="home-metric-card__label">{t('home.expense')}</Text>
-                <MetricValue className="home-metric-card__value home-metric-card__value--expense">
-                  {formatCurrency(summaryEntry.expense, currency)}
-                </MetricValue>
-              </div>
+      <AnalyticsCard
+        title={t('analytics.summaryTitle')}
+        loading={summaryFetch.state.status === 'loading'}
+        error={summaryFetch.state.status === 'error'}
+        onRetry={summaryFetch.retry}
+      >
+        <div className="analytics-summary">
+          <div className="home-summary__row">
+            <div className="home-metric-card">
+              <Text className="home-metric-card__label">{t('home.income')}</Text>
+              <MetricValue className="home-metric-card__value home-metric-card__value--income">
+                {formatCurrency(summaryEntry.income, currency)}
+              </MetricValue>
             </div>
-            <div className="home-summary__row">
-              <div className="home-metric-card">
-                <Text className="home-metric-card__label">{t('analytics.transferNet')}</Text>
-                <MetricValue className="home-metric-card__value home-metric-card__value--transfer">
-                  {formatCurrency(summaryEntry.transfer_net, currency)}
-                </MetricValue>
-              </div>
-              <div className="home-metric-card">
-                <Text className="home-metric-card__label">{t('analytics.netChange')}</Text>
-                <MetricValue className="home-metric-card__value">
-                  {formatCurrency(summaryEntry.net_change, currency)}
-                </MetricValue>
-              </div>
-            </div>
-            <div className="home-metric-card home-metric-card--wide">
-              <Text className="home-metric-card__label">{t('analytics.averageDailyExpense')}</Text>
+            <div className="home-metric-card">
+              <Text className="home-metric-card__label">{t('home.expense')}</Text>
               <MetricValue className="home-metric-card__value home-metric-card__value--expense">
-                {formatCurrency(summaryEntry.average_daily_expense, currency)}
+                {formatCurrency(summaryEntry.expense, currency)}
               </MetricValue>
             </div>
           </div>
-        </AnalyticsCard>
+          <div className="home-summary__row">
+            <div className="home-metric-card">
+              <Text className="home-metric-card__label">{t('analytics.transferNet')}</Text>
+              <MetricValue className="home-metric-card__value home-metric-card__value--transfer">
+                {formatCurrency(summaryEntry.transfer_net, currency)}
+              </MetricValue>
+            </div>
+            <div className="home-metric-card">
+              <Text className="home-metric-card__label">{t('analytics.netChange')}</Text>
+              <MetricValue className="home-metric-card__value">
+                {formatCurrency(summaryEntry.net_change, currency)}
+              </MetricValue>
+            </div>
+          </div>
+          <div className="home-metric-card home-metric-card--wide">
+            <Text className="home-metric-card__label">{t('analytics.averageDailyExpense')}</Text>
+            <MetricValue className="home-metric-card__value home-metric-card__value--expense">
+              {formatCurrency(summaryEntry.average_daily_expense, currency)}
+            </MetricValue>
+          </div>
+        </div>
+      </AnalyticsCard>
 
-        <AnalyticsCard
-          title={t('analytics.weekdayExpenses')}
-          loading={summaryFetch.state.status === 'loading'}
-          error={summaryFetch.state.status === 'error'}
-          onRetry={summaryFetch.retry}
-        >
-          <WeekdayBarChart rows={weekdayRows} />
-        </AnalyticsCard>
-      </div>
+      <AnalyticsCard
+        title={t('analytics.weekdayExpenses')}
+        loading={summaryFetch.state.status === 'loading'}
+        error={summaryFetch.state.status === 'error'}
+        onRetry={summaryFetch.retry}
+      >
+        <WeekdayBarChart rows={weekdayRows} />
+      </AnalyticsCard>
     </div>
   )
 }

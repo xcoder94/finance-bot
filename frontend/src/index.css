@@ -1078,6 +1078,99 @@ button.home-ops-row:focus-visible {
   padding: 0 16px 16px;
 }
 
+.analytics-page__title {
+  padding: 10px 14px 0;
+}
+
+.analytics-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0 14px 12px;
+}
+
+.analytics-tabs {
+  flex: 1;
+  display: flex;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--chip);
+}
+
+.analytics-tabs__btn {
+  flex: 1;
+  border: none;
+  cursor: pointer;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 9px 6px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hint);
+}
+
+.analytics-tabs__btn--active {
+  background: var(--bg);
+  color: var(--tx);
+}
+
+.analytics-page__period {
+  padding: 0 14px 12px;
+}
+
+.analytics-page__period .history-page__period-tabs {
+  padding: 0 0 12px;
+}
+
+.analytics-page__month-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--sep);
+  border-radius: 10px;
+}
+
+.analytics-page__month-nav {
+  border-radius: 0;
+  background: transparent;
+  color: var(--acc);
+  font-size: 16px;
+  font-weight: 500;
+  width: auto;
+  height: auto;
+  padding: 8px 14px;
+}
+
+.analytics-page__month-label-wrap {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.analytics-page__month-label {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.analytics-page__period-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--hint);
+}
+
+.analytics-page__history-stub {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--hint);
+}
+
 .analytics-page__cards {
   display: flex;
   flex-direction: column;
