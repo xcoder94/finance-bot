@@ -260,6 +260,7 @@ export function HomePage() {
   const balancesLoading = balancesFetch.state.status === 'loading'
   const balancesUnavailable = balancesFetch.state.status === 'error'
   const historyLoading = historyFetch.state.status === 'loading'
+  const historySuccess = historyFetch.state.status === 'success'
 
   const hasCachedContent =
     peekHomeSummary(familyId, year, month) !== null ||
@@ -279,10 +280,11 @@ export function HomePage() {
       ? t('home.roleLineOwner', { count: participantLabel })
       : t('home.roleLineMember', { count: participantLabel })
 
-  const opsCountLabel =
-    totalCount === 0
+  const opsCountLabel = historySuccess
+    ? totalCount === 0
       ? t('home.opsNone')
       : t('home.opsCount', { count: totalCount, monthShort: monthShortLabel(month) })
+    : null
 
   const transferLabels = {
     transfer: t('history.transfer'),
@@ -410,16 +412,18 @@ export function HomePage() {
               {t('home.recentTransactions')}
               <span className="home-recent-header__chevron"> ›</span>
             </button>
-            <div className="home-recent-header__count">{opsCountLabel}</div>
+            {opsCountLabel ? (
+              <div className="home-recent-header__count">{opsCountLabel}</div>
+            ) : null}
           </div>
 
-          {totalCount === 0 ? (
+          {historySuccess && totalCount === 0 ? (
             <div className="home-empty-card">
               <div className="home-empty-card__icon" aria-hidden="true" />
               <div className="home-empty-card__title">{emptyMonthTitle(month)}</div>
               <div className="home-empty-card__hint">{t('home.emptyMonthHint')}</div>
             </div>
-          ) : (
+          ) : historySuccess && totalCount > 0 ? (
             <div className="home-ops-card">
               {historyItems.map((item) => (
                 <div key={item.id} className="home-ops-row">
@@ -440,7 +444,22 @@ export function HomePage() {
                 </div>
               ))}
             </div>
-          )}
+          ) : historyLoading ? (
+            <div className="home-skeleton__ops" aria-hidden="true">
+              <div className="home-skeleton__ops-row">
+                <div className="home-skeleton__line home-skeleton__line--ops-left" />
+                <div className="home-skeleton__line home-skeleton__line--ops-right" />
+              </div>
+              <div className="home-skeleton__ops-row">
+                <div className="home-skeleton__line home-skeleton__line--ops-left" />
+                <div className="home-skeleton__line home-skeleton__line--ops-right" />
+              </div>
+              <div className="home-skeleton__ops-row">
+                <div className="home-skeleton__line home-skeleton__line--ops-left" />
+                <div className="home-skeleton__line home-skeleton__line--ops-right" />
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>
