@@ -84,6 +84,38 @@ async def validate_expense_refs(
         raise HTTPException(status_code=400, detail="Expense category must be a subcategory")
 
 
+async def validate_quick_entry_expense_refs(
+    session: AsyncSession,
+    family_budget_id: uuid.UUID,
+    wallet_id: uuid.UUID,
+    expense_category_id: uuid.UUID | None,
+) -> None:
+    wallet = await get_active_wallet(session, wallet_id, family_budget_id)
+    if wallet is None:
+        raise HTTPException(status_code=404)
+    if expense_category_id is None:
+        return
+    category = await get_active_expense_category(session, expense_category_id, family_budget_id)
+    if category is None:
+        raise HTTPException(status_code=404)
+
+
+async def validate_quick_entry_income_refs(
+    session: AsyncSession,
+    family_budget_id: uuid.UUID,
+    wallet_id: uuid.UUID,
+    income_category_id: uuid.UUID | None,
+) -> None:
+    wallet = await get_active_wallet(session, wallet_id, family_budget_id)
+    if wallet is None:
+        raise HTTPException(status_code=404)
+    if income_category_id is None:
+        return
+    category = await get_active_income_category(session, income_category_id, family_budget_id)
+    if category is None:
+        raise HTTPException(status_code=404)
+
+
 def compute_transfer_amounts(
     from_wallet: Wallet,
     to_wallet: Wallet,
