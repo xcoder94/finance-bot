@@ -96,6 +96,40 @@ export function getHistoryItemSubtitle(
   return `${sourceWallet} → ${destinationWallet}`
 }
 
+export function getHistoryItemMeta(item: HistoryItem, t: TFunction): string {
+  const wallet = getHistoryWalletDisplayName(item, t)
+  const author = item.created_by?.trim() ?? ''
+
+  if (item.type === 'income') {
+    const category =
+      resolveStoredEntityDisplayName(
+        item.income_category_name,
+        item.income_category_translation_key,
+        t,
+      ) ?? '—'
+    return [category, wallet, author].filter(Boolean).join(' · ')
+  }
+
+  if (item.type === 'expense') {
+    const category =
+      resolveStoredEntityDisplayName(
+        item.expense_category_name,
+        item.expense_category_translation_key,
+        t,
+      ) ?? '—'
+    const subcategory =
+      resolveStoredEntityDisplayName(
+        item.expense_subcategory_name,
+        item.expense_subcategory_translation_key,
+        t,
+      ) ?? '—'
+    return [category, subcategory, wallet, author].filter(Boolean).join(' · ')
+  }
+
+  const wallets = getHistoryItemSubtitle(item, t('home.income'), t)
+  return author ? `${wallets} · ${author}` : wallets
+}
+
 export function getHistoryWalletDisplayName(item: HistoryItem, t: TFunction): string {
   return (
     resolveStoredEntityDisplayName(item.wallet_name, item.wallet_translation_key, t) ??

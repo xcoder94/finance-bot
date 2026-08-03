@@ -59,7 +59,7 @@ export class HomeApiError extends Error {
   }
 }
 
-const HISTORY_FAR_PAST = '2020-01-01T00:00:00+00:00'
+const TASHKENT_OFFSET = '+05:00'
 
 async function apiGet<T>(url: string): Promise<T> {
   let response: Response
@@ -82,10 +82,13 @@ async function apiGet<T>(url: string): Promise<T> {
 }
 
 export function monthDateRange(year: number, month: number): { dateFrom: string; dateTo: string } {
-  const dateFrom = new Date(Date.UTC(year, month - 1, 1)).toISOString()
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
-  const dateTo = new Date(Date.UTC(year, month - 1, lastDay, 23, 59, 59, 999)).toISOString()
-  return { dateFrom, dateTo }
+  const monthText = String(month).padStart(2, '0')
+  const lastDay = new Date(year, month, 0).getDate()
+  const lastDayText = String(lastDay).padStart(2, '0')
+  return {
+    dateFrom: `${year}-${monthText}-01T00:00:00.000${TASHKENT_OFFSET}`,
+    dateTo: `${year}-${monthText}-${lastDayText}T23:59:59.999${TASHKENT_OFFSET}`,
+  }
 }
 
 export async function fetchSummary(year: number, month: number): Promise<SummaryResponse> {
@@ -101,10 +104,11 @@ export async function fetchWalletBalances(): Promise<WalletBalancesResponse> {
   return apiGet<WalletBalancesResponse>('/api/v1/analytics/wallet-balances')
 }
 
-export async function fetchRecentHistory(): Promise<HistoryResponse> {
+export async function fetchRecentHistory(year: number, month: number): Promise<HistoryResponse> {
+  const { dateFrom, dateTo } = monthDateRange(year, month)
   const params = new URLSearchParams({
-    date_from: HISTORY_FAR_PAST,
-    date_to: new Date().toISOString(),
+    date_from: dateFrom,
+    date_to: dateTo,
     limit: '3',
     offset: '0',
   })

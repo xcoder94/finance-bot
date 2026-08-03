@@ -97,7 +97,8 @@ async function fetchCached<T>(
 const summaryKey = (familyId: string, year: number, month: number) =>
   `home:${familyId}:summary:${year}-${month}`
 const balancesKey = (familyId: string) => `home:${familyId}:balances`
-const recentHistoryKey = (familyId: string) => `home:${familyId}:recent`
+const recentHistoryKey = (familyId: string, year: number, month: number) =>
+  `home:${familyId}:recent:${year}-${month}`
 const walletsKey = (familyId: string) => `reference:${familyId}:wallets`
 const incomeCategoriesKey = (familyId: string) => `reference:${familyId}:income-categories`
 const expenseCategoriesKey = (familyId: string) => `reference:${familyId}:expense-categories`
@@ -134,16 +135,22 @@ export function getCachedWalletBalances(
   return fetchCached(balancesKey(familyId), HOME_TTL_MS, fetcher, force)
 }
 
-export function peekRecentHistory(familyId: string): HistoryResponse | null {
-  return readFresh(recentHistoryKey(familyId), HOME_TTL_MS)
+export function peekRecentHistory(
+  familyId: string,
+  year: number,
+  month: number,
+): HistoryResponse | null {
+  return readFresh(recentHistoryKey(familyId, year, month), HOME_TTL_MS)
 }
 
 export function getCachedRecentHistory(
   familyId: string,
+  year: number,
+  month: number,
   fetcher: () => Promise<HistoryResponse>,
   force = false,
 ): Promise<HistoryResponse> {
-  return fetchCached(recentHistoryKey(familyId), HOME_TTL_MS, fetcher, force)
+  return fetchCached(recentHistoryKey(familyId, year, month), HOME_TTL_MS, fetcher, force)
 }
 
 export function peekWallets(familyId: string): Wallet[] | null {

@@ -13,6 +13,13 @@ export const MONTH_SHORT = [
   'дек',
 ] as const
 
+export type HomeMonth = {
+  year: number
+  month: number
+}
+
+const TASHKENT_TZ = 'Asia/Tashkent'
+
 export const MONTH_PREPOSITIONAL = [
   'январе',
   'феврале',
@@ -64,4 +71,22 @@ export function formatMonthTitle(year: number, month: number): string {
   )
   const capitalized = longMonth.charAt(0).toUpperCase() + longMonth.slice(1)
   return `${capitalized} ${year}`
+}
+
+export function currentMonthInTashkent(): HomeMonth {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TASHKENT_TZ,
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(new Date())
+
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value),
+    month: Number(parts.find((part) => part.type === 'month')?.value),
+  }
+}
+
+export function shiftHomeMonth(selected: HomeMonth, delta: number): HomeMonth {
+  const date = new Date(selected.year, selected.month - 1 + delta, 1)
+  return { year: date.getFullYear(), month: date.getMonth() + 1 }
 }

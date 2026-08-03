@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, SegmentedControl, Spinner, Text, Title } from '@telegram-apps/telegram-ui'
+import { Button, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -11,7 +11,6 @@ import {
   type SummaryResponse,
   type WalletBalancesResponse,
 } from '../api/home'
-import i18n from '../i18n'
 import { useAuthStore } from '../store/authStore'
 import {
   getCachedHomeSummary,
@@ -22,50 +21,32 @@ import {
   peekWalletBalances,
 } from '../store/dataCacheStore'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
-import { getHistoryItemTitle } from '../utils/getDisplayName'
+import {
+  getHistoryItemMeta,
+  getHistoryItemTitle,
+} from '../utils/getDisplayName'
+import {
+  balanceMonthLabel,
+  currentMonthInTashkent,
+  emptyMonthTitle,
+  formatMonthTitle,
+  monthShortLabel,
+  shiftHomeMonth,
+  type HomeMonth,
+} from '../utils/homeMonth'
 
 const CURRENCIES = ['UZS', 'USD'] as const
 
-type SelectedMonth = {
-  year: number
-  month: number
-}
+const ACTION_ICONS = {
+  income: 'M11 5v12m0-12l-4 4m4-4l4 4',
+  expense: 'M11 17V5m0 12l-4-4m4 4l4-4',
+  transfer: 'M4 8h13l-3-3m3 9H4l3 3',
+} as const
 
 type FetchState<T> =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'success'; data: T }
-
-function currentMonth(): SelectedMonth {
-  const now = new Date()
-  return { year: now.getFullYear(), month: now.getMonth() + 1 }
-}
-
-function shiftMonth(selected: SelectedMonth, delta: number): SelectedMonth {
-  const date = new Date(selected.year, selected.month - 1 + delta, 1)
-  return { year: date.getFullYear(), month: date.getMonth() + 1 }
-}
-
-function getLocale(): string {
-  return i18n.language.startsWith('uz') ? 'uz-UZ' : 'ru-RU'
-}
-
-function formatMonthLabel(selected: SelectedMonth): string {
-  return new Intl.DateTimeFormat(getLocale(), {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(selected.year, selected.month - 1, 1))
-}
-
-function formatTransactionDateTime(isoDate: string): string {
-  const date = new Date(isoDate)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}.${month}.${year} ${hours}:${minutes}`
-}
 
 function getSummaryForCurrency(
   summary: SummaryResponse,
@@ -82,51 +63,43 @@ function getBalanceForCurrency(balances: WalletBalancesResponse, currency: Curre
   return balances.balances.find((row) => row.currency === currency)?.balance ?? 0
 }
 
-function getTransactionTypeLabel(
-  item: HistoryItem,
-  labels: { income: string; expense: string; transfer: string; exchange: string },
-): string {
-  if (item.type === 'income') {
-    return labels.income
-  }
-  if (item.type === 'expense') {
-    return labels.expense
-  }
-  if (item.currency !== item.to_currency) {
-    return labels.exchange
-  }
-  return labels.transfer
+function isTransferLike(item: HistoryItem): boolean {
+  return item.type === 'transfer'
 }
 
-function formatSignedTransactionAmount(item: HistoryItem): string {
+function formatHomeTransactionAmount(item: HistoryItem): string {
   const formatted = formatCurrency(item.amount, item.currency as Currency)
+  if (isTransferLike(item)) {
+    return `↔\u2009${formatted}`
+  }
   if (item.type === 'income') {
     return `+${formatted}`
   }
   if (item.type === 'expense') {
-    return `-${formatted}`
+    return `−${formatted}`
   }
   return formatted
 }
 
-function transactionTitleClass(type: string): string {
+function homeAmountClass(type: string, item: HistoryItem): string {
+  if (isTransferLike(item)) {
+    return 'home-ops-row__amount home-ops-row__amount--neutral'
+  }
   if (type === 'expense') {
-    return 'home-recent-item__title home-recent-item__title--expense'
+    return 'home-ops-row__amount home-ops-row__amount--expense'
   }
   if (type === 'income') {
-    return 'home-recent-item__title home-recent-item__title--income'
+    return 'home-ops-row__amount home-ops-row__amount--income'
   }
-  return 'home-recent-item__title'
+  return 'home-ops-row__amount'
 }
 
-function transactionAmountClass(type: string): string {
-  if (type === 'expense') {
-    return 'home-recent-item__amount home-recent-item__amount--expense'
-  }
-  if (type === 'income') {
-    return 'home-recent-item__amount home-recent-item__amount--income'
-  }
-  return 'home-recent-item__amount'
+function formatTransactionDateShort(isoDate: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Asia/Tashkent',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(isoDate))
 }
 
 function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, initialData: T | null = null) {
@@ -176,32 +149,67 @@ function BlockError({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-type MetricValueProps = {
-  loading: boolean
-  unavailable?: boolean
-  className?: string
-  children: string
+function HomeSkeleton() {
+  return (
+    <div className="home-skeleton" aria-hidden="true">
+      <div className="home-skeleton__figures">
+        <div className="home-skeleton__line home-skeleton__line--label" />
+        <div className="home-skeleton__line home-skeleton__line--hero" />
+        <div className="home-skeleton__divider" />
+        <div className="home-skeleton__stats">
+          <div className="home-skeleton__line home-skeleton__line--stat" />
+          <div className="home-skeleton__line home-skeleton__line--stat" />
+        </div>
+      </div>
+      <div className="home-skeleton__actions">
+        <div className="home-skeleton__action" />
+        <div className="home-skeleton__action" />
+        <div className="home-skeleton__action" />
+      </div>
+      <div className="home-skeleton__ops">
+        <div className="home-skeleton__ops-row">
+          <div className="home-skeleton__line home-skeleton__line--ops-left" />
+          <div className="home-skeleton__line home-skeleton__line--ops-right" />
+        </div>
+        <div className="home-skeleton__ops-row">
+          <div className="home-skeleton__line home-skeleton__line--ops-left" />
+          <div className="home-skeleton__line home-skeleton__line--ops-right" />
+        </div>
+        <div className="home-skeleton__ops-row">
+          <div className="home-skeleton__line home-skeleton__line--ops-left" />
+          <div className="home-skeleton__line home-skeleton__line--ops-right" />
+        </div>
+      </div>
+      <span className="visually-hidden">Loading</span>
+    </div>
+  )
 }
 
-function MetricValue({ loading, unavailable, className, children }: MetricValueProps) {
-  if (loading) {
-    return <Spinner size="s" />
-  }
-  if (unavailable) {
-    return <Text>—</Text>
-  }
+function ActionIcon({ path }: { path: string }) {
   return (
-    <Text className={className} weight="2">
-      {children}
-    </Text>
+    <svg
+      className="home-actions__icon"
+      width="15"
+      height="15"
+      viewBox="0 0 22 22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
   )
 }
 
 export function HomePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const familyId = useAuthStore((state) => state.user?.familyBudgetId ?? '')
-  const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(currentMonth)
+  const user = useAuthStore((state) => state.user)
+  const familyId = user?.familyBudgetId ?? ''
+  const [selectedMonth, setSelectedMonth] = useState<HomeMonth>(currentMonthInTashkent)
   const [primaryCurrency, setPrimaryCurrency] = useState<Currency>('UZS')
 
   const { year, month } = selectedMonth
@@ -225,213 +233,216 @@ export function HomePage() {
   )
   const historyFetch = useFetchBlock(
     useCallback(
-      () => getCachedRecentHistory(familyId, fetchRecentHistory),
-      [familyId],
+      () =>
+        getCachedRecentHistory(familyId, year, month, () => fetchRecentHistory(year, month)),
+      [familyId, year, month],
     ),
-    'mount',
-    peekRecentHistory(familyId),
+    monthKey,
+    peekRecentHistory(familyId, year, month),
   )
 
   const summaryData =
     summaryFetch.state.status === 'success' ? summaryFetch.state.data : null
   const balancesData =
     balancesFetch.state.status === 'success' ? balancesFetch.state.data : null
+  const historyData =
+    historyFetch.state.status === 'success' ? historyFetch.state.data : null
 
   const { income, expense } = summaryData
     ? getSummaryForCurrency(summaryData, primaryCurrency)
     : { income: 0, expense: 0 }
   const balance = balancesData ? getBalanceForCurrency(balancesData, primaryCurrency) : 0
+  const totalCount = historyData?.total_count ?? 0
+  const historyItems = historyData?.items ?? []
 
   const summaryLoading = summaryFetch.state.status === 'loading'
   const summaryUnavailable = summaryFetch.state.status === 'error'
   const balancesLoading = balancesFetch.state.status === 'loading'
   const balancesUnavailable = balancesFetch.state.status === 'error'
-  const showSummaryCard =
-    summaryFetch.state.status === 'success' ||
-    balancesFetch.state.status === 'success' ||
-    summaryFetch.state.status === 'error' ||
-    balancesFetch.state.status === 'error'
+  const historyLoading = historyFetch.state.status === 'loading'
 
-  const typeLabels = {
-    income: t('home.income'),
-    expense: t('home.expense'),
-    transfer: t('history.transfer'),
-    exchange: t('history.exchange'),
-  }
+  const hasCachedContent =
+    peekHomeSummary(familyId, year, month) !== null ||
+    peekWalletBalances(familyId) !== null ||
+    peekRecentHistory(familyId, year, month) !== null
+
+  const showSkeleton =
+    !hasCachedContent &&
+    (summaryLoading || balancesLoading || historyLoading) &&
+    summaryFetch.state.status !== 'error' &&
+    balancesFetch.state.status !== 'error' &&
+    historyFetch.state.status !== 'error'
+
+  const participantLabel = t('home.participant', { count: user?.memberCount ?? 0 })
+  const roleLine =
+    user?.role === 'owner'
+      ? t('home.roleLineOwner', { count: participantLabel })
+      : t('home.roleLineMember', { count: participantLabel })
+
+  const opsCountLabel =
+    totalCount === 0
+      ? t('home.opsNone')
+      : t('home.opsCount', { count: totalCount, monthShort: monthShortLabel(month) })
 
   const transferLabels = {
     transfer: t('history.transfer'),
     exchange: t('history.exchange'),
   }
 
+  const quickActions = [
+    { key: 'income', label: t('home.income'), path: '/add-income', icon: ACTION_ICONS.income },
+    { key: 'expense', label: t('home.expense'), path: '/add-expense', icon: ACTION_ICONS.expense },
+    {
+      key: 'transfer',
+      label: t('home.transfer'),
+      path: '/add-transfer',
+      icon: ACTION_ICONS.transfer,
+    },
+  ] as const
+
   return (
     <div className="page-content home-page">
-      <Title level="1" weight="2" className="home-page__title">
-        {t('home.title')}
-      </Title>
+      <div className="home-header">
+        <div className="home-header__info">
+          <h1 className="home-header__title">{user?.budgetName ?? ''}</h1>
+          <p className="home-header__role">{roleLine}</p>
+        </div>
+        <div className="home-currency-chip" role="group" aria-label={t('home.summary')}>
+          {CURRENCIES.map((currency) => (
+            <button
+              key={currency}
+              type="button"
+              className={
+                primaryCurrency === currency
+                  ? 'home-currency-chip__btn home-currency-chip__btn--active'
+                  : 'home-currency-chip__btn'
+              }
+              onClick={() => setPrimaryCurrency(currency)}
+            >
+              {currency}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <div className="home-page__month-selector">
+      <div className="home-month-bar">
         <button
           type="button"
-          className="home-month-nav__button"
+          className="home-month-bar__nav"
           aria-label={t('home.previousMonth')}
-          onClick={() => setSelectedMonth((current) => shiftMonth(current, -1))}
+          onClick={() => setSelectedMonth((current) => shiftHomeMonth(current, -1))}
         >
           ‹
         </button>
-        <Text weight="2" className="home-page__month-label">
-          {formatMonthLabel(selectedMonth)}
-        </Text>
+        <div className="home-month-bar__label">{formatMonthTitle(year, month)}</div>
         <button
           type="button"
-          className="home-month-nav__button"
+          className="home-month-bar__nav"
           aria-label={t('home.nextMonth')}
-          onClick={() => setSelectedMonth((current) => shiftMonth(current, 1))}
+          onClick={() => setSelectedMonth((current) => shiftHomeMonth(current, 1))}
         >
           ›
         </button>
       </div>
 
-      <div className="segmented-control-wrap home-page__currency-toggle">
-        <SegmentedControl>
-          {CURRENCIES.map((currency) => (
-            <SegmentedControl.Item
-              key={currency}
-              selected={primaryCurrency === currency}
-              onClick={() => setPrimaryCurrency(currency)}
-            >
-              {currency}
-            </SegmentedControl.Item>
-          ))}
-        </SegmentedControl>
-      </div>
+      {showSkeleton ? <HomeSkeleton /> : null}
 
-      <div className="home-summary-section">
-        {summaryFetch.state.status === 'error' ? (
-          <BlockError onRetry={summaryFetch.retry} />
-        ) : null}
+      {!showSkeleton ? (
+        <>
+          {summaryFetch.state.status === 'error' ? (
+            <BlockError onRetry={summaryFetch.retry} />
+          ) : null}
+          {balancesFetch.state.status === 'error' ? (
+            <BlockError onRetry={balancesFetch.retry} />
+          ) : null}
+          {historyFetch.state.status === 'error' ? (
+            <BlockError onRetry={historyFetch.retry} />
+          ) : null}
 
-        {balancesFetch.state.status === 'error' ? (
-          <BlockError onRetry={balancesFetch.retry} />
-        ) : null}
-
-        {showSummaryCard ? (
-          <div className="home-summary">
-            <div className="home-summary__row">
-              <div className="home-metric-card">
-                <Text className="home-metric-card__label">{t('home.income')}</Text>
-                <MetricValue
-                  loading={summaryLoading}
-                  unavailable={summaryUnavailable}
-                  className="home-metric-card__value home-metric-card__value--income"
-                >
-                  {formatCurrency(income, primaryCurrency)}
-                </MetricValue>
+          <div className="home-figures-card">
+            <div className="home-figures-card__label">{balanceMonthLabel(month)}</div>
+            <div className="home-figures-card__balance">
+              {balancesUnavailable || balancesLoading
+                ? '—'
+                : formatCurrency(balance, primaryCurrency)}
+            </div>
+            <div className="home-figures-card__stats">
+              <div className="home-figures-card__stat">
+                <div className="home-figures-card__stat-label">{t('home.income')}</div>
+                <div className="home-figures-card__stat-value home-figures-card__stat-value--income">
+                  {summaryUnavailable || summaryLoading
+                    ? '—'
+                    : formatCurrency(income, primaryCurrency)}
+                </div>
               </div>
-              <div className="home-metric-card">
-                <Text className="home-metric-card__label">{t('home.expense')}</Text>
-                <MetricValue
-                  loading={summaryLoading}
-                  unavailable={summaryUnavailable}
-                  className="home-metric-card__value home-metric-card__value--expense"
-                >
-                  {formatCurrency(expense, primaryCurrency)}
-                </MetricValue>
+              <div className="home-figures-card__stat-divider" aria-hidden="true" />
+              <div className="home-figures-card__stat">
+                <div className="home-figures-card__stat-label">{t('home.expense')}</div>
+                <div className="home-figures-card__stat-value home-figures-card__stat-value--expense">
+                  {summaryUnavailable || summaryLoading
+                    ? '—'
+                    : formatCurrency(expense, primaryCurrency)}
+                </div>
               </div>
             </div>
-            <div className="home-metric-card home-metric-card--wide">
-              <Text className="home-metric-card__label">{t('home.balance')}</Text>
-              <MetricValue
-                loading={balancesLoading}
-                unavailable={balancesUnavailable}
-                className="home-metric-card__value home-metric-card__value--balance"
+          </div>
+
+          <div className="home-actions">
+            {quickActions.map((action) => (
+              <button
+                key={action.key}
+                type="button"
+                className="home-actions__btn"
+                onClick={() => navigate(action.path)}
               >
-                {formatCurrency(balance, primaryCurrency)}
-              </MetricValue>
-            </div>
-          </div>
-        ) : (
-          <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
-            <span className="visually-hidden">{t('home.loading')}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="home-quick-actions">
-        <button
-          type="button"
-          className="home-quick-action"
-          onClick={() => navigate('/add-income')}
-        >
-          <span className="home-quick-action__icon home-quick-action__icon--income">+</span>
-          <span className="home-quick-action__label">{t('home.income')}</span>
-        </button>
-        <button
-          type="button"
-          className="home-quick-action"
-          onClick={() => navigate('/add-expense')}
-        >
-          <span className="home-quick-action__icon home-quick-action__icon--expense">−</span>
-          <span className="home-quick-action__label">{t('home.expense')}</span>
-        </button>
-        <button
-          type="button"
-          className="home-quick-action"
-          onClick={() => navigate('/add-transfer')}
-        >
-          <span className="home-quick-action__icon home-quick-action__icon--transfer">⇄</span>
-          <span className="home-quick-action__label">{t('home.transfer')}</span>
-        </button>
-      </div>
-
-      <div className="home-recent">
-        <Text weight="2" className="home-recent__title">
-          {t('home.recentTransactions')}
-        </Text>
-
-        {historyFetch.state.status === 'loading' ? (
-          <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
-            <span className="visually-hidden">{t('home.loading')}</span>
-          </div>
-        ) : null}
-
-        {historyFetch.state.status === 'error' ? (
-          <BlockError onRetry={historyFetch.retry} />
-        ) : null}
-
-        {historyFetch.state.status === 'success' && historyFetch.state.data.items.length === 0 ? (
-          <div className="home-empty-state">
-            <Text>{t('home.noTransactions')}</Text>
-          </div>
-        ) : null}
-
-        {historyFetch.state.status === 'success' && historyFetch.state.data.items.length > 0 ? (
-          <div className="home-recent__list">
-            {historyFetch.state.data.items.map((item) => (
-              <div key={item.id} className="home-recent-item">
-                <div className="home-recent-item__main">
-                  <Text className={transactionTitleClass(item.type)} weight="2">
-                    {getHistoryItemTitle(item, transferLabels, t)}
-                  </Text>
-                  <Text className="home-recent-item__subtitle">
-                    {getTransactionTypeLabel(item, typeLabels)}
-                  </Text>
-                </div>
-                <div className="home-recent-item__aside">
-                  <Text className={transactionAmountClass(item.type)} weight="2">
-                    {formatSignedTransactionAmount(item)}
-                  </Text>
-                  <Text className="home-recent-item__date">
-                    {formatTransactionDateTime(item.transaction_date)}
-                  </Text>
-                </div>
-              </div>
+                <ActionIcon path={action.icon} />
+                {action.label}
+              </button>
             ))}
           </div>
-        ) : null}
-      </div>
+
+          <div className="home-recent-header">
+            <button
+              type="button"
+              className="home-recent-header__link"
+              onClick={() => navigate('/history')}
+            >
+              {t('home.recentTransactions')}
+              <span className="home-recent-header__chevron"> ›</span>
+            </button>
+            <div className="home-recent-header__count">{opsCountLabel}</div>
+          </div>
+
+          {totalCount === 0 ? (
+            <div className="home-empty-card">
+              <div className="home-empty-card__icon" aria-hidden="true" />
+              <div className="home-empty-card__title">{emptyMonthTitle(month)}</div>
+              <div className="home-empty-card__hint">{t('home.emptyMonthHint')}</div>
+            </div>
+          ) : (
+            <div className="home-ops-card">
+              {historyItems.map((item) => (
+                <div key={item.id} className="home-ops-row">
+                  <div className="home-ops-row__main">
+                    <div className="home-ops-row__title">
+                      {getHistoryItemTitle(item, transferLabels, t)}
+                    </div>
+                    <div className="home-ops-row__meta">{getHistoryItemMeta(item, t)}</div>
+                  </div>
+                  <div className="home-ops-row__aside">
+                    <div className={homeAmountClass(item.type, item)}>
+                      {formatHomeTransactionAmount(item)}
+                    </div>
+                    <div className="home-ops-row__date">
+                      {formatTransactionDateShort(item.transaction_date)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : null}
     </div>
   )
 }
