@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, Message
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +43,12 @@ from app.services.quick_entry_create import (
     create_quick_entry_income,
     resolve_category_id,
 )
+from app.services.quick_entry_transfer import (
+    create_quick_entry_transfer,
+    effective_rate,
+    needs_exchange_refusal,
+    resolve_transfer_wallets,
+)
 from app.services.transactions import get_active_transaction, soft_delete_transaction
 from app.services.quick_entry_dates import resolve_operation_date, strip_date_words
 from app.services.quick_entry_wallets import (
@@ -53,11 +61,15 @@ from bot.quick_entry.cards import (
     card_keyboard,
     format_amount,
     format_card,
+    format_exchange_card,
+    format_transfer_card,
+    transfer_card_keyboard,
     type_question_keyboard,
     wallet_picker_keyboard,
 )
 from bot.quick_entry.pending import consume_pending, create_pending, get_pending
 from bot.quick_entry.texts import (
+    MSG_EXCHANGE_RATE_REQUIRED,
     MSG_GONE,
     MSG_MODEL_FAIL,
     MSG_NO_AMOUNT,
@@ -96,8 +108,13 @@ def _is_ambiguous(op: ParsedOperation) -> bool:
     return op.type == "ambiguous" and op.amount is not None
 
 
+def _is_transfer_op(op: ParsedOperation) -> bool:
+    return op.type in ("transfer", "exchange") and op.amount is not None
+
+
 def _filter_countable(ops: list[ParsedOperation]) -> list[ParsedOperation]:
-    return [op for op in ops if op.type not in ("transfer", "exchange")]
+    known = ("expense", "income", "ambiguous", "transfer", "exchange")
+    return [op for op in ops if op.type in known and op.amount is not None]
 
 
 def _category_label(category: str | None) -> str:
@@ -265,9 +282,11 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
         countable = _filter_countable(response.operations)
         clear_ops = [op for op in countable if _is_clear(op)]
         ambiguous_ops = [op for op in countable if _is_ambiguous(op)]
+        transfer_ops = [op for op in countable if _is_transfer_op(op)]
 
         ambiguous_only = (
             not clear_ops
+            and not transfer_ops
             and bool(ambiguous_ops)
             and len(countable) <= MAX_OPERATIONS
         )
@@ -284,7 +303,7 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
             await message.answer(MSG_TOO_MANY_OPS)
             return
 
-        if not clear_ops and not ambiguous_ops:
+        if not clear_ops and not ambiguous_ops and not transfer_ops:
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
@@ -295,6 +314,99 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
 
         op_date = resolve_operation_date(text)
         txn_datetime = _operation_date_to_datetime(op_date)
+
+        for op in transfer_ops:
+            assert op.amount is not None
+            amount_currency: Literal["UZS", "USD"] = (
+                op.currency or default_wallet.currency  # type: ignore[assignment]
+            )
+            resolved = await resolve_transfer_wallets(
+                session=session,
+                family_budget_id=user.family_budget_id,
+                writer=user,
+                from_hint=op.from_wallet_hint,
+                to_hint=op.to_wallet_hint,
+                amount_currency=amount_currency,
+                default_wallet=default_wallet,
+            )
+            if isinstance(resolved, CurrencyMissing):
+                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                    return
+                spend_unparsed(budget)
+                await session.commit()
+                await message.answer(currency_missing_text(resolved.currency))
+                continue
+
+            rate_val = effective_rate(op, text)
+            if needs_exchange_refusal(
+                from_currency=resolved.from_wallet.currency,  # type: ignore[arg-type]
+                to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
+                rate=rate_val,
+            ):
+                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                    return
+                spend_unparsed(budget)
+                await session.commit()
+                await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
+                continue
+
+            create_rate = Decimal(rate_val) if rate_val is not None else None
+            comment = strip_date_words(op.comment, text)
+            try:
+                txn = await create_quick_entry_transfer(
+                    session,
+                    user,
+                    from_wallet_id=resolved.from_wallet.id,
+                    to_wallet_id=resolved.to_wallet.id,
+                    amount=op.amount,
+                    rate=create_rate,
+                    comment=comment,
+                    transaction_date=txn_datetime,
+                )
+            except HTTPException:
+                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                    return
+                spend_unparsed(budget)
+                await session.commit()
+                await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
+                continue
+
+            from_balance = await wallet_balance(session, resolved.from_wallet.id)
+            to_balance = await wallet_balance(session, resolved.to_wallet.id)
+            if (
+                resolved.from_wallet.currency != resolved.to_wallet.currency
+                and rate_val is not None
+            ):
+                card_text = format_exchange_card(
+                    amount=op.amount,
+                    from_currency=resolved.from_wallet.currency,  # type: ignore[arg-type]
+                    to_amount=txn.to_amount,
+                    to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
+                    rate=rate_val,
+                    op_date=op_date,
+                    from_wallet_name=resolved.from_wallet.name,
+                    to_wallet_name=resolved.to_wallet.name,
+                    from_balance=from_balance,
+                    to_balance=to_balance,
+                )
+            else:
+                card_text = format_transfer_card(
+                    amount=op.amount,
+                    currency=amount_currency,
+                    from_wallet_name=resolved.from_wallet.name,
+                    to_wallet_name=resolved.to_wallet.name,
+                    op_date=op_date,
+                    from_balance=from_balance,
+                    to_balance=to_balance,
+                )
+            await message.answer(
+                card_text,
+                reply_markup=transfer_card_keyboard(txn.id),
+                parse_mode="Markdown",
+            )
 
         for op in clear_ops:
             assert op.amount is not None
