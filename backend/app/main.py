@@ -6,6 +6,7 @@ import asyncpg
 from fastapi import FastAPI
 
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.history import router as history_router
 from app.api.v1.members import init_bot_username, router as members_router
@@ -54,6 +55,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(wallets_router)
 app.include_router(categories_router)

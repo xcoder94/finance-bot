@@ -15,18 +15,20 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.pass_tokens import issue_app_pass
 from app.auth.telegram import (
     AUTH_MAX_AGE_SECONDS,
     InitDataValidationError,
     TelegramUser,
     validate_init_data,
 )
-from app.db import engine
+from app.db import engine, get_session
 from app.main import app
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
 
 BOT_TOKEN = "5768337691:AAH5YkoiEuPk8-FZa32hStHTqXiLPtAEhx8"
+TEST_APP_PASS_SECRET = "test-app-pass-secret-not-for-production"
 TEST_INIT_DATA = (
     'query_id=AAHdF6IQAAAAAN0XohDhrOrc&user={"id":279058397,'
     '"first_name":"Vladislav","last_name":"Kibenko","username":"vdkfrost",'
@@ -133,6 +135,19 @@ def _random_telegram_id() -> int:
     return int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
 
 
+def _bearer_headers(
+    telegram_id: int,
+    *,
+    user_id: uuid.UUID | None = None,
+) -> dict[str, str]:
+    token, _, _ = issue_app_pass(
+        telegram_id=telegram_id,
+        user_id=user_id,
+        secret=TEST_APP_PASS_SECRET,
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest.fixture
 def client() -> TestClient:
     with patch("app.main.verify_postgres_connection", new=AsyncMock()):
@@ -217,21 +232,30 @@ class TestMeEndpointUserLookup:
 
         async with rollback_session() as session:
             session_factory = _AsyncSessionFactoryOverride(session)
-            with patch("app.main.verify_postgres_connection", new=AsyncMock()):
-                with patch("app.auth.telegram.BOT_TOKEN", BOT_TOKEN):
-                    with patch(
-                        "app.api.v1.me.async_session_factory",
-                        session_factory,
-                    ):
-                        transport = ASGITransport(app=app)
-                        async with AsyncClient(
-                            transport=transport, base_url="http://test"
-                        ) as client:
-                            response = await client.get(
-                                "/api/v1/me",
-                                headers={"Authorization": f"tma {init_data}"},
-                            )
 
+            async def override_get_session() -> AsyncIterator[AsyncSession]:
+                yield session
+
+            app.dependency_overrides[get_session] = override_get_session
+            try:
+                with patch("app.main.verify_postgres_connection", new=AsyncMock()):
+                    with patch("app.auth.deps.APP_PASS_SECRET", TEST_APP_PASS_SECRET):
+                        with patch(
+                            "app.api.v1.me.async_session_factory",
+                            session_factory,
+                        ):
+                            transport = ASGITransport(app=app)
+                            async with AsyncClient(
+                                transport=transport, base_url="http://test"
+                            ) as client:
+                                response = await client.get(
+                                    "/api/v1/me",
+                                    headers=_bearer_headers(telegram_id),
+                                )
+            finally:
+                app.dependency_overrides.clear()
+
+        await _reset_engine()
         assert response.status_code == 404
         assert response.json() == {"detail": "not_onboarded"}
 
@@ -272,21 +296,30 @@ class TestMeEndpointUserLookup:
             await session.flush()
 
             session_factory = _AsyncSessionFactoryOverride(session)
-            with patch("app.main.verify_postgres_connection", new=AsyncMock()):
-                with patch("app.auth.telegram.BOT_TOKEN", BOT_TOKEN):
-                    with patch(
-                        "app.api.v1.me.async_session_factory",
-                        session_factory,
-                    ):
-                        transport = ASGITransport(app=app)
-                        async with AsyncClient(
-                            transport=transport, base_url="http://test"
-                        ) as client:
-                            response = await client.get(
-                                "/api/v1/me",
-                                headers={"Authorization": f"tma {init_data}"},
-                            )
 
+            async def override_get_session() -> AsyncIterator[AsyncSession]:
+                yield session
+
+            app.dependency_overrides[get_session] = override_get_session
+            try:
+                with patch("app.main.verify_postgres_connection", new=AsyncMock()):
+                    with patch("app.auth.deps.APP_PASS_SECRET", TEST_APP_PASS_SECRET):
+                        with patch(
+                            "app.api.v1.me.async_session_factory",
+                            session_factory,
+                        ):
+                            transport = ASGITransport(app=app)
+                            async with AsyncClient(
+                                transport=transport, base_url="http://test"
+                            ) as client:
+                                response = await client.get(
+                                    "/api/v1/me",
+                                    headers=_bearer_headers(telegram_id),
+                                )
+            finally:
+                app.dependency_overrides.clear()
+
+        await _reset_engine()
         assert response.status_code == 403
         assert response.json() == {"detail": "removed_from_family"}
 
@@ -326,21 +359,33 @@ class TestMeEndpointUserLookup:
             await session.flush()
 
             session_factory = _AsyncSessionFactoryOverride(session)
-            with patch("app.main.verify_postgres_connection", new=AsyncMock()):
-                with patch("app.auth.telegram.BOT_TOKEN", BOT_TOKEN):
-                    with patch(
-                        "app.api.v1.me.async_session_factory",
-                        session_factory,
-                    ):
-                        transport = ASGITransport(app=app)
-                        async with AsyncClient(
-                            transport=transport, base_url="http://test"
-                        ) as client:
-                            response = await client.get(
-                                "/api/v1/me",
-                                headers={"Authorization": f"tma {init_data}"},
-                            )
 
+            async def override_get_session() -> AsyncIterator[AsyncSession]:
+                yield session
+
+            app.dependency_overrides[get_session] = override_get_session
+            try:
+                with patch("app.main.verify_postgres_connection", new=AsyncMock()):
+                    with patch("app.auth.deps.APP_PASS_SECRET", TEST_APP_PASS_SECRET):
+                        with patch(
+                            "app.api.v1.me.async_session_factory",
+                            session_factory,
+                        ):
+                            transport = ASGITransport(app=app)
+                            async with AsyncClient(
+                                transport=transport, base_url="http://test"
+                            ) as client:
+                                response = await client.get(
+                                    "/api/v1/me",
+                                    headers=_bearer_headers(
+                                        telegram_id,
+                                        user_id=db_user.id,
+                                    ),
+                                )
+            finally:
+                app.dependency_overrides.clear()
+
+        await _reset_engine()
         assert response.status_code == 200
         assert response.json() == {
             "id": str(db_user.id),

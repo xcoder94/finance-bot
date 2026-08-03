@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from app.auth.telegram import TelegramUserDep
+from app.auth.deps import AppPassClaimsDep
 from app.db import async_session_factory
 from app.models.user import User
 from app.schemas.auth import MeResponse
@@ -10,10 +10,11 @@ router = APIRouter(prefix="/api/v1")
 
 
 @router.get("/me")
-async def get_me(user: TelegramUserDep) -> MeResponse:
+async def get_me(claims: AppPassClaimsDep) -> MeResponse:
+    telegram_id = int(claims["sub"])
     async with async_session_factory() as session:
         db_user = await session.scalar(
-            select(User).where(User.telegram_id == user.id)
+            select(User).where(User.telegram_id == telegram_id)
         )
 
     if db_user is None:
