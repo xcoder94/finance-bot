@@ -76,6 +76,8 @@ class PerCurrencySummary(BaseModel):
     transfer_net: int
     net_change: int
     average_daily_expense: int = Field(ge=0)
+    most_expensive_weekday: int | None = None
+    most_expensive_weekday_average: int = Field(default=0, ge=0)
 
 
 class SummaryResponse(BaseModel):

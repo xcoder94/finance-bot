@@ -17,6 +17,7 @@ from tests.test_history_analytics import (
     auth_headers,
     create_user_with_budget,
     pytestmark,
+    seed_fixtures,
 )
 
 SELECTED_MONTH_START = datetime(2026, 3, 1, tzinfo=UTC)
@@ -220,3 +221,168 @@ class TestPersonalWalletExclusion:
         assert resp.status_code == 200
         amounts = {item["amount"] for item in resp.json()["items"]}
         assert PERSONAL_FOOD_UZS in amounts
+
+
+class TestTrendEndMonth:
+    async def test_trend_end_month_anchors_twelve_month_window(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        await seed_phase5_fixtures(session, budget, user)
+
+        now = datetime(2026, 8, 3, tzinfo=UTC)
+        with patch("app.services.history_analytics.datetime") as mock_dt:
+            mock_dt.now.return_value = now
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+            resp = await client.get(
+                "/api/v1/analytics/trend",
+                headers=auth_headers(telegram_id),
+                params={"end_month": "2026-03"},
+            )
+
+        assert resp.status_code == 200
+        months = sorted({e["month"] for e in resp.json()})
+        assert months == [
+            "2025-04",
+            "2025-05",
+            "2025-06",
+            "2025-07",
+            "2025-08",
+            "2025-09",
+            "2025-10",
+            "2025-11",
+            "2025-12",
+            "2026-01",
+            "2026-02",
+            "2026-03",
+        ]
+
+    async def test_trend_end_month_invalid_returns_422(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        await create_user_with_budget(session, telegram_id=telegram_id)
+
+        resp = await client.get(
+            "/api/v1/analytics/trend",
+            headers=auth_headers(telegram_id),
+            params={"end_month": "2026-13"},
+        )
+        assert resp.status_code == 422
+
+
+class TestWeekdayAverages:
+    async def test_expense_weekday_averages_two_mondays(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        fx = await seed_fixtures(session, budget, user)
+        expense_sub = fx["expense_sub_a"]
+        wallet_uzs = fx["wallet_uzs"]
+
+        session.add_all(
+            [
+                Transaction(
+                    family_budget_id=budget.id,
+                    type="expense",
+                    wallet_id=wallet_uzs.id,  # type: ignore[union-attr]
+                    amount=100,
+                    expense_category_id=expense_sub.id,  # type: ignore[union-attr]
+                    created_by_user_id=user.id,
+                    transaction_date=datetime(2026, 3, 2, tzinfo=UTC),
+                ),
+                Transaction(
+                    family_budget_id=budget.id,
+                    type="expense",
+                    wallet_id=wallet_uzs.id,  # type: ignore[union-attr]
+                    amount=300,
+                    expense_category_id=expense_sub.id,  # type: ignore[union-attr]
+                    created_by_user_id=user.id,
+                    transaction_date=datetime(2026, 3, 9, tzinfo=UTC),
+                ),
+            ]
+        )
+        await session.flush()
+
+        resp = await client.get(
+            "/api/v1/analytics/summary",
+            headers=auth_headers(telegram_id),
+            params={
+                "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
+                "date_to": datetime(2026, 3, 14, tzinfo=UTC).isoformat(),
+            },
+        )
+        assert resp.status_code == 200
+        expense_dow = resp.json()["day_of_week_expense"]["UZS"]
+        assert expense_dow[0] == 200
+
+    async def test_most_expensive_weekday_matches_highest_average(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        fx = await seed_fixtures(session, budget, user)
+        expense_sub = fx["expense_sub_a"]
+        wallet_uzs = fx["wallet_uzs"]
+
+        session.add_all(
+            [
+                Transaction(
+                    family_budget_id=budget.id,
+                    type="expense",
+                    wallet_id=wallet_uzs.id,  # type: ignore[union-attr]
+                    amount=100,
+                    expense_category_id=expense_sub.id,  # type: ignore[union-attr]
+                    created_by_user_id=user.id,
+                    transaction_date=datetime(2026, 3, 2, tzinfo=UTC),
+                ),
+                Transaction(
+                    family_budget_id=budget.id,
+                    type="expense",
+                    wallet_id=wallet_uzs.id,  # type: ignore[union-attr]
+                    amount=300,
+                    expense_category_id=expense_sub.id,  # type: ignore[union-attr]
+                    created_by_user_id=user.id,
+                    transaction_date=datetime(2026, 3, 9, tzinfo=UTC),
+                ),
+                Transaction(
+                    family_budget_id=budget.id,
+                    type="expense",
+                    wallet_id=wallet_uzs.id,  # type: ignore[union-attr]
+                    amount=50,
+                    expense_category_id=expense_sub.id,  # type: ignore[union-attr]
+                    created_by_user_id=user.id,
+                    transaction_date=datetime(2026, 3, 4, tzinfo=UTC),
+                ),
+            ]
+        )
+        await session.flush()
+
+        resp = await client.get(
+            "/api/v1/analytics/summary",
+            headers=auth_headers(telegram_id),
+            params={
+                "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
+                "date_to": datetime(2026, 3, 14, tzinfo=UTC).isoformat(),
+            },
+        )
+        assert resp.status_code == 200
+        uzs = next(row for row in resp.json()["by_currency"] if row["currency"] == "UZS")
+        assert uzs["most_expensive_weekday"] == 0
+        assert uzs["most_expensive_weekday_average"] == 200
+
+
+class TestTashkentElapsedDays:
+    def test_elapsed_days_uses_tashkent_today(self) -> None:
+        from app.services.history_analytics import elapsed_days_in_period
+
+        date_from = datetime(2026, 3, 1, tzinfo=UTC)
+        date_to = datetime(2026, 3, 31, tzinfo=UTC)
+        now = datetime(2026, 3, 1, 20, 0, tzinfo=UTC)
+        assert elapsed_days_in_period(date_from, date_to, now) == 2

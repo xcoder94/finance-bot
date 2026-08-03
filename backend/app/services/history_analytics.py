@@ -1,5 +1,6 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy import case, func, literal, select, union_all
@@ -22,6 +23,8 @@ from app.schemas.history_analytics import (
     WalletBalancesResponse,
 )
 from app.services.wallets_categories import get_active_expense_parent
+
+TASHKENT = ZoneInfo("Asia/Tashkent")
 
 
 def default_calendar_year_range(now: datetime | None = None) -> tuple[datetime, datetime]:
@@ -53,8 +56,60 @@ async def should_include_created_by(session: AsyncSession, family_budget_id: uui
     return await count_family_users(session, family_budget_id) >= 2
 
 
+def tashkent_today(now: datetime) -> datetime.date:
+    return now.astimezone(TASHKENT).date()
+
+
+def weekday_occurrence_counts(
+    date_from: datetime, date_to: datetime, now: datetime
+) -> list[int]:
+    start = date_from.date()
+    end = min(date_to.date(), tashkent_today(now))
+    counts = [0, 0, 0, 0, 0, 0, 0]
+    if end < start:
+        return counts
+    current = start
+    while current <= end:
+        counts[current.weekday()] += 1
+        current += timedelta(days=1)
+    return counts
+
+
+def expense_weekday_averages(
+    sums_by_currency: dict[str, list[int]],
+    date_from: datetime,
+    date_to: datetime,
+    now: datetime,
+) -> dict[str, list[int]]:
+    counts = weekday_occurrence_counts(date_from, date_to, now)
+    averages: dict[str, list[int]] = {}
+    for currency, sums in sums_by_currency.items():
+        currency_averages: list[int] = []
+        for total, count in zip(sums, counts, strict=True):
+            if total == 0:
+                currency_averages.append(0)
+            elif count == 0:
+                currency_averages.append(total)
+            else:
+                currency_averages.append(total // count)
+        averages[currency] = currency_averages
+    return averages
+
+
+def most_expensive_weekday(averages: list[int]) -> tuple[int | None, int]:
+    best_index: int | None = None
+    best_value = 0
+    for index, value in enumerate(averages):
+        if value > best_value:
+            best_value = value
+            best_index = index
+    if best_index is None:
+        return None, 0
+    return best_index, best_value
+
+
 def elapsed_days_in_period(date_from: datetime, date_to: datetime, now: datetime) -> int:
-    effective_end = min(date_to.date(), now.date())
+    effective_end = min(date_to.date(), tashkent_today(now))
     if effective_end < date_from.date():
         return 1
     return (effective_end - date_from.date()).days + 1
@@ -348,10 +403,13 @@ async def get_income_by_category(
 async def get_trend(
     session: AsyncSession,
     family_budget_id: uuid.UUID,
-    now: datetime | None = None,
+    end: datetime | None = None,
 ) -> list[TrendEntry]:
-    now = now or datetime.now(UTC)
-    months = last_twelve_months(now)
+    anchor = end or datetime.now(UTC)
+    tashkent_anchor = anchor.astimezone(TASHKENT)
+    months = last_twelve_months(
+        datetime(tashkent_anchor.year, tashkent_anchor.month, 1, tzinfo=UTC)
+    )
     month_keys = [f"{year:04d}-{month:02d}" for year, month in months]
 
     from_wallet = aliased(Wallet)
@@ -498,17 +556,21 @@ async def get_summary(
         }
         for row in total_rows
     }
-    day_of_week_expense: dict[str, list[int]] = {}
+    day_of_week_expense_sums: dict[str, list[int]] = {}
     day_of_week_income: dict[str, list[int]] = {}
 
     for row in weekday_rows:
         buckets = (
             day_of_week_income
             if row.transaction_type == "income"
-            else day_of_week_expense
+            else day_of_week_expense_sums
         )
         dow = ensure_currency_day_buckets(buckets, row.currency)
         dow[int(row.isodow) - 1] = int(row.amount)
+
+    day_of_week_expense = expense_weekday_averages(
+        day_of_week_expense_sums, date_from, date_to, now
+    )
 
     elapsed = elapsed_days_in_period(date_from, date_to, now)
     by_currency: list[PerCurrencySummary] = []
@@ -520,6 +582,8 @@ async def get_summary(
         transfer_net = int(data["transfer_net"])
         net_change = income - expense + transfer_net
         average_daily_expense = expense // elapsed if elapsed > 0 else 0
+        expense_averages = day_of_week_expense.get(currency, [0, 0, 0, 0, 0, 0, 0])
+        expensive_weekday, expensive_average = most_expensive_weekday(expense_averages)
         by_currency.append(
             PerCurrencySummary(
                 currency=currency,
@@ -528,6 +592,8 @@ async def get_summary(
                 transfer_net=transfer_net,
                 net_change=net_change,
                 average_daily_expense=average_daily_expense,
+                most_expensive_weekday=expensive_weekday,
+                most_expensive_weekday_average=expensive_average,
             )
         )
 

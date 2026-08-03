@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.user_deps import CurrentUserDep
@@ -88,8 +88,16 @@ async def income_by_category(
 async def trend(
     user: CurrentUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
+    end_month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
 ) -> list[TrendEntry]:
-    return await get_trend(session, user.family_budget_id)
+    end: datetime | None = None
+    if end_month is not None:
+        year_str, month_str = end_month.split("-")
+        year, month = int(year_str), int(month_str)
+        if month < 1 or month > 12:
+            raise HTTPException(status_code=422, detail="Invalid end_month")
+        end = datetime(year, month, 1, tzinfo=UTC)
+    return await get_trend(session, user.family_budget_id, end=end)
 
 
 @router.get("/summary")
