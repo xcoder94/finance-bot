@@ -26,7 +26,18 @@ member view.
 
 ## When the PRD and the design disagree
 
-STOP AND ASK ME. Do not decide which document wins, do not build both.
+The PRD is the source of MEANING. The design is the source of APPEARANCE.
+
+If the disagreement is only about looks — placement, order, spacing, size,
+the wording on a control, which screen an element sits on — the design
+wins. Follow it and do not ask.
+
+If the design would break product behaviour described in the PRD — a rule,
+a limit, a calculation, who may do what, what happens after an action —
+the PRD wins. Follow it and note the deviation in your report.
+
+Stop and ask me only when both documents describe the same behaviour
+differently, or when neither describes it at all. Never build both variants.
 
 One deviation is already approved and recorded in the PRD: the `Графики`
 tab of Analytics carries a UZS/USD switch that the design does not show
