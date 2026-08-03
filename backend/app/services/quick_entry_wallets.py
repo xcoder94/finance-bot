@@ -18,7 +18,7 @@ class CurrencyMissing:
     currency: Literal["UZS", "USD"]
 
 
-def _wallet_matches_hint(hint: str, wallet_name: str) -> bool:
+def wallet_matches_hint(hint: str, wallet_name: str) -> bool:
     hint_cf = hint.casefold()
     name_cf = wallet_name.casefold()
     if hint_cf in name_cf or name_cf in hint_cf:
@@ -59,7 +59,7 @@ def _pick_wallet_by_hint(
 ) -> Wallet:
     if wallet_hint:
         for wallet in wallets:
-            if _wallet_matches_hint(wallet_hint, wallet.name):
+            if wallet_matches_hint(wallet_hint, wallet.name):
                 return wallet
     return default_wallet
 
