@@ -20,6 +20,10 @@ MSG_MODEL_FAIL = (
 )
 MSG_GONE = "Запись больше не существует."
 MSG_TYPE_QUESTION = "Не понял, это трата или доход?"
+MSG_EXCHANGE_RATE_REQUIRED = (
+    "Перевод между кошельками в разных валютах — это обмен, для него нужен курс.\n"
+    "Сделайте его в приложении."
+)
 
 
 def currency_missing_text(currency: Literal["UZS", "USD"]) -> str:

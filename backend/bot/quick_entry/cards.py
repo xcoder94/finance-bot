@@ -67,6 +67,71 @@ def format_card(
     return "\n".join(lines)
 
 
+def format_transfer_card(
+    *,
+    amount: int,
+    currency: str,
+    from_wallet_name: str,
+    to_wallet_name: str,
+    op_date: date,
+    from_balance: int,
+    to_balance: int,
+) -> str:
+    from_bal = _format_number(from_balance)
+    to_bal = _format_number(to_balance)
+    return "\n".join(
+        [
+            f"↔️ **{format_amount(amount, currency)}** · Перевод",
+            f"{from_wallet_name} → {to_wallet_name} · {_format_date(op_date)}",
+            f"{from_wallet_name}: {from_bal} · {to_wallet_name}: {to_bal}",
+        ]
+    )
+
+
+def format_exchange_card(
+    *,
+    amount: int,
+    from_currency: str,
+    to_amount: int,
+    to_currency: str,
+    rate: int,
+    op_date: date,
+    from_wallet_name: str,
+    to_wallet_name: str,
+    from_balance: int,
+    to_balance: int,
+) -> str:
+    amount_from = format_amount(amount, from_currency)
+    amount_to = format_amount(to_amount, to_currency)
+    return "\n".join(
+        [
+            f"🔄 **{amount_from} → {amount_to}** · Обмен",
+            f"Курс {_format_number(rate)} · {_format_date(op_date)}",
+            (
+                f"{from_wallet_name}: {format_amount(from_balance, from_currency)}"
+                f" · {to_wallet_name}: {format_amount(to_balance, to_currency)}"
+            ),
+        ]
+    )
+
+
+def transfer_card_keyboard(transaction_id: uuid.UUID) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Изменить",
+                    web_app=WebAppInfo(url=f"{MINI_APP_URL}?tx={transaction_id}"),
+                ),
+                InlineKeyboardButton(
+                    text="Удалить",
+                    callback_data=f"qe:del:{transaction_id}",
+                ),
+            ]
+        ]
+    )
+
+
 def card_keyboard(transaction_id: uuid.UUID) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
