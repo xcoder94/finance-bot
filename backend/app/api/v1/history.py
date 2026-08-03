@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Annotated
 
@@ -20,6 +21,7 @@ async def list_transaction_history(
     date_to: datetime,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    expense_category_id: uuid.UUID | None = None,
 ) -> HistoryResponse:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
@@ -32,6 +34,7 @@ async def list_transaction_history(
         limit,
         offset,
         include_created_by,
+        expense_category_id,
     )
     serialized_items = [
         item.model_dump() if include_created_by else item.model_dump(exclude={"created_by"})

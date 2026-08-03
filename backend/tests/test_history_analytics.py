@@ -1056,7 +1056,7 @@ class TestAnalyticsTrendAndSummary:
         with patch("app.services.history_analytics.datetime") as mock_dt:
             mock_dt.now.return_value = now
             mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
-            direct = await get_trend(session, budget.id, now=now)
+            direct = await get_trend(session, budget.id, end=now)
             resp = await client.get(
                 "/api/v1/analytics/trend",
                 headers=auth_headers(telegram_id),
@@ -1229,20 +1229,24 @@ class TestAnalyticsTrendAndSummary:
         )
         await session.flush()
 
-        resp = await client.get(
-            "/api/v1/analytics/summary",
-            headers=auth_headers(telegram_id),
-            params={
-                "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
-                "date_to": datetime(2026, 3, 31, tzinfo=UTC).isoformat(),
-            },
-        )
+        with patch("app.services.history_analytics.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 3, 31, tzinfo=UTC)
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+            resp = await client.get(
+                "/api/v1/analytics/summary",
+                headers=auth_headers(telegram_id),
+                params={
+                    "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
+                    "date_to": datetime(2026, 3, 31, tzinfo=UTC).isoformat(),
+                },
+            )
+
         assert resp.status_code == 200
         body = resp.json()
         expense_dow = body["day_of_week_expense"]["UZS"]
         income_dow = body["day_of_week_income"]["UZS"]
-        assert expense_dow[0] == 100
-        assert expense_dow[2] == 50
+        assert expense_dow[0] == 100 // 5
+        assert expense_dow[2] == 50 // 4
         assert income_dow[0] == 1000
         assert income_dow[2] == 500
 
@@ -1328,8 +1332,11 @@ class TestAnalyticsTrendAndSummary:
         assert by_currency["USD"].income == 75
         assert by_currency["USD"].transfer_net == 8
         assert summary.day_of_week_income["UZS"][0] == 1000
-        assert summary.day_of_week_expense["UZS"][2] == 250
+        assert summary.day_of_week_expense["UZS"][2] == 250 // 4
         assert summary.day_of_week_income["USD"][6] == 75
+        uzs_summary = by_currency["UZS"]
+        assert uzs_summary.most_expensive_weekday == 2
+        assert uzs_summary.most_expensive_weekday_average == 250 // 4
         assert len(statements) == 2
         assert all("group by" in statement for statement in statements)
         assert "union all" in statements[0]

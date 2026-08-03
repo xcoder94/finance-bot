@@ -14,6 +14,19 @@ export function formatCurrency(amount: number, currency: Currency): string {
   return `${sign}${formatted} UZS`
 }
 
+export function formatUsdTrendAxisAmount(value: number): string {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) {
+    return String(value)
+  }
+
+  const sign = numeric < 0 ? '-' : ''
+  const absolute = Math.abs(numeric)
+  const isUzbek = i18n.resolvedLanguage?.startsWith('uz') ?? i18n.language.startsWith('uz')
+  const locale = isUzbek ? 'uz-Latn-UZ' : 'ru-RU'
+  return `${sign}$${absolute.toLocaleString(locale)}`
+}
+
 export function formatCompactAxisAmount(value: number): string {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) {

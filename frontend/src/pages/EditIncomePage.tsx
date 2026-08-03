@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 
 import {
   deleteTransaction,
@@ -36,6 +36,7 @@ import {
 } from '../store/dataCacheStore'
 import { getDisplayName } from '../utils/getDisplayName'
 import { parsePositiveInt } from '../utils/transactionForm'
+import { historyBackTarget } from '../utils/historyBackTarget'
 import {
   buildEditSheetTitle,
   filterUncategorizedCategories,
@@ -53,6 +54,7 @@ type LoadState =
 export function EditIncomePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const familyId = useAuthStore((state) => state.user?.familyBudgetId ?? '')
 
@@ -81,8 +83,8 @@ export function EditIncomePage() {
       navigate(-1)
       return
     }
-    navigate('/history', { replace: true })
-  }, [navigate])
+    navigate(historyBackTarget(location.state) ?? '/history', { replace: true })
+  }, [location.state, navigate])
 
   useNativeBackButtonOverlay(
     !categoryPickerOpen && !walletPickerOpen && !deleteConfirmOpen,

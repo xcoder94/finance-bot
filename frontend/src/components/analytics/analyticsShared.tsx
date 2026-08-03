@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Button, Spinner, Text } from '@telegram-apps/telegram-ui'
+import { Spinner, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
+
+import { BlockError } from '../BlockError'
+
+export { BlockError }
 
 type FetchState<T> =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'success'; data: T }
 
-export function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, enabled: boolean) {
+export function useFetchBlock<T>(
+  fetcher: () => Promise<T>,
+  trigger: unknown,
+  enabled: boolean,
+  keepStaleData = true,
+) {
   const [state, setState] = useState<FetchState<T>>({ status: 'loading' })
   const [retryCount, setRetryCount] = useState(0)
 
@@ -17,7 +26,9 @@ export function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, en
     }
 
     let cancelled = false
-    setState((current) => (current.status === 'success' ? current : { status: 'loading' }))
+    setState((current) =>
+      keepStaleData && current.status === 'success' ? current : { status: 'loading' },
+    )
 
     void fetcher()
       .then((data) => {
@@ -34,26 +45,13 @@ export function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, en
     return () => {
       cancelled = true
     }
-  }, [fetcher, trigger, retryCount, enabled])
+  }, [fetcher, trigger, retryCount, enabled, keepStaleData])
 
   const retry = useCallback(() => {
     setRetryCount((count) => count + 1)
   }, [])
 
   return { state, retry }
-}
-
-export function BlockError({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="home-block-error" role="alert">
-      <Text>{t('home.loadError')}</Text>
-      <Button mode="plain" size="s" onClick={onRetry}>
-        {t('auth.retry')}
-      </Button>
-    </div>
-  )
 }
 
 type AnalyticsCardProps = {

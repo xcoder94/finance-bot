@@ -11,14 +11,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { monthDateRange } from '../api/home'
-import { fetchHistoryPage, fetchSummaryForRange, type HistoryItem, type SummaryResponse } from '../api/history'
+import { fetchHistoryPage, fetchSummaryForRange, type SummaryResponse } from '../api/history'
+import { HistoryTransactionList } from '../components/history/HistoryTransactionList'
 import i18n from '../i18n'
 import { editRouteForItem } from '../utils/editRouteForItem'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
-import {
-  getHistoryItemMeta,
-  getHistoryItemTitle,
-} from '../utils/getDisplayName'
 import {
   extractDigits,
   formatDateDigits,
@@ -27,6 +24,7 @@ import {
   maskedDateToUtcEndIso,
   maskedDateToUtcStartIso,
 } from '../utils/transactionForm'
+import type { HistoryItem } from '../api/history'
 
 const CURRENCIES = ['UZS', 'USD'] as const
 const HISTORY_PAGE_SIZE = 50
@@ -69,45 +67,6 @@ function formatMonthLabel(selected: SelectedMonth): string {
   }).format(new Date(selected.year, selected.month - 1, 1))
 }
 
-function formatTransactionDateShort(isoDate: string): string {
-  return new Intl.DateTimeFormat('ru-RU', {
-    timeZone: 'Asia/Tashkent',
-    day: '2-digit',
-    month: '2-digit',
-  }).format(new Date(isoDate))
-}
-
-function isTransferLike(item: HistoryItem): boolean {
-  return item.type === 'transfer'
-}
-
-function formatHistoryTransactionAmount(item: HistoryItem): string {
-  const formatted = formatCurrency(item.amount, item.currency as Currency)
-  if (isTransferLike(item)) {
-    return `↔\u2009${formatted}`
-  }
-  if (item.type === 'income') {
-    return `+${formatted}`
-  }
-  if (item.type === 'expense') {
-    return `−${formatted}`
-  }
-  return formatted
-}
-
-function historyAmountClass(item: HistoryItem): string {
-  if (isTransferLike(item)) {
-    return 'home-ops-row__amount home-ops-row__amount--neutral'
-  }
-  if (item.type === 'expense') {
-    return 'home-ops-row__amount home-ops-row__amount--expense'
-  }
-  if (item.type === 'income') {
-    return 'home-ops-row__amount home-ops-row__amount--income'
-  }
-  return 'home-ops-row__amount'
-}
-
 function getSummaryForCurrency(
   summary: SummaryResponse,
   currency: Currency,
@@ -117,21 +76,6 @@ function getSummaryForCurrency(
     income: entry?.income ?? 0,
     expense: entry?.expense ?? 0,
   }
-}
-
-const HISTORY_LIST_SKELETON_ROWS = 6
-
-function HistoryListSkeleton() {
-  return (
-    <div className="history-list-skeleton" aria-hidden="true">
-      {Array.from({ length: HISTORY_LIST_SKELETON_ROWS }, (_, index) => (
-        <div key={index} className="history-list-skeleton__row">
-          <div className="history-list-skeleton__line history-list-skeleton__line--left" />
-          <div className="history-list-skeleton__line history-list-skeleton__line--right" />
-        </div>
-      ))}
-    </div>
-  )
 }
 
 function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, enabled: boolean) {
@@ -428,11 +372,6 @@ export function HistoryPage() {
   const showSummaryCard =
     summaryFetch.state.status === 'success' || summaryFetch.state.status === 'error'
 
-  const transferLabels = {
-    transfer: t('history.transfer'),
-    exchange: t('history.exchange'),
-  }
-
   return (
     <div className="page-content home-page history-page">
       <Title level="1" weight="2" className="home-page__title">
@@ -569,68 +508,16 @@ export function HistoryPage() {
       </div>
 
       <div className="history-page__list">
-        {historyStatus === 'loading' ? (
-          <HistoryListSkeleton />
-        ) : null}
-
-        {historyStatus === 'error' ? (
-          <BlockError onRetry={() => setHistoryRetryCount((count) => count + 1)} />
-        ) : null}
-
-        {historyStatus === 'success' && historyItems.length === 0 ? (
-          <div className="home-empty-card">
-            <div className="home-empty-card__icon" aria-hidden="true" />
-            <div className="home-empty-card__title">{t('history.emptyTitle')}</div>
-            <div className="home-empty-card__hint">{t('history.emptyHint')}</div>
-          </div>
-        ) : null}
-
-        {historyStatus === 'success' && historyItems.length > 0 ? (
-          <>
-            <div className="home-ops-card">
-              {historyItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="home-ops-row home-ops-row--clickable"
-                  onClick={() => navigate(editRouteForItem(item))}
-                >
-                  <div className="home-ops-row__main">
-                    <div className="home-ops-row__title">
-                      {getHistoryItemTitle(item, transferLabels, t)}
-                    </div>
-                    <div className="home-ops-row__meta">{getHistoryItemMeta(item, t)}</div>
-                  </div>
-                  <div className="home-ops-row__aside">
-                    <div className={historyAmountClass(item)}>
-                      {formatHistoryTransactionAmount(item)}
-                    </div>
-                    <div className="home-ops-row__date">
-                      {formatTransactionDateShort(item.transaction_date)}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {historyItems.length < historyTotal ? (
-              <div className="history-page__load-more">
-                {loadMoreError ? (
-                  <BlockError onRetry={() => void handleLoadMore()} />
-                ) : null}
-                <Button
-                  mode="bezeled"
-                  size="m"
-                  stretched
-                  loading={loadingMore}
-                  onClick={() => void handleLoadMore()}
-                >
-                  {t('history.loadMore')}
-                </Button>
-              </div>
-            ) : null}
-          </>
-        ) : null}
+        <HistoryTransactionList
+          status={historyStatus}
+          items={historyItems}
+          totalCount={historyTotal}
+          onItemClick={(item) => navigate(editRouteForItem(item))}
+          onRetry={() => setHistoryRetryCount((count) => count + 1)}
+          loadingMore={loadingMore}
+          loadMoreError={loadMoreError}
+          onLoadMore={() => void handleLoadMore()}
+        />
       </div>
     </div>
   )

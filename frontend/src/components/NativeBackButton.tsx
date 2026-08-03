@@ -21,15 +21,9 @@ function normalizePathname(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
 }
 
-function fallbackPath(pathname: string): string {
-  if (pathname.startsWith('/analytics/categories/')) {
-    return '/analytics/categories'
-  }
-  if (pathname === '/analytics/categories') {
-    return '/analytics'
-  }
+function fallbackPath(pathname: string, locationState: unknown): string {
   if (pathname.startsWith('/edit-')) {
-    return '/history'
+    return historyBackTarget(locationState) ?? '/history'
   }
   return '/'
 }
@@ -82,7 +76,7 @@ function NativeBackButtonController({
         return
       }
 
-      navigate(fallbackPath(activePathname), { replace: true })
+      navigate(fallbackPath(activePathname, locationStateRef.current), { replace: true })
     })
 
     return () => {

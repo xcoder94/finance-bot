@@ -1,9 +1,17 @@
 import { createContext, useContext, type ReactNode } from 'react'
 
+import type { HistoryCategoryFilter } from '../utils/analyticsDrill'
+import type { AnalyticsTab, DrillParent } from '../utils/analyticsTabState'
 import type { Currency } from '../utils/formatCurrency'
 import type { PeriodTab, ResolvedRange, SelectedMonth } from '../utils/periodFilter'
 
 export type AnalyticsContextValue = {
+  activeTab: AnalyticsTab
+  setActiveTab: (tab: AnalyticsTab) => void
+  drillParent: DrillParent | null
+  setDrillParent: (parent: DrillParent | null) => void
+  historyCategoryFilter: HistoryCategoryFilter | null
+  setHistoryCategoryFilter: (filter: HistoryCategoryFilter | null) => void
   periodTab: PeriodTab
   setPeriodTab: (tab: PeriodTab) => void
   selectedMonth: SelectedMonth
