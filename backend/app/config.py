@@ -8,6 +8,9 @@ load_dotenv(_REPO_ROOT / ".env")
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+APP_PASS_SECRET = os.environ["APP_PASS_SECRET"]
+if not APP_PASS_SECRET:
+    raise RuntimeError("APP_PASS_SECRET environment variable is empty")
 MINI_APP_URL = os.environ["MINI_APP_URL"]
 if not MINI_APP_URL:
     raise RuntimeError("MINI_APP_URL environment variable is empty")
