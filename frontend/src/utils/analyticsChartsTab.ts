@@ -67,15 +67,19 @@ export function formatAnalyticsAmountDigits(amount: number): string {
 
 import { buildCategoryColorIndexMap } from './chartColors'
 
-export function extendCategoryColorMap(
-  orderedIds: string[],
-  additionalIds: string[],
-): Map<string, number> {
+export function mergeCategoryIds(orderedIds: string[], additionalIds: string[]): string[] {
   const mergedIds = [...orderedIds]
   for (const id of additionalIds) {
     if (!mergedIds.includes(id)) {
       mergedIds.push(id)
     }
   }
-  return buildCategoryColorIndexMap(mergedIds)
+  return mergedIds
+}
+
+export function extendCategoryColorMap(
+  orderedIds: string[],
+  additionalIds: string[],
+): Map<string, number> {
+  return buildCategoryColorIndexMap(mergeCategoryIds(orderedIds, additionalIds))
 }

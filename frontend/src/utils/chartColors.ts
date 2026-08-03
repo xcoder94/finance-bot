@@ -25,6 +25,15 @@ export function getColorByIndex(colorIndex: number): string {
   return CHART_CATEGORY_COLORS[clamped - 1]
 }
 
+export function stableColorIndexFromCategoryId(categoryId: string): number {
+  let hash = 0
+  for (let index = 0; index < categoryId.length; index += 1) {
+    hash = (hash * 31 + categoryId.charCodeAt(index)) >>> 0
+  }
+  return (hash % 8) + 1
+}
+
 export function getCategoryColor(categoryId: string, colorMap: Map<string, number>): string {
-  return getColorByIndex(colorMap.get(categoryId) ?? OTHER_CATEGORY_COLOR_INDEX)
+  const colorIndex = colorMap.get(categoryId) ?? stableColorIndexFromCategoryId(categoryId)
+  return getColorByIndex(colorIndex)
 }

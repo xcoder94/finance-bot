@@ -36,6 +36,7 @@ import {
   formatAnalyticsAmountDigits,
   formatChartsEmptyMonth,
   isChartsTabEmpty,
+  mergeCategoryIds,
 } from '../../utils/analyticsChartsTab'
 import { OTHER_CATEGORY_COLOR_INDEX } from '../../utils/chartColors'
 import { dayWordRu } from '../../utils/dayCountLabel'
@@ -198,10 +199,14 @@ export function AnalyticsChartsTab() {
     if (!categoryMaps || expensesFetch.state.status !== 'success') {
       return []
     }
+    const apiCategoryIds = expensesFetch.state.data
+      .filter((entry) => entry.amount > 0)
+      .map((entry) => entry.category_id)
+    const orderedParentIds = mergeCategoryIds(categoryMaps.expenseParentIds, apiCategoryIds)
     return prepareDonutSlices(
       expensesFetch.state.data,
-      categoryMaps.expenseParentIds,
-      extendCategoryColorMap(categoryMaps.expenseParentIds, []),
+      orderedParentIds,
+      extendCategoryColorMap(categoryMaps.expenseParentIds, apiCategoryIds),
       t('analytics.other'),
       t,
       categoryMaps.expenseDisplayNameById,

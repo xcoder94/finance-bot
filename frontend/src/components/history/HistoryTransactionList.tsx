@@ -2,7 +2,7 @@ import { Button } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
 import type { HistoryItem } from '../../api/history'
-import { BlockError } from '../analytics/analyticsShared'
+import { BlockError } from '../BlockError'
 import {
   formatHistoryTransactionAmount,
   formatTransactionDateShort,

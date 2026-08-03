@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Button, Spinner, Text } from '@telegram-apps/telegram-ui'
+import { Spinner, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
+
+import { BlockError } from '../BlockError'
+
+export { BlockError }
 
 type FetchState<T> =
   | { status: 'loading' }
@@ -48,19 +52,6 @@ export function useFetchBlock<T>(
   }, [])
 
   return { state, retry }
-}
-
-export function BlockError({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="home-block-error" role="alert">
-      <Text>{t('home.loadError')}</Text>
-      <Button mode="plain" size="s" onClick={onRetry}>
-        {t('auth.retry')}
-      </Button>
-    </div>
-  )
 }
 
 type AnalyticsCardProps = {

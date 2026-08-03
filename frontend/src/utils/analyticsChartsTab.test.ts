@@ -3,11 +3,31 @@ import { describe, expect, it } from 'vitest'
 import * as analyticsChartsTabModule from './analyticsChartsTab'
 import {
   elapsedDaysInPeriod,
+  extendCategoryColorMap,
   formatChartsEmptyMonth,
   isChartsTabEmpty,
+  mergeCategoryIds,
 } from './analyticsChartsTab'
 import { assertNoFxConversionUsed } from './noCurrencyConversion'
 import { twelveMonthKeysEndingAt } from './analyticsPeriod'
+
+describe('mergeCategoryIds', () => {
+  it('keeps active order and appends analytics-only ids', () => {
+    expect(mergeCategoryIds(['parent-1', 'parent-2'], ['deleted-parent'])).toEqual([
+      'parent-1',
+      'parent-2',
+      'deleted-parent',
+    ])
+  })
+})
+
+describe('extendCategoryColorMap', () => {
+  it('assigns colors to analytics-only category ids', () => {
+    const colorMap = extendCategoryColorMap(['parent-1'], ['deleted-parent'])
+    expect(colorMap.get('deleted-parent')).toBeGreaterThanOrEqual(1)
+    expect(colorMap.get('deleted-parent')).toBeLessThanOrEqual(8)
+  })
+})
 
 describe('isChartsTabEmpty', () => {
   it('is true when there is no expense total and no slices', () => {
