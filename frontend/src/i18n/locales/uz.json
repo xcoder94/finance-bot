@@ -9,8 +9,9 @@
     "unauthorized": "Autentifikatsiya xatosi",
     "notOnboarded": "Avval botni ishga tushiring",
     "removedFromFamily": "Siz oila byudjetidan olib tashlangansiz",
+    "passFailed": "Не удалось открыть приложение. Закройте его и откройте снова через меню бота.",
     "networkError": "Serverga ulanib bo'lmadi",
-    "retry": "Qayta urinish"
+    "retry": "Попробовать снова"
   },
   "placeholder": {
     "comingSoon": "Tez orada"

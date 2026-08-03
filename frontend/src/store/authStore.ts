@@ -6,6 +6,7 @@ export type AuthErrorType =
   | 'unauthorized'
   | 'not_onboarded'
   | 'removed_from_family'
+  | 'pass_failed'
   | 'network'
   | null
 

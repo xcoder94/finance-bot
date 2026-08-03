@@ -16,11 +16,17 @@ function errorMessageKey(errorType: AuthErrorType): string {
       return 'auth.notOnboarded'
     case 'removed_from_family':
       return 'auth.removedFromFamily'
+    case 'pass_failed':
+      return 'auth.passFailed'
     case 'network':
       return 'auth.networkError'
     default:
       return 'auth.networkError'
   }
+}
+
+function showsRetryButton(errorType: AuthErrorType): boolean {
+  return errorType === 'pass_failed' || errorType === 'network'
 }
 
 export function AuthErrorScreen({ errorType, onRetry }: AuthErrorScreenProps) {
@@ -29,7 +35,7 @@ export function AuthErrorScreen({ errorType, onRetry }: AuthErrorScreenProps) {
   return (
     <div className="auth-screen">
       <Placeholder header={t(errorMessageKey(errorType))} />
-      {errorType === 'network' ? (
+      {showsRetryButton(errorType) ? (
         <Button mode="filled" size="m" onClick={onRetry}>
           {t('auth.retry')}
         </Button>
