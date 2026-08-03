@@ -9,6 +9,16 @@ import { useAuthStore, type AuthErrorType } from '../store/authStore'
 
 type AttemptResult = 'ready' | 'handled_error' | 'retry'
 
+function isNetworkFailure(error: unknown): boolean {
+  if (error instanceof MeRequestError) {
+    return error.errorType === 'network'
+  }
+  if (error instanceof Error && error.message === 'pass_issue_failed') {
+    return false
+  }
+  return true
+}
+
 function handleMeError(
   error: unknown,
   setError: (errorType: Exclude<AuthErrorType, null>) => void,
@@ -35,6 +45,8 @@ export function useAuthBootstrap() {
   const authenticate = useCallback(async () => {
     setLoading()
 
+    let lastWasNetwork = false
+
     const attempt = async (): Promise<AttemptResult> => {
       if (readAppPass()) {
         try {
@@ -44,6 +56,7 @@ export function useAuthBootstrap() {
           return 'ready'
         } catch (error) {
           clearAppPass()
+          lastWasNetwork = isNetworkFailure(error)
           const handled = handleMeError(error, setError)
           if (handled === 'handled_error') {
             return 'handled_error'
@@ -52,6 +65,7 @@ export function useAuthBootstrap() {
       }
 
       if (!rawInitData) {
+        lastWasNetwork = false
         return 'retry'
       }
 
@@ -63,6 +77,7 @@ export function useAuthBootstrap() {
         return 'ready'
       } catch (error) {
         clearAppPass()
+        lastWasNetwork = isNetworkFailure(error)
         return handleMeError(error, setError)
       }
     }
@@ -77,7 +92,7 @@ export function useAuthBootstrap() {
       return
     }
 
-    setError('pass_failed')
+    setError(lastWasNetwork ? 'network' : 'pass_failed')
   }, [rawInitData, setError, setLoading, setReady])
 
   useEffect(() => {
