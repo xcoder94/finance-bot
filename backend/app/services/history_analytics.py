@@ -556,6 +556,7 @@ async def get_wallet_balances(
         .where(
             Transaction.family_budget_id == family_budget_id,
             Transaction.is_deleted.is_(False),
+            from_wallet.is_personal.is_(False),
         )
     )
     destination_ledger = (
@@ -569,6 +570,7 @@ async def get_wallet_balances(
             Transaction.is_deleted.is_(False),
             Transaction.type == "transfer",
             Transaction.to_amount.is_not(None),
+            to_wallet.is_personal.is_(False),
         )
     )
     ledger = union_all(source_ledger, destination_ledger).subquery()
