@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.config import BOT_TOKEN
 
 AUTH_MAX_AGE_SECONDS = 3600
+PASS_ISSUE_MAX_AGE_SECONDS = 86_400
 
 
 class TelegramUser(BaseModel):
