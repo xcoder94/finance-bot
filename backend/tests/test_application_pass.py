@@ -176,6 +176,8 @@ async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
                 "first_name": "AppFirst",
                 "username": "appuser",
                 "language": "uz",
+                "budget_name": "Семейный бюджет",
+                "member_count": 1,
             }
 
             me_tma = await client.get(

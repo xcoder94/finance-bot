@@ -13,3 +13,5 @@ class MeResponse(BaseModel):
     first_name: str | None
     username: str | None
     language: str
+    budget_name: str
+    member_count: int

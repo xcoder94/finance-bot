@@ -381,4 +381,6 @@ class TestMeEndpointUserLookup:
             "first_name": "AppFirst",
             "username": "appuser",
             "language": "uz",
+            "budget_name": "Семейный бюджет",
+            "member_count": 1,
         }
