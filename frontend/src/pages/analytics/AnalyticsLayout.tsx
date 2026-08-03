@@ -1,11 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
 import { PeriodFilterControls } from '../../components/PeriodFilterControls'
 import { AnalyticsProvider } from '../../contexts/AnalyticsContext'
+import {
+  createDefaultAnalyticsShellState,
+  useAnalyticsShellStore,
+} from '../../store/analyticsShellStore'
 import type { HistoryCategoryFilter } from '../../utils/analyticsDrill'
-import type { AnalyticsTab, DrillParent } from '../../utils/analyticsTabState'
+import {
+  switchAnalyticsTab,
+  type AnalyticsShellState,
+  type AnalyticsTab,
+  type DrillParent,
+} from '../../utils/analyticsTabState'
 import {
   currentMonth,
   useResolvedRange,
@@ -18,19 +27,74 @@ import { AnalyticsHistoryTab } from './AnalyticsHistoryTab'
 
 const CURRENCIES = ['UZS', 'USD'] as const
 
+function hydrateShellState(persisted: AnalyticsShellState | null): AnalyticsShellState {
+  if (!persisted) {
+    return createDefaultAnalyticsShellState()
+  }
+  return persisted
+}
+
 export function AnalyticsLayout() {
   const { t } = useTranslation()
-  const [activeTab, setActiveTabState] = useState<AnalyticsTab>('charts')
-  const [drillParent, setDrillParent] = useState<DrillParent | null>(null)
+  const persistedShell = useAnalyticsShellStore((state) => state.shell)
+  const setPersistedShell = useAnalyticsShellStore((state) => state.setShell)
+  const initialShell = useMemo(() => hydrateShellState(persistedShell), [persistedShell])
+
+  const [activeTab, setActiveTabState] = useState<AnalyticsTab>(initialShell.activeTab)
+  const [drillParent, setDrillParent] = useState<DrillParent | null>(initialShell.drillParent)
   const [historyCategoryFilter, setHistoryCategoryFilter] =
-    useState<HistoryCategoryFilter | null>(null)
-  const [periodTab, setPeriodTab] = useState<PeriodTab>('month')
-  const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(currentMonth)
-  const [rangeFrom, setRangeFrom] = useState('')
-  const [rangeTo, setRangeTo] = useState('')
-  const [rangeFromTouched, setRangeFromTouched] = useState(false)
-  const [rangeToTouched, setRangeToTouched] = useState(false)
-  const [currency, setCurrencyState] = useState<Currency>('UZS')
+    useState<HistoryCategoryFilter | null>(initialShell.historyCategoryFilter)
+  const [periodTab, setPeriodTab] = useState<PeriodTab>(initialShell.periodTab)
+  const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(
+    initialShell.selectedMonth ?? currentMonth(),
+  )
+  const [rangeFrom, setRangeFrom] = useState(initialShell.rangeFrom)
+  const [rangeTo, setRangeTo] = useState(initialShell.rangeTo)
+  const [rangeFromTouched, setRangeFromTouched] = useState(initialShell.rangeFromTouched)
+  const [rangeToTouched, setRangeToTouched] = useState(initialShell.rangeToTouched)
+  const [currency, setCurrencyState] = useState<Currency>(initialShell.currency)
+
+  const buildShellState = useCallback(
+    (): AnalyticsShellState => ({
+      activeTab,
+      drillParent,
+      historyCategoryFilter,
+      periodTab,
+      selectedMonth,
+      rangeFrom,
+      rangeTo,
+      rangeFromTouched,
+      rangeToTouched,
+      currency,
+    }),
+    [
+      activeTab,
+      drillParent,
+      historyCategoryFilter,
+      periodTab,
+      selectedMonth,
+      rangeFrom,
+      rangeTo,
+      rangeFromTouched,
+      rangeToTouched,
+      currency,
+    ],
+  )
+
+  useEffect(() => {
+    setPersistedShell(buildShellState())
+  }, [buildShellState, setPersistedShell])
+
+  const setActiveTab = useCallback(
+    (tab: AnalyticsTab) => {
+      const next = switchAnalyticsTab(buildShellState(), tab)
+      setActiveTabState(next.activeTab)
+      setHistoryCategoryFilter(next.historyCategoryFilter)
+    },
+    [buildShellState],
+  )
+
+  const setCurrency = setCurrencyState
 
   const { range, rangeOrderInvalid } = useResolvedRange(
     periodTab,
@@ -41,9 +105,6 @@ export function AnalyticsLayout() {
   const rangeKey = range ? `${range.dateFrom}|${range.dateTo}` : 'invalid'
   const rangeFetchEnabled = range !== null
   const fetchKey = `${rangeKey}|${currency}`
-
-  const setActiveTab = setActiveTabState
-  const setCurrency = setCurrencyState
 
   const contextValue = useMemo(
     () => ({
@@ -75,6 +136,7 @@ export function AnalyticsLayout() {
     }),
     [
       activeTab,
+      setActiveTab,
       drillParent,
       historyCategoryFilter,
       periodTab,

@@ -26,7 +26,7 @@ const baseState: AnalyticsShellState = {
 }
 
 describe('switchAnalyticsTab', () => {
-  it('keeps selected month and range when switching tabs', () => {
+  it('keeps selected month and range when switching to history', () => {
     const next = switchAnalyticsTab(baseState, 'history')
 
     expect(next.activeTab).toBe('history')
@@ -36,6 +36,23 @@ describe('switchAnalyticsTab', () => {
     expect(next.periodTab).toBe(baseState.periodTab)
     expect(next.drillParent).toEqual(baseState.drillParent)
     expect(next.historyCategoryFilter).toEqual(baseState.historyCategoryFilter)
+  })
+
+  it('clears history filter when switching to charts', () => {
+    const historyState: AnalyticsShellState = {
+      ...baseState,
+      activeTab: 'history',
+    }
+
+    const next = switchAnalyticsTab(historyState, 'charts')
+
+    expect(next.activeTab).toBe('charts')
+    expect(next.historyCategoryFilter).toBeNull()
+    expect(next.drillParent).toEqual(baseState.drillParent)
+    expect(next.selectedMonth).toEqual(baseState.selectedMonth)
+    expect(next.rangeFrom).toBe(baseState.rangeFrom)
+    expect(next.rangeTo).toBe(baseState.rangeTo)
+    expect(next.periodTab).toBe(baseState.periodTab)
   })
 })
 

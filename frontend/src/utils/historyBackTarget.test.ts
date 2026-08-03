@@ -7,10 +7,13 @@ describe('historyBackTarget', () => {
     expect(historyBackTarget({ from: 'home' })).toBe('/')
   })
 
-  it('returns null without home origin state', () => {
+  it('returns analytics when opened from analytics', () => {
+    expect(historyBackTarget({ from: 'analytics' })).toBe('/analytics')
+  })
+
+  it('returns null without known origin state', () => {
     expect(historyBackTarget(null)).toBeNull()
     expect(historyBackTarget(undefined)).toBeNull()
     expect(historyBackTarget({})).toBeNull()
-    expect(historyBackTarget({ from: 'analytics' })).toBeNull()
   })
 })

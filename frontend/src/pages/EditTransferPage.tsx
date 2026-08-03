@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 
 import {
   deleteTransaction,
@@ -32,6 +32,7 @@ import {
   invalidateTransactionData,
 } from '../store/dataCacheStore'
 import { getDisplayName } from '../utils/getDisplayName'
+import { historyBackTarget } from '../utils/historyBackTarget'
 import type { TFunction } from 'i18next'
 import { computeTransferToAmount, parsePositiveInt } from '../utils/transactionForm'
 import {
@@ -64,6 +65,7 @@ function buildTransferSubtitle(
 export function EditTransferPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const familyId = useAuthStore((state) => state.user?.familyBudgetId ?? '')
 
@@ -93,8 +95,8 @@ export function EditTransferPage() {
       navigate(-1)
       return
     }
-    navigate('/history', { replace: true })
-  }, [navigate])
+    navigate(historyBackTarget(location.state) ?? '/history', { replace: true })
+  }, [location.state, navigate])
 
   useNativeBackButtonOverlay(
     !sourcePickerOpen && !destPickerOpen && !deleteConfirmOpen,

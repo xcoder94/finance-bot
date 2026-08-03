@@ -26,6 +26,14 @@ export function switchAnalyticsTab(
   state: AnalyticsShellState,
   tab: AnalyticsTab,
 ): AnalyticsShellState {
+  if (tab === 'charts' && state.historyCategoryFilter !== null) {
+    return {
+      ...state,
+      activeTab: 'charts',
+      historyCategoryFilter: null,
+    }
+  }
+
   return {
     ...state,
     activeTab: tab,
