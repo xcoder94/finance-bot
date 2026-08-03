@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.pass_tokens import issue_app_pass
 from app.auth.telegram import (
     AUTH_MAX_AGE_SECONDS,
     InitDataValidationError,
@@ -26,9 +25,9 @@ from app.db import engine, get_session
 from app.main import app
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
+from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
 
 BOT_TOKEN = "5768337691:AAH5YkoiEuPk8-FZa32hStHTqXiLPtAEhx8"
-TEST_APP_PASS_SECRET = "test-app-pass-secret-not-for-production"
 TEST_INIT_DATA = (
     'query_id=AAHdF6IQAAAAAN0XohDhrOrc&user={"id":279058397,'
     '"first_name":"Vladislav","last_name":"Kibenko","username":"vdkfrost",'
@@ -135,19 +134,6 @@ def _random_telegram_id() -> int:
     return int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
 
 
-def _bearer_headers(
-    telegram_id: int,
-    *,
-    user_id: uuid.UUID | None = None,
-) -> dict[str, str]:
-    token, _, _ = issue_app_pass(
-        telegram_id=telegram_id,
-        user_id=user_id,
-        secret=TEST_APP_PASS_SECRET,
-    )
-    return {"Authorization": f"Bearer {token}"}
-
-
 @pytest.fixture
 def client() -> TestClient:
     with patch("app.main.verify_postgres_connection", new=AsyncMock()):
@@ -250,7 +236,7 @@ class TestMeEndpointUserLookup:
                             ) as client:
                                 response = await client.get(
                                     "/api/v1/me",
-                                    headers=_bearer_headers(telegram_id),
+                                    headers=bearer_header_for_telegram_id(telegram_id),
                                 )
             finally:
                 app.dependency_overrides.clear()
@@ -314,7 +300,7 @@ class TestMeEndpointUserLookup:
                             ) as client:
                                 response = await client.get(
                                     "/api/v1/me",
-                                    headers=_bearer_headers(telegram_id),
+                                    headers=bearer_header_for_telegram_id(telegram_id),
                                 )
             finally:
                 app.dependency_overrides.clear()
@@ -377,7 +363,7 @@ class TestMeEndpointUserLookup:
                             ) as client:
                                 response = await client.get(
                                     "/api/v1/me",
-                                    headers=_bearer_headers(
+                                    headers=bearer_header_for_telegram_id(
                                         telegram_id,
                                         user_id=db_user.id,
                                     ),

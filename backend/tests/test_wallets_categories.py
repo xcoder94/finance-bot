@@ -1,6 +1,4 @@
-import json
 import socket
-import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -12,7 +10,6 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.telegram import sign_init_data
 from app.db import engine, get_session
 from app.main import app
 from app.models.expense_category import ExpenseCategory
@@ -21,8 +18,7 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
-
-BOT_TOKEN = "5768337691:AAH5YkoiEuPk8-FZa32hStHTqXiLPtAEhx8"
+from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
 
 
 def _db_available() -> bool:
@@ -54,18 +50,6 @@ async def rollback_session() -> AsyncIterator[AsyncSession]:
             await session.close()
 
 
-def build_init_data(telegram_id: int) -> str:
-    user_json = json.dumps(
-        {"id": telegram_id, "first_name": "Test", "username": "testuser"},
-        separators=(",", ":"),
-    )
-    fields = {
-        "user": user_json,
-        "auth_date": str(int(time.time())),
-    }
-    return sign_init_data(fields, BOT_TOKEN)
-
-
 async def create_user_with_budget(
     session: AsyncSession,
     *,
@@ -87,7 +71,7 @@ async def create_user_with_budget(
 
 
 def auth_headers(telegram_id: int) -> dict[str, str]:
-    return {"Authorization": f"tma {build_init_data(telegram_id)}"}
+    return bearer_header_for_telegram_id(telegram_id)
 
 
 @pytest.fixture
@@ -107,7 +91,7 @@ async def api_client() -> AsyncIterator[tuple[AsyncClient, AsyncSession]]:
     app.dependency_overrides[get_session] = override_get_session
 
     with patch("app.main.verify_postgres_connection", new=AsyncMock()):
-        with patch("app.auth.telegram.BOT_TOKEN", BOT_TOKEN):
+        with patch("app.auth.deps.APP_PASS_SECRET", TEST_APP_PASS_SECRET):
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 yield client, session
@@ -594,7 +578,7 @@ class TestListingQueryCounts:
                 select_statements.clear()
                 response = await client.get(path, headers=auth_headers(telegram_id))
                 assert response.status_code == 200
-                assert len(select_statements) == 2
+                assert len(select_statements) == 3
                 assert all(set(item) == expected_keys for item in response.json())
         finally:
             event.remove(engine.sync_engine, "before_cursor_execute", record_select)

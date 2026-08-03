@@ -1,6 +1,4 @@
-import json
 import socket
-import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -11,7 +9,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.telegram import sign_init_data
 from app.db import engine, get_session
 from app.main import app
 from app.models.family_budget import FamilyBudget
@@ -20,8 +17,8 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.invite import build_invite_link
 from bot.onboarding import get_family_budget_by_invite_token
+from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
 
-BOT_TOKEN = "5768337691:AAH5YkoiEuPk8-FZa32hStHTqXiLPtAEhx8"
 TEST_BOT_USERNAME = "finance_test_bot"
 
 
@@ -52,22 +49,6 @@ async def rollback_session() -> AsyncIterator[AsyncSession]:
         finally:
             await trans.rollback()
             await session.close()
-
-
-def build_init_data(telegram_id: int) -> str:
-    user_json = json.dumps(
-        {"id": telegram_id, "first_name": "Test", "username": "testuser"},
-        separators=(",", ":"),
-    )
-    fields = {
-        "user": user_json,
-        "auth_date": str(int(time.time())),
-    }
-    return sign_init_data(fields, BOT_TOKEN)
-
-
-def auth_headers(telegram_id: int) -> dict[str, str]:
-    return {"Authorization": f"tma {build_init_data(telegram_id)}"}
 
 
 async def create_user_with_budget(
@@ -101,6 +82,10 @@ async def create_user_with_budget(
     return user, budget
 
 
+def auth_headers(telegram_id: int) -> dict[str, str]:
+    return bearer_header_for_telegram_id(telegram_id)
+
+
 @pytest.fixture
 async def api_client() -> AsyncIterator[tuple[AsyncClient, AsyncSession]]:
     await _reset_engine()
@@ -118,7 +103,7 @@ async def api_client() -> AsyncIterator[tuple[AsyncClient, AsyncSession]]:
     app.dependency_overrides[get_session] = override_get_session
 
     with patch("app.main.verify_postgres_connection", new=AsyncMock()):
-        with patch("app.auth.telegram.BOT_TOKEN", BOT_TOKEN):
+        with patch("app.auth.deps.APP_PASS_SECRET", TEST_APP_PASS_SECRET):
             with patch(
                 "app.api.v1.members.get_bot_username",
                 new=AsyncMock(return_value=TEST_BOT_USERNAME),
