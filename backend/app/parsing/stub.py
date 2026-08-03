@@ -12,7 +12,82 @@ _DEFAULT_RESPONSES: dict[str, ParseResponse] = {
                 comment=None,
             )
         ]
-    )
+    ),
+    "переложил 500 тысяч с карты на наличные": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="transfer",
+                amount=500_000,
+                currency="UZS",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+                from_wallet_hint="карта",
+                to_wallet_hint="наличные",
+                rate=None,
+            )
+        ]
+    ),
+    "поменял 100 долларов на сумы по 12800": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="exchange",
+                amount=100,
+                currency="USD",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+                from_wallet_hint="Карта USD",
+                to_wallet_hint="Карта сум",
+                rate=12_800,
+            )
+        ]
+    ),
+    "перевел с карты доллара на карту сум 50$": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="exchange",
+                amount=50,
+                currency="USD",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+                from_wallet_hint="карта доллара",
+                to_wallet_hint="карта сум",
+                rate=None,
+            )
+        ]
+    ),
+    "dollar kartasidan so'm kartasiga 50$ o'tkazdim": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="exchange",
+                amount=50,
+                currency="USD",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+                from_wallet_hint="Карта USD",
+                to_wallet_hint="Карта сум",
+                rate=None,
+            )
+        ]
+    ),
+    "поменял 100 долларов на сумы 12800": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="exchange",
+                amount=100,
+                currency="USD",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+                from_wallet_hint="Карта USD",
+                to_wallet_hint="Карта сум",
+                rate=None,
+            )
+        ]
+    ),
 }
 
 
