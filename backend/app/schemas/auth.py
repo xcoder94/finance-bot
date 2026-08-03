@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -16,3 +17,10 @@ class MeResponse(BaseModel):
     budget_name: str
     member_count: int
     default_wallet_id: uuid.UUID | None
+
+
+class MeUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    default_wallet_id: uuid.UUID | None = None
+    language: Literal["ru", "uz"] | None = None

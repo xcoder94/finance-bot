@@ -7,7 +7,14 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.onboarding import (
+    SEED_EXPENSE_CATEGORIES,
+    SEED_INCOME_CATEGORIES,
+    copy_seed_data,
+    count_seed_rows,
+)
 from app.models.expense_category import ExpenseCategory
+from app.models.family_budget import FamilyBudget
 from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
@@ -401,3 +408,210 @@ async def test_soft_deleted_category_keeps_color_in_analytics(
     row = response.json()[0]
     assert row["category_name"] == "Зарплата"
     assert row["color_index"] == 5
+
+
+async def test_wallet_list_includes_is_personal(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    shared = Wallet(
+        family_budget_id=budget.id,
+        name="Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    personal = Wallet(
+        family_budget_id=budget.id,
+        name="Personal",
+        currency="USD",
+        is_personal=True,
+    )
+    session.add_all([shared, personal])
+    await session.flush()
+
+    response = await client.get("/api/v1/wallets", headers=headers)
+    assert response.status_code == 200
+    wallets = {w["id"]: w for w in response.json()}
+    assert set(wallets[str(shared.id)]) >= {
+        "id",
+        "name",
+        "currency",
+        "translation_key",
+        "transaction_count",
+        "is_personal",
+    }
+    assert wallets[str(shared.id)]["is_personal"] is False
+    assert wallets[str(personal.id)]["is_personal"] is True
+
+
+async def test_patch_me_default_wallet(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    wallet = Wallet(
+        family_budget_id=budget.id,
+        name="Cash",
+        currency="UZS",
+        is_personal=False,
+    )
+    session.add(wallet)
+    await session.flush()
+
+    patch_resp = await client.patch(
+        "/api/v1/me",
+        headers=headers,
+        json={"default_wallet_id": str(wallet.id)},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["default_wallet_id"] == str(wallet.id)
+
+    me_resp = await client.get("/api/v1/me", headers=headers)
+    assert me_resp.status_code == 200
+    assert me_resp.json()["default_wallet_id"] == str(wallet.id)
+
+
+async def test_patch_me_language_persists(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    patch_resp = await client.patch(
+        "/api/v1/me",
+        headers=headers,
+        json={"language": "uz"},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["language"] == "uz"
+
+    me_resp = await client.get("/api/v1/me", headers=headers)
+    assert me_resp.status_code == 200
+    assert me_resp.json()["language"] == "uz"
+
+
+async def test_patch_me_rejects_foreign_wallet(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    other_budget = FamilyBudget(invite_token=f"other-{uuid.uuid4()}")
+    session.add(other_budget)
+    await session.flush()
+    foreign_wallet = Wallet(
+        family_budget_id=other_budget.id,
+        name="Foreign",
+        currency="UZS",
+    )
+    session.add(foreign_wallet)
+    await session.flush()
+
+    response = await client.patch(
+        "/api/v1/me",
+        headers=headers,
+        json={"default_wallet_id": str(foreign_wallet.id)},
+    )
+    assert response.status_code == 404
+
+
+async def test_patch_me_rejects_deleted_wallet(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    deleted_wallet = Wallet(
+        family_budget_id=budget.id,
+        name="Gone",
+        currency="UZS",
+        is_deleted=True,
+        deleted_at=datetime.now(UTC),
+    )
+    session.add(deleted_wallet)
+    await session.flush()
+
+    response = await client.patch(
+        "/api/v1/me",
+        headers=headers,
+        json={"default_wallet_id": str(deleted_wallet.id)},
+    )
+    assert response.status_code == 404
+
+
+async def test_seed_category_names_unchanged_by_colour_migration(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    _client, session = api_client
+    budget = FamilyBudget(invite_token=f"pre-mvp2-{uuid.uuid4()}")
+    session.add(budget)
+    await session.flush()
+    await copy_seed_data(session, budget.id)
+
+    counts = await count_seed_rows(session, budget.id)
+    assert counts["income_categories"] == len(SEED_INCOME_CATEGORIES)
+    assert counts["expense_top_level"] == len(SEED_EXPENSE_CATEGORIES)
+    expected_sub_count = sum(
+        len(subs) for _, subs in SEED_EXPENSE_CATEGORIES.values()
+    )
+    assert counts["expense_subcategories"] == expected_sub_count
+
+    income_names = set(
+        (
+            await session.scalars(
+                select(IncomeCategory.name).where(
+                    IncomeCategory.family_budget_id == budget.id,
+                    IncomeCategory.is_deleted.is_(False),
+                )
+            )
+        ).all()
+    )
+    assert income_names == {name for name, _ in SEED_INCOME_CATEGORIES}
+
+    parent_names = set(
+        (
+            await session.scalars(
+                select(ExpenseCategory.name).where(
+                    ExpenseCategory.family_budget_id == budget.id,
+                    ExpenseCategory.parent_id.is_(None),
+                    ExpenseCategory.is_deleted.is_(False),
+                )
+            )
+        ).all()
+    )
+    assert parent_names == set(SEED_EXPENSE_CATEGORIES.keys())
+
+    for parent_name, (_, sub_entries) in SEED_EXPENSE_CATEGORIES.items():
+        parent = await session.scalar(
+            select(ExpenseCategory).where(
+                ExpenseCategory.family_budget_id == budget.id,
+                ExpenseCategory.name == parent_name,
+                ExpenseCategory.parent_id.is_(None),
+            )
+        )
+        assert parent is not None
+        sub_names = set(
+            (
+                await session.scalars(
+                    select(ExpenseCategory.name).where(
+                        ExpenseCategory.family_budget_id == budget.id,
+                        ExpenseCategory.parent_id == parent.id,
+                        ExpenseCategory.is_deleted.is_(False),
+                    )
+                )
+            ).all()
+        )
+        assert sub_names == {name for name, _ in sub_entries}

@@ -73,6 +73,7 @@ async def list_wallets(
             name=wallet.name,
             currency=wallet.currency,
             translation_key=wallet.translation_key,
+            is_personal=wallet.is_personal,
             transaction_count=int(transaction_count),
         )
         for wallet, transaction_count in rows
@@ -110,6 +111,7 @@ async def create_wallet(
         name=wallet.name,
         currency=wallet.currency,
         translation_key=wallet.translation_key,
+        is_personal=wallet.is_personal,
         transaction_count=0,
     )
 
@@ -133,6 +135,7 @@ async def update_wallet(
         name=wallet.name,
         currency=wallet.currency,
         translation_key=wallet.translation_key,
+        is_personal=wallet.is_personal,
         transaction_count=await count_wallet_transactions(session, wallet.id),
     )
 

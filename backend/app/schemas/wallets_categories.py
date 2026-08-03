@@ -36,6 +36,7 @@ class WalletResponse(BaseModel):
     name: str
     currency: str
     translation_key: str | None
+    is_personal: bool
     transaction_count: int = Field(default=0)
 
 

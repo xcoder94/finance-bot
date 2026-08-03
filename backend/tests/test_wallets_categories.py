@@ -19,6 +19,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
+from tests.test_telegram_auth import _AsyncSessionFactoryOverride
 
 
 def _db_available() -> bool:
@@ -92,9 +93,13 @@ async def api_client() -> AsyncIterator[tuple[AsyncClient, AsyncSession]]:
 
     with patch("app.main.verify_postgres_connection", new=AsyncMock()):
         with patch("app.auth.deps.APP_PASS_SECRET", TEST_APP_PASS_SECRET):
-            transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                yield client, session
+            with patch(
+                "app.api.v1.me.async_session_factory",
+                _AsyncSessionFactoryOverride(session),
+            ):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    yield client, session
 
     await trans.rollback()
     await session.close()
@@ -238,7 +243,14 @@ class TestWalletsApi:
         wallet_ids = {wallet["id"] for wallet in wallets}
         assert str(active_wallet.id) in wallet_ids
         active_listed = next(wallet for wallet in wallets if wallet["id"] == str(active_wallet.id))
-        assert set(active_listed) == {"id", "name", "currency", "translation_key", "transaction_count"}
+        assert set(active_listed) == {
+            "id",
+            "name",
+            "currency",
+            "translation_key",
+            "is_personal",
+            "transaction_count",
+        }
         assert active_listed["transaction_count"] == 2
 
         patch_resp = await client.patch(
@@ -571,7 +583,14 @@ class TestListingQueryCounts:
             for path, expected_keys in (
                 (
                     "/api/v1/wallets",
-                    {"id", "name", "currency", "translation_key", "transaction_count"},
+                    {
+                        "id",
+                        "name",
+                        "currency",
+                        "translation_key",
+                        "is_personal",
+                        "transaction_count",
+                    },
                 ),
                 (
                     "/api/v1/categories/income",
