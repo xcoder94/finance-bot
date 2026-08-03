@@ -12,6 +12,9 @@ class ParsedOperation:
     wallet_hint: str | None
     category: str | None
     comment: str | None
+    from_wallet_hint: str | None = None
+    to_wallet_hint: str | None = None
+    rate: int | None = None
 
 
 @dataclass(frozen=True)

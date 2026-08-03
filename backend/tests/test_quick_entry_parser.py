@@ -5,6 +5,11 @@ from unittest.mock import patch
 from app.parsing.factory import get_parser
 from app.parsing.http_adapter import HttpParser
 from app.parsing.stub import StubParser
+from app.parsing.prompt import (
+    IMMUTABLE_PARSER_INSTRUCTIONS,
+    build_mutable_parser_payload,
+    build_parser_messages,
+)
 from app.parsing.types import (
     ParseRequest,
     ParseResponse,
@@ -155,3 +160,37 @@ async def test_http_parser_unavailable_after_retry_exhausted():
         )
     assert attempts == 3
     await client.aclose()
+
+
+def test_parsed_operation_accepts_transfer_fields():
+    op = ParsedOperation(
+        type="transfer",
+        amount=500_000,
+        currency="UZS",
+        wallet_hint=None,
+        category=None,
+        comment=None,
+        from_wallet_hint="карта",
+        to_wallet_hint="наличные",
+        rate=None,
+    )
+    assert op.from_wallet_hint == "карта"
+    assert op.to_wallet_hint == "наличные"
+    assert op.rate is None
+
+
+def test_prompt_immutable_then_mutable_order():
+    req = ParseRequest(
+        text="переложил 500 тысяч с карты на наличные",
+        wallet_names=["Карта сум", "Наличный сум"],
+        expense_category_names=["Такси"],
+        income_category_names=["Зарплата"],
+    )
+    messages = build_parser_messages(req)
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"] == IMMUTABLE_PARSER_INSTRUCTIONS
+    assert "по курсу" in IMMUTABLE_PARSER_INSTRUCTIONS
+    assert "transfer" in IMMUTABLE_PARSER_INSTRUCTIONS
+    assert messages[1]["role"] == "user"
+    assert messages[1]["content"] == build_mutable_parser_payload(req)
+    assert "переложил 500 тысяч" in messages[1]["content"]

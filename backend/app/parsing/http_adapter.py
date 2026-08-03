@@ -4,6 +4,11 @@ from typing import Any
 
 import httpx
 
+from app.parsing.prompt import (
+    IMMUTABLE_PARSER_INSTRUCTIONS,
+    build_mutable_parser_payload,
+    build_parser_messages,
+)
 from app.parsing.types import (
     ParseRequest,
     ParseResponse,
@@ -16,25 +21,6 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT_SECONDS = 10.0
 _MAX_ATTEMPTS = 3
-
-_SYSTEM_PROMPT = (
-    "Parse family budget chat messages. Reply with JSON only, no markdown:\n"
-    '{"operations":[{"type":"expense|income|ambiguous|transfer|exchange",'
-    '"amount":integer_or_null,"currency":"UZS|USD"|null,'
-    '"wallet_hint":string_or_null,"category":string_or_null,"comment":string_or_null}]}'
-)
-
-
-def _build_user_content(request: ParseRequest) -> str:
-    return json.dumps(
-        {
-            "text": request.text,
-            "wallet_names": request.wallet_names,
-            "expense_category_names": request.expense_category_names,
-            "income_category_names": request.income_category_names,
-        },
-        ensure_ascii=False,
-    )
 
 
 def _parse_operations_payload(data: Any) -> list[ParsedOperation]:
@@ -78,6 +64,18 @@ def _parse_operations_payload(data: Any) -> list[ParsedOperation]:
         if comment is not None and not isinstance(comment, str):
             raise ParserMalformed("comment must be string or null")
 
+        from_wallet_hint = item.get("from_wallet_hint")
+        if from_wallet_hint is not None and not isinstance(from_wallet_hint, str):
+            raise ParserMalformed("from_wallet_hint must be string or null")
+
+        to_wallet_hint = item.get("to_wallet_hint")
+        if to_wallet_hint is not None and not isinstance(to_wallet_hint, str):
+            raise ParserMalformed("to_wallet_hint must be string or null")
+
+        rate = item.get("rate")
+        if rate is not None and not isinstance(rate, int):
+            raise ParserMalformed("rate must be integer or null")
+
         operations.append(
             ParsedOperation(
                 type=op_type,
@@ -86,6 +84,9 @@ def _parse_operations_payload(data: Any) -> list[ParsedOperation]:
                 wallet_hint=wallet_hint,
                 category=category,
                 comment=comment,
+                from_wallet_hint=from_wallet_hint,
+                to_wallet_hint=to_wallet_hint,
+                rate=rate,
             )
         )
     return operations
@@ -198,7 +199,7 @@ class HttpParser:
     async def _post(
         self, client: httpx.AsyncClient, request: ParseRequest
     ) -> httpx.Response:
-        user_content = _build_user_content(request)
+        user_content = build_mutable_parser_payload(request)
         if self._provider == "openai":
             return await client.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -208,10 +209,7 @@ class HttpParser:
                 },
                 json={
                     "model": self._model,
-                    "messages": [
-                        {"role": "system", "content": _SYSTEM_PROMPT},
-                        {"role": "user", "content": user_content},
-                    ],
+                    "messages": build_parser_messages(request),
                 },
             )
 
@@ -225,7 +223,7 @@ class HttpParser:
             json={
                 "model": self._model,
                 "max_tokens": 1024,
-                "system": _SYSTEM_PROMPT,
+                "system": IMMUTABLE_PARSER_INSTRUCTIONS,
                 "messages": [{"role": "user", "content": user_content}],
             },
         )
