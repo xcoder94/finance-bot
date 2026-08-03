@@ -19,7 +19,11 @@ from app.models.wallet import Wallet
 from app.parsing.stub import StubParser
 from app.parsing.types import ParseResponse, ParsedOperation
 from app.services.quick_entry_balance import wallet_balance
-from bot.quick_entry.handlers import handle_quick_entry_text, set_parser_override
+from bot.quick_entry.handlers import (
+    handle_quick_entry_delete,
+    handle_quick_entry_text,
+    set_parser_override,
+)
 from bot.quick_entry.texts import MSG_EXCHANGE_RATE_REQUIRED
 
 
@@ -86,6 +90,25 @@ def make_message(*, telegram_id: int, text: str) -> SimpleNamespace:
     return SimpleNamespace(
         from_user=SimpleNamespace(id=telegram_id),
         text=text,
+        answer=AsyncMock(),
+    )
+
+
+def make_callback(
+    *,
+    telegram_id: int,
+    data: str,
+    message_text: str = "card",
+) -> SimpleNamespace:
+    message = SimpleNamespace(
+        text=message_text,
+        edit_text=AsyncMock(),
+        edit_reply_markup=AsyncMock(),
+    )
+    return SimpleNamespace(
+        from_user=SimpleNamespace(id=telegram_id),
+        message=message,
+        data=data,
         answer=AsyncMock(),
     )
 
@@ -443,3 +466,155 @@ class TestExpenseRegression:
                 )
             ).all()
             assert len(txns) == 1
+
+
+class TestTransferDelete:
+    async def test_soft_delete_restores_balances(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_010_007)
+            cash_uzs, card_uzs, _, _ = await seed_transfer_wallets(
+                session, budget, user
+            )
+            await seed_income(session, user, budget, card_uzs, 1_000_000)
+
+            card_before = await wallet_balance(session, card_uzs.id)
+            cash_before = await wallet_balance(session, cash_uzs.id)
+
+            text = "переложил 500 тысяч с карты на наличные"
+            set_parser_override(StubParser())
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.resolve_operation_date",
+                lambda _text, now=None: date(2026, 8, 1),
+            )
+
+            message = make_message(telegram_id=user.telegram_id, text=text)
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            transfer = (
+                await session.scalars(
+                    select(Transaction).where(
+                        Transaction.family_budget_id == budget.id,
+                        Transaction.type == "transfer",
+                    )
+                )
+            ).one()
+            assert await wallet_balance(session, card_uzs.id) == 500_000
+            assert await wallet_balance(session, cash_uzs.id) == 500_000
+
+            callback = make_callback(
+                telegram_id=user.telegram_id,
+                data=f"qe:del:{transfer.id}",
+            )
+            await handle_quick_entry_delete(callback, SimpleNamespace())
+
+            await session.refresh(transfer)
+            assert transfer.is_deleted is True
+            assert await wallet_balance(session, card_uzs.id) == card_before
+            assert await wallet_balance(session, cash_uzs.id) == cash_before
+            callback.message.edit_reply_markup.assert_awaited_once_with(
+                reply_markup=None
+            )
+            callback.answer.assert_awaited_once()
+
+
+class TestMixedRefusedTransferAndExpense:
+    async def test_expense_created_transfer_refused_balances(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_010_008)
+            cash_uzs, card_uzs, _, card_usd = await seed_transfer_wallets(
+                session, budget, user
+            )
+            transport = ExpenseCategory(family_budget_id=budget.id, name="Транспорт")
+            session.add(transport)
+            await session.flush()
+            taxi = ExpenseCategory(
+                family_budget_id=budget.id, name="Такси", parent_id=transport.id
+            )
+            session.add(taxi)
+            await session.flush()
+            await seed_income(session, user, budget, card_usd, 500)
+            await seed_income(session, user, budget, card_uzs, 1_000_000)
+            await seed_income(session, user, budget, cash_uzs, 1_300_000)
+
+            usd_before = await wallet_balance(session, card_usd.id)
+            uzs_card_before = await wallet_balance(session, card_uzs.id)
+            cash_before = await wallet_balance(session, cash_uzs.id)
+
+            text = "такси 25 тысяч и перевел с карты доллара на карту сум 50$"
+            set_parser_override(
+                StubParser(
+                    responses={
+                        text: ParseResponse(
+                            operations=[
+                                ParsedOperation(
+                                    type="expense",
+                                    amount=25_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Такси",
+                                    comment=None,
+                                ),
+                                ParsedOperation(
+                                    type="exchange",
+                                    amount=50,
+                                    currency="USD",
+                                    wallet_hint=None,
+                                    category=None,
+                                    comment=None,
+                                    from_wallet_hint="карта доллара",
+                                    to_wallet_hint="карта сум",
+                                    rate=None,
+                                ),
+                            ]
+                        )
+                    }
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.resolve_operation_date",
+                lambda _text, now=None: date(2026, 8, 1),
+            )
+
+            message = make_message(telegram_id=user.telegram_id, text=text)
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            assert message.answer.await_count == 2
+            assert message.answer.await_args_list[0].args[0] == MSG_EXCHANGE_RATE_REQUIRED
+            assert "➖ **25 000 сум** · Такси" in message.answer.await_args_list[1].args[0]
+
+            transfer_txns = (
+                await session.scalars(
+                    select(Transaction).where(
+                        Transaction.family_budget_id == budget.id,
+                        Transaction.type == "transfer",
+                    )
+                )
+            ).all()
+            assert transfer_txns == []
+
+            expense_txns = (
+                await session.scalars(
+                    select(Transaction).where(
+                        Transaction.family_budget_id == budget.id,
+                        Transaction.type == "expense",
+                    )
+                )
+            ).all()
+            assert len(expense_txns) == 1
+            assert expense_txns[0].amount == 25_000
+
+            assert await wallet_balance(session, card_usd.id) == usd_before
+            assert await wallet_balance(session, card_uzs.id) == uzs_card_before
+            assert await wallet_balance(session, cash_uzs.id) == cash_before - 25_000
