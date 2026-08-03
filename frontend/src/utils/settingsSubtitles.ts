@@ -14,6 +14,16 @@ export function defaultWalletSubtitle(walletName: string | null | undefined): st
   return walletName ?? '—'
 }
 
+export function formatDefaultWalletRowSubtitle(
+  isPersonal: boolean,
+  currency: string,
+  sharedLabel: string,
+  personalLabel: string,
+): string {
+  const typeLabel = isPersonal ? personalLabel : sharedLabel
+  return `${typeLabel} · ${currency}`
+}
+
 function categoryWordRu(count: number): string {
   const abs = Math.abs(count)
   const mod10 = abs % 10

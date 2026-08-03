@@ -11,11 +11,44 @@ export const CHART_CATEGORY_COLORS = [
 
 export const OTHER_CATEGORY_COLOR_INDEX = 8
 
-export function buildCategoryColorIndexMap(categoryIdsInOrder: string[]): Map<string, number> {
+export function mergeStoredCategoryColorIndices(
+  categories: Array<{ id: string; color_index?: number }>,
+  amounts: Array<{ color_index?: number; [key: string]: string | number | null | undefined }>,
+  amountIdKey: string,
+): Map<string, number> {
+  const map = new Map<string, number>()
+
+  for (const category of categories) {
+    if (category.color_index !== undefined) {
+      map.set(category.id, category.color_index)
+    }
+  }
+
+  for (const entry of amounts) {
+    const id = entry[amountIdKey]
+    if (typeof id === 'string' && entry.color_index !== undefined) {
+      map.set(id, entry.color_index)
+    }
+  }
+
+  return map
+}
+
+export function buildCategoryColorIndexMap(
+  categoryIdsInOrder: string[],
+  storedColorIndexById?: Map<string, number>,
+): Map<string, number> {
   const map = new Map<string, number>()
   for (let index = 0; index < categoryIdsInOrder.length; index += 1) {
-    const colorIndex = index < 8 ? index + 1 : OTHER_CATEGORY_COLOR_INDEX
-    map.set(categoryIdsInOrder[index], colorIndex)
+    const categoryId = categoryIdsInOrder[index]
+    const stored = storedColorIndexById?.get(categoryId)
+    const colorIndex =
+      stored !== undefined && stored >= 1 && stored <= OTHER_CATEGORY_COLOR_INDEX
+        ? stored
+        : index < 8
+          ? index + 1
+          : OTHER_CATEGORY_COLOR_INDEX
+    map.set(categoryId, colorIndex)
   }
   return map
 }

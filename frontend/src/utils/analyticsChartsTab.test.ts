@@ -27,6 +27,19 @@ describe('extendCategoryColorMap', () => {
     expect(colorMap.get('deleted-parent')).toBeGreaterThanOrEqual(1)
     expect(colorMap.get('deleted-parent')).toBeLessThanOrEqual(8)
   })
+
+  it('prefers stored color_index from category API', () => {
+    const colorMap = extendCategoryColorMap(
+      ['parent-1'],
+      ['deleted-parent'],
+      new Map([
+        ['parent-1', 2],
+        ['deleted-parent', 6],
+      ]),
+    )
+    expect(colorMap.get('parent-1')).toBe(2)
+    expect(colorMap.get('deleted-parent')).toBe(6)
+  })
 })
 
 describe('isChartsTabEmpty', () => {

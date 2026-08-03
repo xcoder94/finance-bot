@@ -72,3 +72,44 @@ export async function fetchMe(): Promise<AuthUser> {
   const data = (await response.json()) as MeResponseJson
   return mapMeResponse(data)
 }
+
+export type MeUpdatePayload = {
+  default_wallet_id?: string | null
+  language?: 'ru' | 'uz'
+}
+
+export async function patchMe(payload: MeUpdatePayload): Promise<AuthUser> {
+  let response: Response
+
+  try {
+    response = await fetch('/api/v1/me', {
+      method: 'PATCH',
+      headers: {
+        Authorization: getAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new MeRequestError('network')
+  }
+
+  if (response.status === 401) {
+    throw new MeRequestError('unauthorized')
+  }
+
+  if (response.status === 404) {
+    throw new MeRequestError('not_onboarded')
+  }
+
+  if (response.status === 403) {
+    throw new MeRequestError('removed_from_family')
+  }
+
+  if (!response.ok) {
+    throw new MeRequestError('network')
+  }
+
+  const data = (await response.json()) as MeResponseJson
+  return mapMeResponse(data)
+}

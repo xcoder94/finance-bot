@@ -31,6 +31,7 @@ type AuthState = {
   setReady: (user: AuthUser) => void
   setError: (errorType: Exclude<AuthErrorType, null>) => void
   setLocalLanguage: (language: string) => void
+  setLocalDefaultWallet: (defaultWalletId: string | null) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -44,6 +45,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) =>
       state.user
         ? { user: { ...state.user, language } }
+        : state,
+    ),
+  setLocalDefaultWallet: (defaultWalletId) =>
+    set((state) =>
+      state.user
+        ? { user: { ...state.user, defaultWalletId } }
         : state,
     ),
 }))

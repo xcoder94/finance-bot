@@ -6,6 +6,7 @@ export type IncomeCategoryResponse = {
   name: string
   translation_key: string | null
   transaction_count: number
+  color_index: number
 }
 
 export type IncomeCategoryDeleteResponse = {
@@ -28,6 +29,7 @@ export type ExpenseCategoryResponse = {
   translation_key: string | null
   parent_id: string | null
   transaction_count: number
+  color_index: number
 }
 
 export type ExpenseCategoryDeleteResponse = {

@@ -361,6 +361,58 @@ async def test_no_free_color_reuses_oldest_deleted_color(
     assert create_resp.json()["color_index"] == 1
 
 
+async def test_get_categories_excludes_soft_deleted_from_picker_lists(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    active_income = IncomeCategory(family_budget_id=budget.id, name="Active income")
+    deleted_income = IncomeCategory(
+        family_budget_id=budget.id,
+        name="Deleted income",
+        is_deleted=True,
+        deleted_at=datetime.now(UTC),
+    )
+    active_parent = ExpenseCategory(family_budget_id=budget.id, name="Active parent")
+    deleted_parent = ExpenseCategory(
+        family_budget_id=budget.id,
+        name="Deleted parent",
+        is_deleted=True,
+        deleted_at=datetime.now(UTC),
+    )
+    session.add_all([active_income, deleted_income, active_parent, deleted_parent])
+    await session.flush()
+
+    active_sub = ExpenseCategory(
+        family_budget_id=budget.id,
+        name="Active sub",
+        parent_id=active_parent.id,
+    )
+    deleted_sub = ExpenseCategory(
+        family_budget_id=budget.id,
+        name="Deleted sub",
+        parent_id=active_parent.id,
+        is_deleted=True,
+        deleted_at=datetime.now(UTC),
+    )
+    session.add_all([active_sub, deleted_sub])
+    await session.flush()
+
+    income_resp = await client.get("/api/v1/categories/income", headers=headers)
+    assert income_resp.status_code == 200
+    assert [row["name"] for row in income_resp.json()] == ["Active income"]
+
+    expense_resp = await client.get("/api/v1/categories/expense", headers=headers)
+    assert expense_resp.status_code == 200
+    expense_names = {row["name"] for row in expense_resp.json()}
+    assert expense_names == {"Active parent", "Active sub"}
+    assert "Deleted parent" not in expense_names
+    assert "Deleted sub" not in expense_names
+
+
 async def test_soft_deleted_category_keeps_color_in_analytics(
     api_client: tuple[AsyncClient, AsyncSession],
 ) -> None:
