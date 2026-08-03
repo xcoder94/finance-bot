@@ -14,7 +14,7 @@ import {
   NativeBackButtonContext,
 } from './nativeBackButtonContext'
 
-const ROOT_PATHS = new Set(['/', '/analytics', '/history', '/settings'])
+const ROOT_PATHS = new Set(['/', '/analytics', '/goals', '/settings'])
 
 function normalizePathname(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname

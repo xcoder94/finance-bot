@@ -11,7 +11,7 @@ import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
 import { Spinner, Tabbar } from '@telegram-apps/telegram-ui'
 import { useSignal, viewport } from '@tma.js/sdk-react'
 import { useTranslation } from 'react-i18next'
-import { ChartPie, History, House, Settings, type LucideIcon } from 'lucide-react'
+import { type LucideIcon } from 'lucide-react'
 
 import { AddExpensePage } from '../pages/AddExpensePage'
 import { AddIncomePage } from '../pages/AddIncomePage'
@@ -19,10 +19,14 @@ import { AddTransferPage } from '../pages/AddTransferPage'
 import { EditExpensePage } from '../pages/EditExpensePage'
 import { EditIncomePage } from '../pages/EditIncomePage'
 import { EditTransferPage } from '../pages/EditTransferPage'
+import { GoalsPage } from '../pages/GoalsPage'
 import { HistoryPage } from '../pages/HistoryPage'
 import { HomePage } from '../pages/HomePage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
+import { MAIN_TABS } from './mainTabs'
+
+export { MAIN_TABS } from './mainTabs'
 
 const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
 
@@ -94,12 +98,10 @@ function AppLayout() {
     }
   }, [])
 
-  const tabs = [
-    { path: '/', label: t('nav.home'), icon: House, end: true },
-    { path: '/analytics', label: t('nav.analytics'), icon: ChartPie, end: false },
-    { path: '/history', label: t('nav.history'), icon: History, end: false },
-    { path: '/settings', label: t('nav.settings'), icon: Settings, end: false },
-  ] as const
+  const tabs = MAIN_TABS.map((tab) => ({
+    ...tab,
+    label: t(tab.labelKey),
+  }))
 
   return (
     <div
@@ -175,6 +177,7 @@ export function AppShell() {
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
           <Route path="analytics/*" element={<AnalyticsRoute />} />
+          <Route path="goals" element={<GoalsPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
