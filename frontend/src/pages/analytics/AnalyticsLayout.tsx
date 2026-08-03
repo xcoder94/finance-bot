@@ -13,7 +13,7 @@ import {
   type SelectedMonth,
 } from '../../utils/periodFilter'
 import type { Currency } from '../../utils/formatCurrency'
-import { AnalyticsChartsContent } from './AnalyticsChartsContent'
+import { AnalyticsChartsTab } from './AnalyticsChartsTab'
 import { AnalyticsHistoryTab } from './AnalyticsHistoryTab'
 
 const CURRENCIES = ['UZS', 'USD'] as const
@@ -169,7 +169,7 @@ export function AnalyticsLayout() {
           />
         </div>
 
-        {activeTab === 'charts' ? <AnalyticsChartsContent /> : <AnalyticsHistoryTab />}
+        {activeTab === 'charts' ? <AnalyticsChartsTab /> : <AnalyticsHistoryTab />}
       </div>
     </AnalyticsProvider>
   )

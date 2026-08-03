@@ -13,6 +13,7 @@ import {
 } from './chartColors'
 
 export type DonutSlice = {
+  key: string
   name: string
   value: number
   color: string
@@ -123,6 +124,7 @@ export function prepareSubcategoryDonutSlices(
     const orderIndex = orderedSubcategoryIds.indexOf(entry.subcategory_id)
     if (orderIndex >= 0 && orderIndex < 8) {
       slices.set(entry.subcategory_id, {
+        key: entry.subcategory_id,
         name: entry.display_name,
         value: entry.amount,
         color: getCategoryColor(entry.subcategory_id, colorMap),
@@ -136,6 +138,7 @@ export function prepareSubcategoryDonutSlices(
   const result = Array.from(slices.values())
   if (otherAmount > 0) {
     result.push({
+      key: OTHER_CATEGORY_KEY,
       name: otherLabel,
       value: otherAmount,
       color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
@@ -214,6 +217,7 @@ export function prepareDonutSlices(
     const orderIndex = orderedCategoryIds.indexOf(entry.category_id)
     if (orderIndex >= 0 && orderIndex < 8) {
       slices.set(entry.category_id, {
+        key: entry.category_id,
         name: resolveCategoryAmountDisplayName(entry, displayNameById, t),
         value: entry.amount,
         color: getCategoryColor(entry.category_id, colorMap),
@@ -227,6 +231,7 @@ export function prepareDonutSlices(
   const result = Array.from(slices.values())
   if (otherAmount > 0) {
     result.push({
+      key: OTHER_CATEGORY_KEY,
       name: otherLabel,
       value: otherAmount,
       color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),

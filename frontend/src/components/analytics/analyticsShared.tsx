@@ -7,7 +7,12 @@ type FetchState<T> =
   | { status: 'error' }
   | { status: 'success'; data: T }
 
-export function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, enabled: boolean) {
+export function useFetchBlock<T>(
+  fetcher: () => Promise<T>,
+  trigger: unknown,
+  enabled: boolean,
+  keepStaleData = true,
+) {
   const [state, setState] = useState<FetchState<T>>({ status: 'loading' })
   const [retryCount, setRetryCount] = useState(0)
 
@@ -17,7 +22,9 @@ export function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, en
     }
 
     let cancelled = false
-    setState((current) => (current.status === 'success' ? current : { status: 'loading' }))
+    setState((current) =>
+      keepStaleData && current.status === 'success' ? current : { status: 'loading' },
+    )
 
     void fetcher()
       .then((data) => {
@@ -34,7 +41,7 @@ export function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, en
     return () => {
       cancelled = true
     }
-  }, [fetcher, trigger, retryCount, enabled])
+  }, [fetcher, trigger, retryCount, enabled, keepStaleData])
 
   const retry = useCallback(() => {
     setRetryCount((count) => count + 1)

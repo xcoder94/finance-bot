@@ -23,9 +23,13 @@ export type WeekdayChartRow = {
 
 type WeekdayBarChartProps = {
   rows: WeekdayChartRow[]
+  barColor?: string
 }
 
-export function WeekdayBarChart({ rows }: WeekdayBarChartProps) {
+export function WeekdayBarChart({
+  rows,
+  barColor = EXPENSE_COLOR,
+}: WeekdayBarChartProps) {
   return (
     <div className="analytics-chart analytics-chart--wide">
       <ResponsiveContainer width="100%" height={220}>
@@ -50,7 +54,7 @@ export function WeekdayBarChart({ rows }: WeekdayBarChartProps) {
             itemStyle={TOOLTIP_TEXT_STYLE}
             cursor={{ fill: 'var(--app-chart-cursor)' }}
           />
-          <Bar dataKey="amount" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="amount" fill={barColor} radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
