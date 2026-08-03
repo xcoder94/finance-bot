@@ -6,9 +6,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
+DEFAULT_BUDGET_NAME = "Семейный бюджет"
+
+
 class FamilyBudget(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
     __tablename__ = "family_budgets"
 
+    name: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        server_default=DEFAULT_BUDGET_NAME,
+    )
     invite_token: Mapped[str | None] = mapped_column(
         String, nullable=True, unique=True, index=True
     )
