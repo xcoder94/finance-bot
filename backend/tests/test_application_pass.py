@@ -178,6 +178,7 @@ async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
                 "language": "uz",
                 "budget_name": "Семейный бюджет",
                 "member_count": 1,
+                "default_wallet_id": None,
             }
 
             me_tma = await client.get(

@@ -46,4 +46,5 @@ async def get_me(claims: AppPassClaimsDep) -> MeResponse:
         language=db_user.language,
         budget_name=budget.name if budget is not None else "",
         member_count=member_count or 0,
+        default_wallet_id=db_user.default_wallet_id,
     )

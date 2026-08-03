@@ -15,3 +15,4 @@ class MeResponse(BaseModel):
     language: str
     budget_name: str
     member_count: int
+    default_wallet_id: uuid.UUID | None

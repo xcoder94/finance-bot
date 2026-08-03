@@ -319,7 +319,7 @@ class TestIncomeExpenseValidation:
             )
         ).status_code == 404
 
-    async def test_expense_rejects_top_level_category_with_400(
+    async def test_expense_accepts_top_level_category_with_201(
         self, api_client: tuple[AsyncClient, AsyncSession]
     ) -> None:
         client, session = api_client
@@ -333,7 +333,142 @@ class TestIncomeExpenseValidation:
             headers=headers,
             json=txn_payload(wallet_id=str(wallet.id), expense_category_id=str(top.id)),
         )
-        assert response.status_code == 400
+        assert response.status_code == 201
+        assert response.json()["expense_category_id"] == str(top.id)
+
+
+class TestCommentMaxLength:
+    async def test_income_rejects_comment_over_200_chars(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        wallet, category = await seed_income_fixtures(session, budget, user)
+        headers = auth_headers(telegram_id)
+
+        response = await client.post(
+            "/api/v1/transactions/income",
+            headers=headers,
+            json=txn_payload(
+                wallet_id=str(wallet.id),
+                income_category_id=str(category.id),
+                comment="x" * 201,
+            ),
+        )
+        assert response.status_code == 422
+
+    async def test_income_accepts_comment_of_200_chars(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        wallet, category = await seed_income_fixtures(session, budget, user)
+        headers = auth_headers(telegram_id)
+        comment = "x" * 200
+
+        response = await client.post(
+            "/api/v1/transactions/income",
+            headers=headers,
+            json=txn_payload(
+                wallet_id=str(wallet.id),
+                income_category_id=str(category.id),
+                comment=comment,
+            ),
+        )
+        assert response.status_code == 201
+        assert response.json()["comment"] == comment
+
+    async def test_expense_rejects_comment_over_200_chars(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        wallet, _, sub = await seed_expense_fixtures(session, budget)
+        headers = auth_headers(telegram_id)
+
+        response = await client.post(
+            "/api/v1/transactions/expense",
+            headers=headers,
+            json=txn_payload(
+                wallet_id=str(wallet.id),
+                expense_category_id=str(sub.id),
+                comment="x" * 201,
+            ),
+        )
+        assert response.status_code == 422
+
+    async def test_expense_accepts_comment_of_200_chars(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        wallet, _, sub = await seed_expense_fixtures(session, budget)
+        headers = auth_headers(telegram_id)
+        comment = "x" * 200
+
+        response = await client.post(
+            "/api/v1/transactions/expense",
+            headers=headers,
+            json=txn_payload(
+                wallet_id=str(wallet.id),
+                expense_category_id=str(sub.id),
+                comment=comment,
+            ),
+        )
+        assert response.status_code == 201
+        assert response.json()["comment"] == comment
+
+    async def test_transfer_rejects_comment_over_200_chars(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        wallet_a = Wallet(family_budget_id=budget.id, name="Cash", currency="UZS")
+        wallet_b = Wallet(family_budget_id=budget.id, name="Card", currency="UZS")
+        session.add_all([wallet_a, wallet_b])
+        await session.flush()
+        headers = auth_headers(telegram_id)
+
+        response = await client.post(
+            "/api/v1/transactions/transfer",
+            headers=headers,
+            json=txn_payload(
+                wallet_id=str(wallet_a.id),
+                to_wallet_id=str(wallet_b.id),
+                comment="x" * 201,
+            ),
+        )
+        assert response.status_code == 422
+
+    async def test_transfer_accepts_comment_of_200_chars(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        wallet_a = Wallet(family_budget_id=budget.id, name="Cash", currency="UZS")
+        wallet_b = Wallet(family_budget_id=budget.id, name="Card", currency="UZS")
+        session.add_all([wallet_a, wallet_b])
+        await session.flush()
+        headers = auth_headers(telegram_id)
+        comment = "x" * 200
+
+        response = await client.post(
+            "/api/v1/transactions/transfer",
+            headers=headers,
+            json=txn_payload(
+                wallet_id=str(wallet_a.id),
+                to_wallet_id=str(wallet_b.id),
+                comment=comment,
+            ),
+        )
+        assert response.status_code == 201
+        assert response.json()["comment"] == comment
 
 
 class TestTransferValidation:
