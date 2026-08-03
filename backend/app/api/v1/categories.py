@@ -20,6 +20,13 @@ from app.schemas.wallets_categories import (
     IncomeCategoryResponse,
     IncomeCategoryUpdate,
 )
+from app.services.entity_limits import (
+    LIMIT_EXPENSE_PARENTS,
+    LIMIT_INCOME_CATEGORIES,
+    PARENT_CATEGORY_LIMIT,
+    SUBCATEGORY_LIMIT,
+    limit_subcategories,
+)
 from app.services.wallets_categories import (
     count_expense_category_transactions,
     count_income_category_transactions,
@@ -85,6 +92,17 @@ async def create_income_category(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> IncomeCategoryResponse:
+    income_count = await session.scalar(
+        select(func.count())
+        .select_from(IncomeCategory)
+        .where(
+            IncomeCategory.family_budget_id == user.family_budget_id,
+            IncomeCategory.is_deleted.is_(False),
+        )
+    )
+    if income_count is not None and income_count >= PARENT_CATEGORY_LIMIT:
+        raise HTTPException(status_code=409, detail=LIMIT_INCOME_CATEGORIES)
+
     category = IncomeCategory(
         family_budget_id=user.family_budget_id,
         name=body.name,
@@ -196,7 +214,19 @@ async def create_expense_category(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ExpenseCategoryResponse:
-    if body.parent_id is not None:
+    if body.parent_id is None:
+        parent_count = await session.scalar(
+            select(func.count())
+            .select_from(ExpenseCategory)
+            .where(
+                ExpenseCategory.family_budget_id == user.family_budget_id,
+                ExpenseCategory.is_deleted.is_(False),
+                ExpenseCategory.parent_id.is_(None),
+            )
+        )
+        if parent_count is not None and parent_count >= PARENT_CATEGORY_LIMIT:
+            raise HTTPException(status_code=409, detail=LIMIT_EXPENSE_PARENTS)
+    else:
         parent = await get_active_expense_parent(session, body.parent_id, user.family_budget_id)
         if parent is None:
             raise HTTPException(status_code=404)
@@ -204,6 +234,20 @@ async def create_expense_category(
             raise HTTPException(
                 status_code=400,
                 detail="parent_id must reference a top-level category",
+            )
+        subcategory_count = await session.scalar(
+            select(func.count())
+            .select_from(ExpenseCategory)
+            .where(
+                ExpenseCategory.family_budget_id == user.family_budget_id,
+                ExpenseCategory.is_deleted.is_(False),
+                ExpenseCategory.parent_id == body.parent_id,
+            )
+        )
+        if subcategory_count is not None and subcategory_count >= SUBCATEGORY_LIMIT:
+            raise HTTPException(
+                status_code=409,
+                detail=limit_subcategories(parent.name),
             )
 
     category = ExpenseCategory(
