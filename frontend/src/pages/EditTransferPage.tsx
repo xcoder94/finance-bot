@@ -1,47 +1,65 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Select, Textarea } from '@telegram-apps/telegram-ui'
+import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import {
+  deleteTransaction,
   fetchTransaction,
   fetchWallets,
   updateTransferTransaction,
   type TransactionResponse,
   type Wallet,
 } from '../api/transactions'
+import { DeleteConfirmSheet } from '../components/forms/DeleteConfirmSheet'
+import { FormSheet } from '../components/forms/FormSheet'
+import { FormSheetField } from '../components/forms/FormSheetField'
 import {
-  LimitedDigitInput,
-  MaskedDateTimeInput,
-  TransactionFormField,
-  TransactionFormLayout,
-  TransactionFormLoadError,
-  TransactionFormLoading,
-  TransactionReceiveRow,
-  TransactionSubmitError,
-} from '../components/transaction-form/TransactionFormShared'
+  FormSheetAmountField,
+  FormSheetCommentField,
+  FormSheetDateField,
+  FormSheetRateField,
+  isFormSheetDateValid,
+  WalletPickerSheet,
+} from '../components/forms/transactionAddFields'
+import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
+import { TransactionSubmitError } from '../components/transaction-form/TransactionFormShared'
 import { useAuthStore } from '../store/authStore'
 import {
   cacheTransaction,
   getCachedTransaction,
   getCachedWallets,
-  invalidateHomeData,
+  invalidateTransactionData,
 } from '../store/dataCacheStore'
-import {
-  computeTransferToAmount,
-  formatReceiveAmount,
-  formatWalletLabel,
-  isoDatetimeToMaskedDatetime,
-  isValidMaskedDatetime,
-  maskedDatetimeToIso,
-  parsePositiveInt,
-} from '../utils/transactionForm'
 import { getDisplayName } from '../utils/getDisplayName'
+import type { TFunction } from 'i18next'
+import { computeTransferToAmount, parsePositiveInt } from '../utils/transactionForm'
+import {
+  buildEditSheetTitle,
+  formatTransferResultLine,
+  isoToMaskedDateInTashkent,
+  isTransferCrossCurrency,
+  maskedDateToTashkentIso,
+  pickAlternateWalletId,
+  resolveEditSheetLabel,
+  shouldShowTransferRateField,
+  walletCurrencySuffix,
+} from '../utils/transactionFormFields'
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'success'; wallets: Wallet[]; transaction: TransactionResponse }
+
+function buildTransferSubtitle(
+  sourceWallet: Wallet | null,
+  destWallet: Wallet | null,
+  t: TFunction,
+): string {
+  const sourceName = sourceWallet ? getDisplayName(sourceWallet, t) : '—'
+  const destName = destWallet ? getDisplayName(destWallet, t) : '—'
+  return `${sourceName} → ${destName}`
+}
 
 export function EditTransferPage() {
   const { t } = useTranslation()
@@ -62,8 +80,26 @@ export function EditTransferPage() {
   const [rateOverLimit, setRateOverLimit] = useState(false)
   const [comment, setComment] = useState('')
 
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
+  const [destPickerOpen, setDestPickerOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(false)
   const [submitError, setSubmitError] = useState(false)
+
+  const closeSheet = useCallback(() => {
+    if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
+      navigate(-1)
+      return
+    }
+    navigate('/history', { replace: true })
+  }, [navigate])
+
+  useNativeBackButtonOverlay(
+    !sourcePickerOpen && !destPickerOpen && !deleteConfirmOpen,
+    closeSheet,
+  )
 
   const loadData = useCallback(async () => {
     if (!id) {
@@ -83,13 +119,11 @@ export function EditTransferPage() {
         return
       }
 
-      setTransactionDate(isoDatetimeToMaskedDatetime(transaction.transaction_date))
+      setTransactionDate(isoToMaskedDateInTashkent(transaction.transaction_date))
       setSourceWalletId(transaction.wallet_id)
       setDestWalletId(transaction.to_wallet_id ?? '')
       setAmount(String(transaction.amount))
-      setRate(
-        transaction.rate !== null ? String(Math.round(Number(transaction.rate))) : '',
-      )
+      setRate(transaction.rate !== null ? String(Math.round(Number(transaction.rate))) : '')
       setComment(transaction.comment ?? '')
       setLoadState({ status: 'success', wallets, transaction })
     } catch {
@@ -101,23 +135,22 @@ export function EditTransferPage() {
     void loadData()
   }, [loadData, loadRetry])
 
-  const sourceWallet = useMemo(() => {
-    if (loadState.status !== 'success') {
-      return null
-    }
-    return loadState.wallets.find((wallet) => wallet.id === sourceWalletId) ?? null
-  }, [loadState, sourceWalletId])
+  const sourceWallet =
+    loadState.status === 'success'
+      ? loadState.wallets.find((wallet) => wallet.id === sourceWalletId) ?? null
+      : null
 
-  const destWallet = useMemo(() => {
-    if (loadState.status !== 'success') {
-      return null
-    }
-    return loadState.wallets.find((wallet) => wallet.id === destWalletId) ?? null
-  }, [loadState, destWalletId])
+  const destWallet =
+    loadState.status === 'success'
+      ? loadState.wallets.find((wallet) => wallet.id === destWalletId) ?? null
+      : null
 
-  const isCrossCurrency = Boolean(
-    sourceWallet && destWallet && sourceWallet.currency !== destWallet.currency,
+  const isCrossCurrency = isTransferCrossCurrency(
+    sourceWallet?.currency,
+    destWallet?.currency,
   )
+
+  const transferSubtitle = buildTransferSubtitle(sourceWallet, destWallet, t)
 
   const receiveAmount = useMemo(() => {
     const parsedAmount = parsePositiveInt(amount)
@@ -139,16 +172,35 @@ export function EditTransferPage() {
     )
   }, [amount, rate, sourceWallet, destWallet, isCrossCurrency])
 
+  const transferResultHint = useMemo(() => {
+    const parsedAmount = parsePositiveInt(amount)
+    if (
+      !shouldShowTransferRateField(sourceWallet?.currency, destWallet?.currency) ||
+      !sourceWallet ||
+      !destWallet ||
+      parsedAmount === null ||
+      parsePositiveInt(rate) === null ||
+      receiveAmount <= 0
+    ) {
+      return undefined
+    }
+    return formatTransferResultLine(
+      parsedAmount,
+      sourceWallet.currency,
+      receiveAmount,
+      destWallet.currency,
+    )
+  }, [amount, rate, receiveAmount, sourceWallet, destWallet])
+
   const handleSourceWalletChange = (nextSourceWalletId: string) => {
     setSourceWalletId(nextSourceWalletId)
     if (nextSourceWalletId === destWalletId && loadState.status === 'success') {
-      const alternative = loadState.wallets.find((wallet) => wallet.id !== nextSourceWalletId)
-      setDestWalletId(alternative?.id ?? '')
+      setDestWalletId(pickAlternateWalletId(loadState.wallets, nextSourceWalletId))
     }
   }
 
   const validateDate = () => {
-    const valid = isValidMaskedDatetime(transactionDate)
+    const valid = isFormSheetDateValid(transactionDate)
     setDateError(!valid)
     return valid
   }
@@ -178,7 +230,7 @@ export function EditTransferPage() {
       parsedRate = rateValue
     }
 
-    const transactionDateIso = maskedDatetimeToIso(transactionDate)
+    const transactionDateIso = maskedDateToTashkentIso(transactionDate)
     if (!transactionDateIso) {
       setDateError(true)
       return
@@ -197,8 +249,8 @@ export function EditTransferPage() {
         comment: comment.trim() || null,
       })
       cacheTransaction(familyId, updated)
-      invalidateHomeData(familyId)
-      navigate('/history', { replace: true })
+      invalidateTransactionData(familyId, id)
+      closeSheet()
     } catch {
       setSubmitError(true)
     } finally {
@@ -206,122 +258,179 @@ export function EditTransferPage() {
     }
   }
 
-  if (loadState.status === 'loading') {
-    return <TransactionFormLoading />
+  const handleDelete = async () => {
+    if (!id || loadState.status !== 'success') {
+      return
+    }
+
+    setDeleting(true)
+    setDeleteError(false)
+    try {
+      await deleteTransaction(id)
+      invalidateTransactionData(familyId, id)
+      closeSheet()
+    } catch {
+      setDeleteError(true)
+      setDeleteConfirmOpen(true)
+    } finally {
+      setDeleting(false)
+    }
   }
 
-  if (loadState.status === 'error') {
-    return (
-      <TransactionFormLoadError onRetry={() => setLoadRetry((count) => count + 1)} />
-    )
-  }
+  const sheetTitle =
+    loadState.status === 'success'
+      ? buildEditSheetTitle(resolveEditSheetLabel(comment, transferSubtitle))
+      : t('editTransfer.title')
 
-  const { wallets } = loadState
-  const destinationOptions = wallets.filter((wallet) => wallet.id !== sourceWalletId)
+  const sheetIntro = isCrossCurrency
+    ? t('formSheet.transferDiffIntro')
+    : t('formSheet.transferSameIntro')
+
   const parsedAmount = parsePositiveInt(amount)
   const parsedRate = parsePositiveInt(rate)
   const canSubmit =
-    wallets.length >= 2 &&
+    loadState.status === 'success' &&
+    loadState.wallets.length >= 2 &&
     parsedAmount !== null &&
     Boolean(sourceWalletId) &&
     Boolean(destWalletId) &&
     sourceWalletId !== destWalletId &&
     !amountOverLimit &&
-    isValidMaskedDatetime(transactionDate) &&
+    isFormSheetDateValid(transactionDate) &&
+    comment.length <= 200 &&
     (!isCrossCurrency || (parsedRate !== null && !rateOverLimit))
 
-  const amountLabel = sourceWallet
-    ? t('addTransaction.amountWithCurrency', { currency: sourceWallet.currency })
-    : t('addTransaction.amount')
+  if (loadState.status === 'loading') {
+    return (
+      <FormSheet open title={t('editTransfer.title')} onClose={closeSheet} showPrimary={false}>
+        <div className="form-sheet-loading" role="status" aria-live="polite">
+          <Spinner size="m" aria-hidden="true" />
+          <span className="visually-hidden">{t('home.loading')}</span>
+        </div>
+      </FormSheet>
+    )
+  }
+
+  if (loadState.status === 'error') {
+    return (
+      <FormSheet open title={t('editTransfer.title')} onClose={closeSheet} showPrimary={false}>
+        <div className="form-sheet-load-error" role="alert">
+          <p>{t('addTransaction.loadError')}</p>
+          <button type="button" onClick={() => setLoadRetry((count) => count + 1)}>
+            {t('auth.retry')}
+          </button>
+        </div>
+      </FormSheet>
+    )
+  }
+
+  const { wallets, transaction } = loadState
+  const destinationWallets = wallets.filter((wallet) => wallet.id !== sourceWalletId)
+  const deleteCurrency = (sourceWallet?.currency ?? 'UZS') as 'UZS' | 'USD'
+  const deleteAmount = parsePositiveInt(amount) ?? transaction.amount
 
   return (
-    <TransactionFormLayout
-      titleKey="editTransfer.title"
-      submitLabelKey="editTransaction.save"
-      onCancel={() => navigate('/history')}
-      onSubmit={() => void handleSubmit()}
-      submitting={submitting}
-      submitDisabled={!canSubmit}
-    >
-      <TransactionFormField>
-        <MaskedDateTimeInput
+    <>
+      <FormSheet
+        open
+        title={sheetTitle}
+        intro={sheetIntro}
+        onClose={closeSheet}
+        onPrimary={() => void handleSubmit()}
+        primaryDisabled={!canSubmit}
+        primaryLoading={submitting}
+        danger={
+          <button
+            type="button"
+            className="form-sheet-danger-button"
+            onClick={() => {
+              setDeleteError(false)
+              setDeleteConfirmOpen(true)
+            }}
+          >
+            {t('formSheet.deleteRecord')}
+          </button>
+        }
+      >
+        <FormSheetField
+          label={t('addTransaction.sourceWallet')}
+          right="›"
+          onClick={() => setSourcePickerOpen(true)}
+        >
+          <span>{sourceWallet ? getDisplayName(sourceWallet, t) : '—'}</span>
+        </FormSheetField>
+
+        <FormSheetField
+          label={t('addTransaction.destinationWallet')}
+          right="›"
+          onClick={() => setDestPickerOpen(true)}
+        >
+          <span>{destWallet ? getDisplayName(destWallet, t) : '—'}</span>
+        </FormSheetField>
+
+        <FormSheetAmountField
+          value={amount}
+          currencySuffix={walletCurrencySuffix(sourceWallet?.currency ?? 'UZS')}
+          overLimit={amountOverLimit}
+          onChange={setAmount}
+          onOverLimitChange={setAmountOverLimit}
+        />
+
+        {isCrossCurrency ? (
+          <FormSheetRateField
+            value={rate}
+            overLimit={rateOverLimit}
+            resultHint={transferResultHint}
+            onChange={setRate}
+            onOverLimitChange={setRateOverLimit}
+          />
+        ) : null}
+
+        <FormSheetDateField
           value={transactionDate}
-          onChange={setTransactionDate}
           hasError={dateError}
+          onChange={setTransactionDate}
           onBlur={validateDate}
           onEdit={() => setDateError(false)}
         />
-      </TransactionFormField>
 
-      <TransactionFormField>
-        <Select
-          header={t('addTransaction.sourceWallet')}
-          value={sourceWalletId}
-          onChange={(event) => handleSourceWalletChange(event.target.value)}
-          disabled={wallets.length === 0}
-        >
-          {wallets.map((wallet) => (
-            <option key={wallet.id} value={wallet.id}>
-              {formatWalletLabel(getDisplayName(wallet, t), wallet.currency)}
-            </option>
-          ))}
-        </Select>
-      </TransactionFormField>
+        <FormSheetCommentField value={comment} onChange={setComment} />
 
-      <TransactionFormField>
-        <Select
-          header={t('addTransaction.destinationWallet')}
-          value={destWalletId}
-          onChange={(event) => setDestWalletId(event.target.value)}
-          disabled={destinationOptions.length === 0}
-        >
-          {destinationOptions.map((wallet) => (
-            <option key={wallet.id} value={wallet.id}>
-              {formatWalletLabel(getDisplayName(wallet, t), wallet.currency)}
-            </option>
-          ))}
-        </Select>
-      </TransactionFormField>
+        {submitError ? <TransactionSubmitError onRetry={() => void handleSubmit()} /> : null}
+      </FormSheet>
 
-      <TransactionFormField>
-        <LimitedDigitInput
-          header={amountLabel}
-          value={amount}
-          onChange={setAmount}
-          overLimit={amountOverLimit}
-          onOverLimitChange={setAmountOverLimit}
-        />
-      </TransactionFormField>
+      <WalletPickerSheet
+        open={sourcePickerOpen}
+        title={t('addTransaction.sourceWallet')}
+        wallets={wallets}
+        selectedWalletId={sourceWalletId}
+        onClose={() => setSourcePickerOpen(false)}
+        onSelect={handleSourceWalletChange}
+      />
 
-      {isCrossCurrency ? (
-        <TransactionFormField>
-          <LimitedDigitInput
-            header={t('addTransaction.rateLabel')}
-            value={rate}
-            onChange={setRate}
-            overLimit={rateOverLimit}
-            onOverLimitChange={setRateOverLimit}
-          />
-        </TransactionFormField>
-      ) : null}
+      <WalletPickerSheet
+        open={destPickerOpen}
+        title={t('addTransaction.destinationWallet')}
+        wallets={destinationWallets}
+        selectedWalletId={destWalletId}
+        onClose={() => setDestPickerOpen(false)}
+        onSelect={setDestWalletId}
+      />
 
-      {isCrossCurrency && destWallet ? (
-        <TransactionReceiveRow
-          label={t('addTransaction.walletWillReceive')}
-          value={formatReceiveAmount(receiveAmount, destWallet.currency)}
-        />
-      ) : null}
-
-      <TransactionFormField>
-        <Textarea
-          header={t('addTransaction.commentOptional')}
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          rows={3}
-        />
-      </TransactionFormField>
-
-      {submitError ? <TransactionSubmitError onRetry={() => void handleSubmit()} /> : null}
-    </TransactionFormLayout>
+      <DeleteConfirmSheet
+        open={deleteConfirmOpen}
+        onClose={() => {
+          setDeleteConfirmOpen(false)
+          setDeleteError(false)
+        }}
+        onConfirm={() => void handleDelete()}
+        comment={comment}
+        categoryLabel={transferSubtitle}
+        amount={deleteAmount}
+        currency={deleteCurrency}
+        confirming={deleting}
+        error={deleteError}
+      />
+    </>
   )
 }

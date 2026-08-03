@@ -20,6 +20,7 @@ export type AuthUser = {
   language: string
   budgetName: string
   memberCount: number
+  defaultWalletId: string | null
 }
 
 type AuthState = {

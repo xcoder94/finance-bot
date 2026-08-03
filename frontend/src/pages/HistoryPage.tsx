@@ -8,14 +8,15 @@ import {
 } from 'react'
 import { Button, Input, SegmentedControl, Spinner, Text, Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 import { monthDateRange } from '../api/home'
 import { fetchHistoryPage, fetchSummaryForRange, type HistoryItem, type SummaryResponse } from '../api/history'
-import { TransactionDetailModal } from '../components/TransactionDetailModal'
 import i18n from '../i18n'
+import { editRouteForItem } from '../utils/editRouteForItem'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
 import {
-  getHistoryItemSubtitle,
+  getHistoryItemMeta,
   getHistoryItemTitle,
 } from '../utils/getDisplayName'
 import {
@@ -68,14 +69,43 @@ function formatMonthLabel(selected: SelectedMonth): string {
   }).format(new Date(selected.year, selected.month - 1, 1))
 }
 
-function formatTransactionDateTime(isoDate: string): string {
-  const date = new Date(isoDate)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}.${month}.${year} ${hours}:${minutes}`
+function formatTransactionDateShort(isoDate: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Asia/Tashkent',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(isoDate))
+}
+
+function isTransferLike(item: HistoryItem): boolean {
+  return item.type === 'transfer'
+}
+
+function formatHistoryTransactionAmount(item: HistoryItem): string {
+  const formatted = formatCurrency(item.amount, item.currency as Currency)
+  if (isTransferLike(item)) {
+    return `↔\u2009${formatted}`
+  }
+  if (item.type === 'income') {
+    return `+${formatted}`
+  }
+  if (item.type === 'expense') {
+    return `−${formatted}`
+  }
+  return formatted
+}
+
+function historyAmountClass(item: HistoryItem): string {
+  if (isTransferLike(item)) {
+    return 'home-ops-row__amount home-ops-row__amount--neutral'
+  }
+  if (item.type === 'expense') {
+    return 'home-ops-row__amount home-ops-row__amount--expense'
+  }
+  if (item.type === 'income') {
+    return 'home-ops-row__amount home-ops-row__amount--income'
+  }
+  return 'home-ops-row__amount'
 }
 
 function getSummaryForCurrency(
@@ -89,35 +119,19 @@ function getSummaryForCurrency(
   }
 }
 
-function formatSignedTransactionAmount(item: HistoryItem): string {
-  const formatted = formatCurrency(item.amount, item.currency as Currency)
-  if (item.type === 'income') {
-    return `+${formatted}`
-  }
-  if (item.type === 'expense') {
-    return `-${formatted}`
-  }
-  return formatted
-}
+const HISTORY_LIST_SKELETON_ROWS = 6
 
-function historyItemTitleClass(item: HistoryItem): string {
-  if (item.type === 'expense') {
-    return 'home-recent-item__title home-recent-item__title--expense'
-  }
-  if (item.type === 'income') {
-    return 'home-recent-item__title home-recent-item__title--income'
-  }
-  return 'home-recent-item__title'
-}
-
-function historyItemAmountClass(item: HistoryItem): string {
-  if (item.type === 'expense') {
-    return 'home-recent-item__amount home-recent-item__amount--expense'
-  }
-  if (item.type === 'income') {
-    return 'home-recent-item__amount home-recent-item__amount--income'
-  }
-  return 'home-recent-item__amount'
+function HistoryListSkeleton() {
+  return (
+    <div className="history-list-skeleton" aria-hidden="true">
+      {Array.from({ length: HISTORY_LIST_SKELETON_ROWS }, (_, index) => (
+        <div key={index} className="history-list-skeleton__row">
+          <div className="history-list-skeleton__line history-list-skeleton__line--left" />
+          <div className="history-list-skeleton__line history-list-skeleton__line--right" />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, enabled: boolean) {
@@ -301,6 +315,7 @@ function resolveRange(
 
 export function HistoryPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [periodTab, setPeriodTab] = useState<PeriodTab>('month')
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(currentMonth)
   const [rangeFrom, setRangeFrom] = useState('')
@@ -315,7 +330,6 @@ export function HistoryPage() {
   const [historyRetryCount, setHistoryRetryCount] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState(false)
-  const [selectedListItem, setSelectedListItem] = useState<HistoryItem | null>(null)
 
   const { range, rangeOrderInvalid } = useMemo(
     () => resolveRange(periodTab, selectedMonth, rangeFrom, rangeTo),
@@ -554,12 +568,9 @@ export function HistoryPage() {
         ) : null}
       </div>
 
-      <div className="home-recent history-page__list">
+      <div className="history-page__list">
         {historyStatus === 'loading' ? (
-          <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
-            <span className="visually-hidden">{t('home.loading')}</span>
-          </div>
+          <HistoryListSkeleton />
         ) : null}
 
         {historyStatus === 'error' ? (
@@ -567,42 +578,36 @@ export function HistoryPage() {
         ) : null}
 
         {historyStatus === 'success' && historyItems.length === 0 ? (
-          <div className="home-empty-state">
-            <Text>{t('home.noTransactions')}</Text>
+          <div className="home-empty-card">
+            <div className="home-empty-card__icon" aria-hidden="true" />
+            <div className="home-empty-card__title">{t('history.emptyTitle')}</div>
+            <div className="home-empty-card__hint">{t('history.emptyHint')}</div>
           </div>
         ) : null}
 
         {historyStatus === 'success' && historyItems.length > 0 ? (
           <>
-            <div className="home-recent__list">
+            <div className="home-ops-card">
               {historyItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="home-recent-item home-recent-item--clickable"
-                  onClick={() => setSelectedListItem(item)}
+                  className="home-ops-row home-ops-row--clickable"
+                  onClick={() => navigate(editRouteForItem(item))}
                 >
-                  <div className="home-recent-item__main">
-                    <Text className={historyItemTitleClass(item)} weight="2">
+                  <div className="home-ops-row__main">
+                    <div className="home-ops-row__title">
                       {getHistoryItemTitle(item, transferLabels, t)}
-                    </Text>
-                    <Text className="home-recent-item__subtitle">
-                      {getHistoryItemSubtitle(item, t('home.income'), t)}
-                    </Text>
-                    {item.created_by ? (
-                      <Text className="home-recent-item__meta">{item.created_by}</Text>
-                    ) : null}
-                    {item.comment ? (
-                      <Text className="home-recent-item__comment">{item.comment}</Text>
-                    ) : null}
+                    </div>
+                    <div className="home-ops-row__meta">{getHistoryItemMeta(item, t)}</div>
                   </div>
-                  <div className="home-recent-item__aside">
-                    <Text className={historyItemAmountClass(item)} weight="2">
-                      {formatSignedTransactionAmount(item)}
-                    </Text>
-                    <Text className="home-recent-item__date">
-                      {formatTransactionDateTime(item.transaction_date)}
-                    </Text>
+                  <div className="home-ops-row__aside">
+                    <div className={historyAmountClass(item)}>
+                      {formatHistoryTransactionAmount(item)}
+                    </div>
+                    <div className="home-ops-row__date">
+                      {formatTransactionDateShort(item.transaction_date)}
+                    </div>
                   </div>
                 </button>
               ))}
@@ -627,15 +632,6 @@ export function HistoryPage() {
           </>
         ) : null}
       </div>
-
-      <TransactionDetailModal
-        listItem={selectedListItem}
-        onClose={() => setSelectedListItem(null)}
-        onDeleted={() => {
-          setHistoryRetryCount((count) => count + 1)
-          setSelectedListItem(null)
-        }}
-      />
     </div>
   )
 }

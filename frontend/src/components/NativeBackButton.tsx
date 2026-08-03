@@ -9,6 +9,7 @@ import {
 import { backButton } from '@tma.js/sdk-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { historyBackTarget } from '../utils/historyBackTarget'
 import {
   type BackHandler,
   NativeBackButtonContext,
@@ -42,9 +43,11 @@ function NativeBackButtonController({
   const navigate = useNavigate()
   const pathname = normalizePathname(location.pathname)
   const pathnameRef = useRef(pathname)
+  const locationStateRef = useRef(location.state)
   const overlayHandlerRef = useRef(overlayHandler)
 
   pathnameRef.current = pathname
+  locationStateRef.current = location.state
   overlayHandlerRef.current = overlayHandler
 
   useEffect(() => {
@@ -63,6 +66,14 @@ function NativeBackButtonController({
       const activePathname = pathnameRef.current
       if (ROOT_PATHS.has(activePathname)) {
         return
+      }
+
+      if (activePathname === '/history') {
+        const backTarget = historyBackTarget(locationStateRef.current)
+        if (backTarget) {
+          navigate(backTarget, { replace: true })
+          return
+        }
       }
 
       const historyIndex = window.history.state?.idx

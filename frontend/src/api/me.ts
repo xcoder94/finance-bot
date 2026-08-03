@@ -11,6 +11,7 @@ type MeResponseJson = {
   language: string
   budget_name: string
   member_count: number
+  default_wallet_id: string | null
 }
 
 export type MeErrorType = 'unauthorized' | 'not_onboarded' | 'removed_from_family' | 'network'
@@ -24,7 +25,7 @@ export class MeRequestError extends Error {
   }
 }
 
-function mapMeResponse(data: MeResponseJson): AuthUser {
+export function mapMeResponse(data: MeResponseJson): AuthUser {
   return {
     id: data.id,
     telegramId: data.telegram_id,
@@ -35,6 +36,7 @@ function mapMeResponse(data: MeResponseJson): AuthUser {
     language: data.language,
     budgetName: data.budget_name,
     memberCount: data.member_count,
+    defaultWalletId: data.default_wallet_id,
   }
 }
 
