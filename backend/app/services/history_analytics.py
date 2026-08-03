@@ -22,7 +22,7 @@ from app.schemas.history_analytics import (
     TrendEntry,
     WalletBalancesResponse,
 )
-from app.services.wallets_categories import get_active_expense_parent
+from app.services.wallets_categories import get_expense_parent_including_deleted
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
 
@@ -149,16 +149,23 @@ async def get_history(
     limit: int,
     offset: int,
     include_created_by: bool,
+    expense_category_id: uuid.UUID | None = None,
 ) -> tuple[list[HistoryItem], int]:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
 
-    base_filters = (
+    base_filters: tuple = (
         Transaction.family_budget_id == family_budget_id,
         Transaction.is_deleted.is_(False),
         Transaction.transaction_date >= date_from,
         Transaction.transaction_date <= date_to,
     )
+    if expense_category_id is not None:
+        base_filters = (
+            *base_filters,
+            Transaction.type == "expense",
+            Transaction.expense_category_id == expense_category_id,
+        )
 
     count_stmt = select(func.count()).select_from(Transaction).where(*base_filters)
     total_count = int(await session.scalar(count_stmt) or 0)
@@ -307,7 +314,9 @@ async def get_expenses_by_subcategory(
     date_from: datetime,
     date_to: datetime,
 ) -> list[SubcategoryAmount]:
-    parent = await get_active_expense_parent(session, parent_category_id, family_budget_id)
+    parent = await get_expense_parent_including_deleted(
+        session, parent_category_id, family_budget_id
+    )
     if parent is None or parent.parent_id is not None:
         raise HTTPException(status_code=404)
 

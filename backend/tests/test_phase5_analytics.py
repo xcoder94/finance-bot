@@ -394,3 +394,86 @@ class TestTashkentElapsedDays:
         date_to = datetime(2026, 3, 31, tzinfo=UTC)
         now = datetime(2026, 3, 1, 20, 0, tzinfo=UTC)
         assert elapsed_days_in_period(date_from, date_to, now) == 2
+
+
+class TestSoftDeletedCategoryDrill:
+    async def test_expenses_by_subcategory_works_when_parent_soft_deleted(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        fx = await seed_phase5_fixtures(session, budget, user)
+        food = fx["food"]
+
+        food.is_deleted = True
+        food.deleted_at = datetime.now(UTC)
+        await session.flush()
+
+        resp = await client.get(
+            "/api/v1/analytics/expenses-by-subcategory",
+            headers=auth_headers(telegram_id),
+            params={
+                "currency": "UZS",
+                "date_from": SELECTED_MONTH_START.isoformat(),
+                "date_to": SELECTED_MONTH_END.isoformat(),
+                "parent_category_id": str(food.id),
+            },
+        )
+        assert resp.status_code == 200
+        by_name = {row["subcategory_name"]: row["amount"] for row in resp.json()}
+        assert by_name["Groceries"] == SHARED_FOOD_UZS
+        assert "Restaurants" not in by_name
+
+    async def test_expenses_by_category_includes_soft_deleted_parent_name(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        fx = await seed_phase5_fixtures(session, budget, user)
+        food = fx["food"]
+
+        food.is_deleted = True
+        food.deleted_at = datetime.now(UTC)
+        await session.flush()
+
+        resp = await client.get(
+            "/api/v1/analytics/expenses-by-category",
+            headers=auth_headers(telegram_id),
+            params={
+                "currency": "UZS",
+                "date_from": SELECTED_MONTH_START.isoformat(),
+                "date_to": SELECTED_MONTH_END.isoformat(),
+            },
+        )
+        assert resp.status_code == 200
+        by_name = {row["category_name"]: row["amount"] for row in resp.json()}
+        assert by_name["Food"] == SHARED_FOOD_UZS
+        assert by_name["Transport"] == SHARED_TRANSPORT_UZS
+
+    async def test_history_filters_by_expense_category_id(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        fx = await seed_phase5_fixtures(session, budget, user)
+        food_groceries = fx["food_groceries"]
+
+        resp = await client.get(
+            "/api/v1/transactions/history",
+            headers=auth_headers(telegram_id),
+            params={
+                "date_from": SELECTED_MONTH_START.isoformat(),
+                "date_to": SELECTED_MONTH_END.isoformat(),
+                "expense_category_id": str(food_groceries.id),
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_count"] == 2
+        assert len(body["items"]) == 2
+        amounts = {item["amount"] for item in body["items"]}
+        assert amounts == {SHARED_FOOD_UZS, SHARED_FOOD_USD}
+        assert all(item["type"] == "expense" for item in body["items"])

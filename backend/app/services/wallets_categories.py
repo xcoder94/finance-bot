@@ -90,6 +90,18 @@ async def get_active_expense_parent(
     return await session.scalar(stmt)
 
 
+async def get_expense_parent_including_deleted(
+    session: AsyncSession,
+    parent_id: uuid.UUID,
+    family_budget_id: uuid.UUID,
+) -> ExpenseCategory | None:
+    stmt = select(ExpenseCategory).where(
+        ExpenseCategory.id == parent_id,
+        ExpenseCategory.family_budget_id == family_budget_id,
+    )
+    return await session.scalar(stmt)
+
+
 def soft_delete(record: Wallet | IncomeCategory | ExpenseCategory) -> None:
     record.is_deleted = True
     record.deleted_at = datetime.now(UTC)
