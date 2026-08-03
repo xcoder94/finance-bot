@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import engine
@@ -199,17 +198,13 @@ class TestCreateQuickEntryIncome:
             assert without_cat.income_category_id is None
 
 
-class TestApiValidateExpenseRefsUnchanged:
-    async def test_api_still_rejects_parent_category(self) -> None:
+class TestApiValidateExpenseRefs:
+    async def test_api_accepts_parent_category(self) -> None:
         async with rollback_session() as session:
             _, budget = await create_user(session, telegram_id=1_001_005)
             wallet, food, _, _, _ = await seed_expense_tree(session, budget)
 
-            with pytest.raises(HTTPException) as exc:
-                await validate_expense_refs(
-                    session, budget.id, wallet.id, food.id
-                )
-            assert exc.value.status_code == 400
+            await validate_expense_refs(session, budget.id, wallet.id, food.id)
 
 
 class TestResolveCategoryId:

@@ -383,4 +383,5 @@ class TestMeEndpointUserLookup:
             "language": "uz",
             "budget_name": "Семейный бюджет",
             "member_count": 1,
+            "default_wallet_id": None,
         }

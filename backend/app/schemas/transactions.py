@@ -12,7 +12,7 @@ class IncomeCreate(BaseModel):
     amount: int = Field(gt=0)
     wallet_id: uuid.UUID
     income_category_id: uuid.UUID
-    comment: str | None = None
+    comment: str | None = Field(default=None, max_length=200)
 
 
 class ExpenseCreate(BaseModel):
@@ -22,7 +22,7 @@ class ExpenseCreate(BaseModel):
     amount: int = Field(gt=0)
     wallet_id: uuid.UUID
     expense_category_id: uuid.UUID
-    comment: str | None = None
+    comment: str | None = Field(default=None, max_length=200)
 
 
 class TransferCreate(BaseModel):
@@ -33,7 +33,7 @@ class TransferCreate(BaseModel):
     to_wallet_id: uuid.UUID
     amount: int = Field(gt=0)
     rate: Decimal | None = None
-    comment: str | None = None
+    comment: str | None = Field(default=None, max_length=200)
 
 
 IncomeUpdate = IncomeCreate

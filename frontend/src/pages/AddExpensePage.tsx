@@ -1,45 +1,44 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Select, Text, Textarea } from '@telegram-apps/telegram-ui'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import {
-  createExpenseCategory,
   createExpenseTransaction,
   fetchExpenseCategories,
   fetchWallets,
   type ExpenseCategory,
   type Wallet,
 } from '../api/transactions'
+import { CategoryPickerSheet } from '../components/forms/CategoryPickerSheet'
+import { FormSheet } from '../components/forms/FormSheet'
+import { FormSheetField } from '../components/forms/FormSheetField'
 import {
-  LimitedDigitInput,
-  MaskedDateTimeInput,
-  TransactionFormField,
-  TransactionFormLayout,
-  TransactionFormLoadError,
-  TransactionFormLoading,
-  TransactionSubmitError,
-  TransactionSuccessModal,
-} from '../components/transaction-form/TransactionFormShared'
+  FormSheetAmountField,
+  FormSheetCommentField,
+  FormSheetDateField,
+  isFormSheetDateValid,
+  WalletPickerSheet,
+} from '../components/forms/transactionAddFields'
+import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
+import { TransactionSubmitError } from '../components/transaction-form/TransactionFormShared'
 import { useAuthStore } from '../store/authStore'
 import {
-  cacheExpenseCategory,
   getCachedExpenseCategories,
   getCachedWallets,
   invalidateHomeData,
   peekExpenseCategories,
   peekWallets,
 } from '../store/dataCacheStore'
-import {
-  formatWalletLabel,
-  isValidMaskedDatetime,
-  maskedDatetimeToIso,
-  nowMaskedDatetimeValue,
-  parsePositiveInt,
-} from '../utils/transactionForm'
 import { getDisplayName } from '../utils/getDisplayName'
-
-const GENERAL_SUBCATEGORY_NAME = 'Общее'
+import { parsePositiveInt } from '../utils/transactionForm'
+import {
+  filterUncategorizedCategories,
+  maskedDateToTashkentIso,
+  nowMaskedDateInTashkent,
+  resolveDefaultWalletId,
+  walletCurrencySuffix,
+} from '../utils/transactionFormFields'
 
 type ReferenceState =
   | { status: 'loading' }
@@ -47,20 +46,14 @@ type ReferenceState =
   | { status: 'success'; wallets: Wallet[]; categories: ExpenseCategory[] }
 
 function getTopLevelCategories(categories: ExpenseCategory[]): ExpenseCategory[] {
-  return categories.filter((category) => category.parent_id === null)
-}
-
-function getSubcategories(
-  categories: ExpenseCategory[],
-  parentId: string,
-): ExpenseCategory[] {
-  return categories.filter((category) => category.parent_id === parentId)
+  return filterUncategorizedCategories(categories.filter((category) => category.parent_id === null))
 }
 
 export function AddExpensePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const familyId = useAuthStore((state) => state.user?.familyBudgetId ?? '')
+  const defaultWalletId = useAuthStore((state) => state.user?.defaultWalletId ?? null)
 
   const [referenceState, setReferenceState] = useState<ReferenceState>(() => {
     const wallets = peekWallets(familyId)
@@ -71,24 +64,29 @@ export function AddExpensePage() {
   })
   const [referenceRetry, setReferenceRetry] = useState(0)
 
-  const [transactionDate, setTransactionDate] = useState(nowMaskedDatetimeValue)
+  const [transactionDate, setTransactionDate] = useState(nowMaskedDateInTashkent)
   const [dateError, setDateError] = useState(false)
   const [amount, setAmount] = useState('')
   const [amountOverLimit, setAmountOverLimit] = useState(false)
   const [walletId, setWalletId] = useState('')
-  const [parentCategoryId, setParentCategoryId] = useState('')
-  const [subcategoryId, setSubcategoryId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [categoryLabel, setCategoryLabel] = useState('')
   const [comment, setComment] = useState('')
 
-  const [subcategoryLoading, setSubcategoryLoading] = useState(false)
-  const [subcategoryError, setSubcategoryError] = useState(false)
-  const [hiddenFallbackParentIds, setHiddenFallbackParentIds] = useState<Set<string>>(
-    () => new Set(),
-  )
-  const subcategoryRequestId = useRef(0)
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
+  const [walletPickerOpen, setWalletPickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
+
+  const closeSheet = useCallback(() => {
+    if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
+      navigate(-1)
+      return
+    }
+    navigate('/', { replace: true })
+  }, [navigate])
+
+  useNativeBackButtonOverlay(!categoryPickerOpen && !walletPickerOpen, closeSheet)
 
   const loadReferenceData = useCallback(async () => {
     setReferenceState({ status: 'loading' })
@@ -114,108 +112,34 @@ export function AddExpensePage() {
     return getTopLevelCategories(referenceState.categories)
   }, [referenceState])
 
-  const subcategories = useMemo(() => {
-    if (referenceState.status !== 'success' || !parentCategoryId) {
-      return []
-    }
-    return getSubcategories(referenceState.categories, parentCategoryId)
-  }, [referenceState, parentCategoryId])
-
-  const ensureSubcategoryForParent = useCallback(
-    async (parentId: string, categories: ExpenseCategory[]) => {
-      const requestId = subcategoryRequestId.current + 1
-      subcategoryRequestId.current = requestId
-      setSubcategoryError(false)
-      setSubcategoryLoading(false)
-
-      const existing = getSubcategories(categories, parentId)
-      if (existing.length > 0) {
-        setSubcategoryId(existing[0].id)
-        return
-      }
-
-      setHiddenFallbackParentIds((current) => new Set(current).add(parentId))
-      setSubcategoryLoading(true)
-      try {
-        const created = await createExpenseCategory({
-          name: GENERAL_SUBCATEGORY_NAME,
-          parent_id: parentId,
-        })
-        if (subcategoryRequestId.current !== requestId) {
-          return
-        }
-        cacheExpenseCategory(familyId, created)
-        setReferenceState((current) => {
-          if (current.status !== 'success') {
-            return current
-          }
-          return {
-            ...current,
-            categories: [...current.categories, created],
-          }
-        })
-        setSubcategoryId(created.id)
-      } catch {
-        if (subcategoryRequestId.current !== requestId) {
-          return
-        }
-        setSubcategoryId('')
-        setSubcategoryError(true)
-      } finally {
-        if (subcategoryRequestId.current === requestId) {
-          setSubcategoryLoading(false)
-        }
-      }
-    },
-    [familyId],
-  )
-
   useEffect(() => {
     if (referenceState.status !== 'success') {
       return
     }
+
     if (!walletId && referenceState.wallets.length > 0) {
-      setWalletId(referenceState.wallets[0].id)
+      setWalletId(resolveDefaultWalletId(referenceState.wallets, defaultWalletId))
     }
-    if (!parentCategoryId && topLevelCategories.length > 0) {
-      const firstParentId = topLevelCategories[0].id
-      setParentCategoryId(firstParentId)
-      void ensureSubcategoryForParent(firstParentId, referenceState.categories)
-    }
-  }, [referenceState, walletId, parentCategoryId, topLevelCategories, ensureSubcategoryForParent])
 
-  const handleParentCategoryChange = (nextParentId: string) => {
-    setParentCategoryId(nextParentId)
-    setSubcategoryId('')
-    setSubcategoryError(false)
-    if (referenceState.status === 'success') {
-      void ensureSubcategoryForParent(nextParentId, referenceState.categories)
+    if (!categoryId && topLevelCategories.length > 0) {
+      const firstParent = topLevelCategories[0]
+      setCategoryId(firstParent.id)
+      setCategoryLabel(getDisplayName(firstParent, t))
     }
-  }
+  }, [referenceState, walletId, categoryId, topLevelCategories, defaultWalletId, t])
 
-  const resetForm = useCallback(() => {
-    setTransactionDate(nowMaskedDatetimeValue())
-    setDateError(false)
-    setAmount('')
-    setAmountOverLimit(false)
-    setComment('')
-    setSubmitError(false)
-    setSubcategoryError(false)
-    setSubcategoryId('')
-    if (referenceState.status === 'success') {
-      if (referenceState.wallets.length > 0) {
-        setWalletId(referenceState.wallets[0].id)
-      }
-      if (topLevelCategories.length > 0) {
-        const firstParentId = topLevelCategories[0].id
-        setParentCategoryId(firstParentId)
-        void ensureSubcategoryForParent(firstParentId, referenceState.categories)
-      }
-    }
-  }, [referenceState, topLevelCategories, ensureSubcategoryForParent])
+  const selectedWallet =
+    referenceState.status === 'success'
+      ? referenceState.wallets.find((wallet) => wallet.id === walletId) ?? null
+      : null
+
+  const showDefaultWalletHint =
+    Boolean(defaultWalletId) &&
+    selectedWallet?.id === defaultWalletId &&
+    referenceState.status === 'success'
 
   const validateDate = () => {
-    const valid = isValidMaskedDatetime(transactionDate)
+    const valid = isFormSheetDateValid(transactionDate)
     setDateError(!valid)
     return valid
   }
@@ -226,11 +150,11 @@ export function AddExpensePage() {
     }
 
     const parsedAmount = parsePositiveInt(amount)
-    if (!parsedAmount || !walletId || !subcategoryId || amountOverLimit) {
+    if (!parsedAmount || !walletId || !categoryId || amountOverLimit) {
       return
     }
 
-    const transactionDateIso = maskedDatetimeToIso(transactionDate)
+    const transactionDateIso = maskedDateToTashkentIso(transactionDate)
     if (!transactionDateIso) {
       setDateError(true)
       return
@@ -244,12 +168,11 @@ export function AddExpensePage() {
         transaction_date: transactionDateIso,
         amount: parsedAmount,
         wallet_id: walletId,
-        expense_category_id: subcategoryId,
+        expense_category_id: categoryId,
         comment: comment.trim() || null,
       })
       invalidateHomeData(familyId)
-      resetForm()
-      setShowSuccess(true)
+      closeSheet()
     } catch {
       setSubmitError(true)
     } finally {
@@ -257,140 +180,110 @@ export function AddExpensePage() {
     }
   }
 
+  const canSubmit =
+    referenceState.status === 'success' &&
+    referenceState.wallets.length > 0 &&
+    topLevelCategories.length > 0 &&
+    parsePositiveInt(amount) !== null &&
+    Boolean(walletId) &&
+    Boolean(categoryId) &&
+    !amountOverLimit &&
+    isFormSheetDateValid(transactionDate) &&
+    comment.length <= 200
+
   if (referenceState.status === 'loading') {
-    return <TransactionFormLoading />
+    return (
+      <FormSheet open title={t('addExpense.title')} onClose={closeSheet} showPrimary={false}>
+        <div className="form-sheet-loading" role="status" aria-live="polite">
+          <Spinner size="m" aria-hidden="true" />
+          <span className="visually-hidden">{t('home.loading')}</span>
+        </div>
+      </FormSheet>
+    )
   }
 
   if (referenceState.status === 'error') {
     return (
-      <TransactionFormLoadError onRetry={() => setReferenceRetry((count) => count + 1)} />
+      <FormSheet open title={t('addExpense.title')} onClose={closeSheet} showPrimary={false}>
+        <div className="form-sheet-load-error" role="alert">
+          <p>{t('addTransaction.loadError')}</p>
+          <button type="button" onClick={() => setReferenceRetry((count) => count + 1)}>
+            {t('auth.retry')}
+          </button>
+        </div>
+      </FormSheet>
     )
   }
 
-  const { wallets } = referenceState
-  const hideSubcategorySelect =
-    !parentCategoryId ||
-    subcategories.length === 0 ||
-    hiddenFallbackParentIds.has(parentCategoryId)
-  const canSubmit =
-    wallets.length > 0 &&
-    topLevelCategories.length > 0 &&
-    parsePositiveInt(amount) !== null &&
-    Boolean(walletId) &&
-    Boolean(subcategoryId) &&
-    !subcategoryLoading &&
-    !amountOverLimit &&
-    isValidMaskedDatetime(transactionDate)
+  const { wallets, categories } = referenceState
 
   return (
     <>
-      <TransactionFormLayout
-        titleKey="addExpense.title"
-        onCancel={() => navigate('/')}
-        onSubmit={() => void handleSubmit()}
-        submitting={submitting}
-        submitDisabled={!canSubmit}
+      <FormSheet
+        open
+        title={t('addExpense.title')}
+        onClose={closeSheet}
+        onPrimary={() => void handleSubmit()}
+        primaryDisabled={!canSubmit}
+        primaryLoading={submitting}
       >
-        <TransactionFormField>
-          <MaskedDateTimeInput
-            value={transactionDate}
-            onChange={setTransactionDate}
-            hasError={dateError}
-            onBlur={validateDate}
-            onEdit={() => setDateError(false)}
-          />
-        </TransactionFormField>
+        <FormSheetAmountField
+          value={amount}
+          currencySuffix={walletCurrencySuffix(selectedWallet?.currency ?? 'UZS')}
+          overLimit={amountOverLimit}
+          hint={t('formSheet.amountCurrencyHint')}
+          onChange={setAmount}
+          onOverLimitChange={setAmountOverLimit}
+        />
 
-        <TransactionFormField>
-          <LimitedDigitInput
-            header={t('addTransaction.amount')}
-            value={amount}
-            onChange={setAmount}
-            overLimit={amountOverLimit}
-            onOverLimitChange={setAmountOverLimit}
-          />
-        </TransactionFormField>
+        <FormSheetField
+          label={t('addTransaction.category')}
+          right="›"
+          onClick={() => setCategoryPickerOpen(true)}
+        >
+          <span>{categoryLabel || '—'}</span>
+        </FormSheetField>
 
-        <TransactionFormField>
-          <Select
-            header={t('addTransaction.wallet')}
-            value={walletId}
-            onChange={(event) => setWalletId(event.target.value)}
-            disabled={wallets.length === 0}
-          >
-            {wallets.map((wallet) => (
-              <option key={wallet.id} value={wallet.id}>
-                {formatWalletLabel(getDisplayName(wallet, t), wallet.currency)}
-              </option>
-            ))}
-          </Select>
-        </TransactionFormField>
+        <FormSheetField
+          label={t('addTransaction.wallet')}
+          right="›"
+          hint={showDefaultWalletHint ? t('formSheet.defaultWalletHint') : undefined}
+          onClick={() => setWalletPickerOpen(true)}
+        >
+          <span>{selectedWallet ? getDisplayName(selectedWallet, t) : '—'}</span>
+        </FormSheetField>
 
-        <TransactionFormField>
-          <Select
-            header={t('addTransaction.category')}
-            value={parentCategoryId}
-            onChange={(event) => handleParentCategoryChange(event.target.value)}
-            disabled={topLevelCategories.length === 0}
-          >
-            {topLevelCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {getDisplayName(category, t)}
-              </option>
-            ))}
-          </Select>
-        </TransactionFormField>
+        <FormSheetDateField
+          value={transactionDate}
+          hasError={dateError}
+          onChange={setTransactionDate}
+          onBlur={validateDate}
+          onEdit={() => setDateError(false)}
+        />
 
-        {!hideSubcategorySelect ? (
-          <TransactionFormField>
-            <Select
-              header={t('addTransaction.subcategory')}
-              value={subcategoryId}
-              onChange={(event) => setSubcategoryId(event.target.value)}
-              disabled={subcategories.length === 0 || subcategoryLoading}
-            >
-              {subcategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {getDisplayName(category, t)}
-                </option>
-              ))}
-            </Select>
-          </TransactionFormField>
-        ) : null}
-
-        {subcategoryError ? (
-          <div className="transaction-form__submit-error" role="alert">
-            <Text>{t('addExpense.subcategoryCreateError')}</Text>
-            <Button
-              mode="plain"
-              size="s"
-              onClick={() =>
-                void ensureSubcategoryForParent(parentCategoryId, referenceState.categories)
-              }
-            >
-              {t('auth.retry')}
-            </Button>
-          </div>
-        ) : null}
-
-        <TransactionFormField>
-          <Textarea
-            header={t('addTransaction.commentOptional')}
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            rows={3}
-          />
-        </TransactionFormField>
+        <FormSheetCommentField value={comment} onChange={setComment} />
 
         {submitError ? <TransactionSubmitError onRetry={() => void handleSubmit()} /> : null}
-      </TransactionFormLayout>
+      </FormSheet>
 
-      <TransactionSuccessModal
-        open={showSuccess}
-        onGoHome={() => navigate('/')}
-        onAddAnother={() => {
-          setShowSuccess(false)
+      <CategoryPickerSheet
+        variant="expense"
+        open={categoryPickerOpen}
+        categories={categories}
+        selectedCategoryId={categoryId}
+        onClose={() => setCategoryPickerOpen(false)}
+        onSelect={(selection) => {
+          setCategoryId(selection.categoryId)
+          setCategoryLabel(selection.label)
         }}
+      />
+
+      <WalletPickerSheet
+        open={walletPickerOpen}
+        wallets={wallets}
+        selectedWalletId={walletId}
+        onClose={() => setWalletPickerOpen(false)}
+        onSelect={setWalletId}
       />
     </>
   )

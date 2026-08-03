@@ -72,14 +72,14 @@
     "opsCount": "{{count}} за {{monthShort}}"
   },
   "addIncome": {
-    "title": "Добавление дохода"
+    "title": "Новый доход"
   },
   "addExpense": {
-    "title": "Добавление расхода",
-    "subcategoryCreateError": "Не удалось подготовить подкатегорию. Проверьте подключение и повторите попытку."
+    "title": "Новый расход"
   },
   "addTransfer": {
-    "title": "Перевод / обмен валюты"
+    "titleSame": "Перевод",
+    "titleExchange": "Обмен"
   },
   "addTransaction": {
     "dateTime": "Дата и время",
@@ -89,9 +89,9 @@
     "category": "Категория",
     "subcategory": "Подкатегория",
     "commentOptional": "Комментарий (необязательно)",
-    "sourceWallet": "Кошелёк-источник",
-    "destinationWallet": "Кошелёк-получатель",
-    "rateLabel": "Курс (UZS за 1 USD)",
+    "sourceWallet": "Откуда",
+    "destinationWallet": "Куда",
+    "rateLabel": "Курс",
     "walletWillReceive": "Получит кошелёк",
     "cancel": "Отменить",
     "add": "Добавить",
@@ -101,6 +101,7 @@
     "goHome": "На главную",
     "addAnother": "Добавить ещё",
     "invalidDateTime": "Введите корректную дату и время",
+    "invalidDate": "Введите корректную дату",
     "amountTooLong": "Сумма не должна превышать 10 цифр"
   },
   "history": {
@@ -111,6 +112,8 @@
     "dateTo": "По",
     "transfer": "Перевод",
     "exchange": "Обмен валюты",
+    "emptyTitle": "Операций за период нет",
+    "emptyHint": "Смените месяц или сбросьте фильтр по категории.",
     "loadMore": "Показать ещё",
     "invalidDate": "Введите корректную дату",
     "invalidRange": "Дата «С» не может быть позже даты «По»",
@@ -118,21 +121,40 @@
     "edit": "Редактировать",
     "delete": "Удалить",
     "close": "Закрыть",
-    "confirmDelete": "Удалить эту операцию?",
+    "confirmDelete": "Удалить запись?",
     "deleteError": "Не удалось удалить операцию",
     "destinationAmount": "Получено: {{amount}}"
   },
   "editIncome": {
-    "title": "Редактирование дохода"
+    "title": "Запись"
   },
   "editExpense": {
-    "title": "Редактирование расхода"
+    "title": "Запись"
   },
   "editTransfer": {
-    "title": "Редактирование перевода"
+    "title": "Запись"
   },
   "editTransaction": {
     "save": "Сохранить"
+  },
+  "categoryPicker": {
+    "expenseTitle": "Категория расхода",
+    "incomeTitle": "Категория дохода",
+    "expenseIntro": "Можно остановиться на родителе — подкатегория необязательна.",
+    "parentOnly": "Без подкатегории · только «{{parent}}»"
+  },
+  "formSheet": {
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "date": "Дата",
+    "comment": "Комментарий",
+    "commentTooLong": "Комментарий не должен превышать 200 знаков",
+    "amountCurrencyHint": "Валюта берётся от кошелька и отдельно не выбирается",
+    "defaultWalletHint": "Подставлен кошелёк по умолчанию",
+    "incomeCategoryHint": "У доходов подкатегорий нет",
+    "transferSameIntro": "Валюты совпадают — поля курса нет.",
+    "transferDiffIntro": "Валюты разные — появляется курс и строка результата.",
+    "deleteRecord": "Удалить запись"
   },
   "analytics": {
     "title": "Аналитика",

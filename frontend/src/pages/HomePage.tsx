@@ -8,19 +8,29 @@ import {
   fetchSummary,
   fetchWalletBalances,
   type HistoryItem,
-  type SummaryResponse,
-  type WalletBalancesResponse,
 } from '../api/home'
 import { useAuthStore } from '../store/authStore'
 import {
   getCachedHomeSummary,
   getCachedRecentHistory,
   getCachedWalletBalances,
+  invalidateHomeData,
   peekHomeSummary,
   peekRecentHistory,
   peekWalletBalances,
 } from '../store/dataCacheStore'
+import { editRouteForItem } from '../utils/editRouteForItem'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
+import {
+  getBalanceForCurrency,
+  getHomeBudgetHeading,
+  getSummaryForCurrency,
+} from '../utils/homeFigures'
+import {
+  composeBalancesFetchTrigger,
+  composeHomeFetchTrigger,
+  shouldRefreshHomeOnVisibility,
+} from '../utils/homeVisibility'
 import {
   getHistoryItemMeta,
   getHistoryItemTitle,
@@ -47,21 +57,6 @@ type FetchState<T> =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'success'; data: T }
-
-function getSummaryForCurrency(
-  summary: SummaryResponse,
-  currency: Currency,
-): { income: number; expense: number } {
-  const entry = summary.by_currency.find((row) => row.currency === currency)
-  return {
-    income: entry?.income ?? 0,
-    expense: entry?.expense ?? 0,
-  }
-}
-
-function getBalanceForCurrency(balances: WalletBalancesResponse, currency: Currency): number {
-  return balances.balances.find((row) => row.currency === currency)?.balance ?? 0
-}
 
 function isTransferLike(item: HistoryItem): boolean {
   return item.type === 'transfer'
@@ -211,16 +206,32 @@ export function HomePage() {
   const familyId = user?.familyBudgetId ?? ''
   const [selectedMonth, setSelectedMonth] = useState<HomeMonth>(currentMonthInTashkent)
   const [primaryCurrency, setPrimaryCurrency] = useState<Currency>('UZS')
+  const [visibilityRefreshCount, setVisibilityRefreshCount] = useState(0)
 
   const { year, month } = selectedMonth
   const monthKey = `${year}-${month}`
+  const homeFetchTrigger = composeHomeFetchTrigger(monthKey, visibilityRefreshCount)
+  const balancesFetchTrigger = composeBalancesFetchTrigger(visibilityRefreshCount)
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (!familyId || !shouldRefreshHomeOnVisibility(document.visibilityState)) {
+        return
+      }
+      invalidateHomeData(familyId)
+      setVisibilityRefreshCount((count) => count + 1)
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [familyId])
 
   const summaryFetch = useFetchBlock(
     useCallback(
       () => getCachedHomeSummary(familyId, year, month, () => fetchSummary(year, month)),
       [familyId, year, month],
     ),
-    monthKey,
+    homeFetchTrigger,
     peekHomeSummary(familyId, year, month),
   )
   const balancesFetch = useFetchBlock(
@@ -228,7 +239,7 @@ export function HomePage() {
       () => getCachedWalletBalances(familyId, fetchWalletBalances),
       [familyId],
     ),
-    'mount',
+    balancesFetchTrigger,
     peekWalletBalances(familyId),
   )
   const historyFetch = useFetchBlock(
@@ -237,7 +248,7 @@ export function HomePage() {
         getCachedRecentHistory(familyId, year, month, () => fetchRecentHistory(year, month)),
       [familyId, year, month],
     ),
-    monthKey,
+    homeFetchTrigger,
     peekRecentHistory(familyId, year, month),
   )
 
@@ -306,7 +317,7 @@ export function HomePage() {
     <div className="page-content home-page">
       <div className="home-header">
         <div className="home-header__info">
-          <h1 className="home-header__title">{user?.budgetName ?? ''}</h1>
+          <h1 className="home-header__title">{getHomeBudgetHeading(user)}</h1>
           <p className="home-header__role">{roleLine}</p>
         </div>
         <div className="home-currency-chip" role="group" aria-label={t('home.summary')}>
@@ -407,7 +418,7 @@ export function HomePage() {
             <button
               type="button"
               className="home-recent-header__link"
-              onClick={() => navigate('/history')}
+              onClick={() => navigate('/history', { state: { from: 'home' } })}
             >
               {t('home.recentTransactions')}
               <span className="home-recent-header__chevron"> ›</span>
@@ -426,7 +437,12 @@ export function HomePage() {
           ) : historySuccess && totalCount > 0 ? (
             <div className="home-ops-card">
               {historyItems.map((item) => (
-                <div key={item.id} className="home-ops-row">
+                <button
+                  key={item.id}
+                  type="button"
+                  className="home-ops-row home-ops-row--clickable"
+                  onClick={() => navigate(editRouteForItem(item))}
+                >
                   <div className="home-ops-row__main">
                     <div className="home-ops-row__title">
                       {getHistoryItemTitle(item, transferLabels, t)}
@@ -441,7 +457,7 @@ export function HomePage() {
                       {formatTransactionDateShort(item.transaction_date)}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           ) : historyLoading ? (
