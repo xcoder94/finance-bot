@@ -1,4 +1,4 @@
-export const ENTITY_NAME_MAX_LENGTH = 50
+export const ENTITY_NAME_MAX_LENGTH = 30
 
 export type EntityNameValidationError = 'required' | 'tooLong'
 

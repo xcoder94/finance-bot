@@ -81,7 +81,7 @@ function CategoryNameForm({
     nameValidationError === 'required'
       ? 'settings.nameRequired'
       : nameValidationError === 'tooLong'
-        ? 'settings.nameTooLong'
+        ? 'settings.nameTooLong30'
         : null
 
   return (

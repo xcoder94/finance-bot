@@ -9,6 +9,8 @@ type EntityDeleteConfirmSheetProps = {
   open: boolean
   entityName: string
   transactionCount: number
+  intro?: string
+  dangerLabel?: string
   onClose: () => void
   onConfirm: () => void
   confirming?: boolean
@@ -21,6 +23,8 @@ export function EntityDeleteConfirmSheet({
   open,
   entityName,
   transactionCount,
+  intro,
+  dangerLabel = WALLET_DELETE_DANGER_LABEL,
   onClose,
   onConfirm,
   confirming = false,
@@ -29,13 +33,13 @@ export function EntityDeleteConfirmSheet({
   errorMessage = 'Не удалось сохранить изменения',
 }: EntityDeleteConfirmSheetProps) {
   const title = buildEntityDeleteTitle(entityName)
-  const intro = buildWalletDeleteIntro(transactionCount)
+  const resolvedIntro = intro ?? buildWalletDeleteIntro(transactionCount)
 
   return (
     <FormSheet
       open={open}
       title={title}
-      intro={intro}
+      intro={resolvedIntro}
       onClose={onClose}
       showPrimary={false}
       danger={
@@ -45,7 +49,7 @@ export function EntityDeleteConfirmSheet({
           onClick={onConfirm}
           disabled={confirming}
         >
-          {confirming ? '…' : WALLET_DELETE_DANGER_LABEL}
+          {confirming ? '…' : dangerLabel}
         </button>
       }
     >

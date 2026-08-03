@@ -56,6 +56,10 @@ export function expenseCategoriesSubtitle(parentCount: number, subcategoryCount:
   return `${parentCount} родительских · ${subcategoryCount} ${subcategoryWordRu(subcategoryCount)}`
 }
 
+export function expenseParentRowSubtitle(subcategoryCount: number): string {
+  return `${subcategoryCount} ${subcategoryWordRu(subcategoryCount)}`
+}
+
 export function membersSubtitle(memberCount: number): string {
   return `${memberCount} из 4`
 }

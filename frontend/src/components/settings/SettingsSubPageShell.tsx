@@ -7,6 +7,8 @@ type SettingsSubPageShellProps = {
   backTo: string
   actionLabel?: string
   onAction?: () => void
+  dangerLabel?: string
+  onDanger?: () => void
   children?: ReactNode
 }
 
@@ -16,6 +18,8 @@ export function SettingsSubPageShell({
   backTo,
   actionLabel,
   onAction,
+  dangerLabel,
+  onDanger,
   children,
 }: SettingsSubPageShellProps) {
   return (
@@ -28,6 +32,11 @@ export function SettingsSubPageShell({
       {actionLabel && onAction ? (
         <button type="button" className="settings-sub-page__action" onClick={onAction}>
           {actionLabel}
+        </button>
+      ) : null}
+      {dangerLabel && onDanger ? (
+        <button type="button" className="settings-sub-page__danger" onClick={onDanger}>
+          {dangerLabel}
         </button>
       ) : null}
     </div>

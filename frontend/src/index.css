@@ -1076,6 +1076,19 @@ body {
   cursor: pointer;
 }
 
+.settings-sub-page__danger {
+  margin-top: 4px;
+  border: 1px solid var(--exp);
+  border-radius: 12px;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--exp);
+  background: none;
+  cursor: pointer;
+}
+
 .settings-entity-group {
   display: flex;
   flex-direction: column;

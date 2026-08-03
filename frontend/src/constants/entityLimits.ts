@@ -3,6 +3,7 @@
 export const SHARED_WALLET_LIMIT = 10
 export const PERSONAL_WALLET_LIMIT = 5
 export const PARENT_CATEGORY_LIMIT = 8
+export const INCOME_CATEGORY_LIMIT = 8
 export const SUBCATEGORY_LIMIT = 8
 export const ENTITY_NAME_MAX = 30
 
