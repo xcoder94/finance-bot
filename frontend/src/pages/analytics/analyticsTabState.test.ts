@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { CHART_CATEGORY_COLORS } from '../../utils/chartColors'
 import {
   applyAnalyticsCurrencyChange,
+  applyClearHistoryFilter,
   switchAnalyticsTab,
   type AnalyticsShellState,
 } from '../../utils/analyticsTabState'
@@ -48,5 +49,37 @@ describe('applyAnalyticsCurrencyChange', () => {
     expect(next.selectedMonth).toEqual(baseState.selectedMonth)
     expect(next.rangeFrom).toBe(baseState.rangeFrom)
     expect(next.rangeTo).toBe(baseState.rangeTo)
+  })
+})
+
+describe('applyClearHistoryFilter', () => {
+  it('clears filter and returns to charts drill while keeping period and drill parent', () => {
+    const historyState: AnalyticsShellState = {
+      ...baseState,
+      activeTab: 'history',
+    }
+
+    const next = applyClearHistoryFilter(historyState, { returnToDrill: true })
+
+    expect(next.historyCategoryFilter).toBeNull()
+    expect(next.activeTab).toBe('charts')
+    expect(next.drillParent).toEqual(baseState.drillParent)
+    expect(next.selectedMonth).toEqual(baseState.selectedMonth)
+    expect(next.rangeFrom).toBe(baseState.rangeFrom)
+    expect(next.rangeTo).toBe(baseState.rangeTo)
+    expect(next.periodTab).toBe(baseState.periodTab)
+  })
+
+  it('clears filter without changing tab when drill parent is absent', () => {
+    const historyState: AnalyticsShellState = {
+      ...baseState,
+      activeTab: 'history',
+      drillParent: null,
+    }
+
+    const next = applyClearHistoryFilter(historyState, { returnToDrill: true })
+
+    expect(next.historyCategoryFilter).toBeNull()
+    expect(next.activeTab).toBe('history')
   })
 })

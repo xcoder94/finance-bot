@@ -1,4 +1,4 @@
-import type { HistoryCategoryFilter } from './analyticsDrill'
+import type { ClearHistoryFilterOptions, HistoryCategoryFilter } from './analyticsDrill'
 import type { Currency } from './formatCurrency'
 import type { PeriodTab, SelectedMonth } from './periodFilter'
 
@@ -40,4 +40,23 @@ export function applyAnalyticsCurrencyChange(
     ...state,
     currency,
   }
+}
+
+export function applyClearHistoryFilter(
+  state: AnalyticsShellState,
+  options?: ClearHistoryFilterOptions,
+): AnalyticsShellState {
+  const next: AnalyticsShellState = {
+    ...state,
+    historyCategoryFilter: null,
+  }
+
+  if (options?.returnToDrill && state.drillParent) {
+    return {
+      ...next,
+      activeTab: 'charts',
+    }
+  }
+
+  return next
 }
