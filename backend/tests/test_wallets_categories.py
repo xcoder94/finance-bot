@@ -427,7 +427,14 @@ class TestExpenseCategoriesApi:
         listed = (await client.get("/api/v1/categories/expense", headers=headers)).json()
         assert len(listed) == 2
         by_id = {category["id"]: category for category in listed}
-        assert set(by_id[top_id]) == {"id", "name", "translation_key", "parent_id", "transaction_count"}
+        assert set(by_id[top_id]) == {
+            "id",
+            "name",
+            "translation_key",
+            "parent_id",
+            "color_index",
+            "transaction_count",
+        }
         assert by_id[top_id]["transaction_count"] == 0
         assert by_id[sub_resp.json()["id"]]["transaction_count"] == 1
 
@@ -568,11 +575,18 @@ class TestListingQueryCounts:
                 ),
                 (
                     "/api/v1/categories/income",
-                    {"id", "name", "translation_key", "transaction_count"},
+                    {"id", "name", "translation_key", "color_index", "transaction_count"},
                 ),
                 (
                     "/api/v1/categories/expense",
-                    {"id", "name", "translation_key", "parent_id", "transaction_count"},
+                    {
+                        "id",
+                        "name",
+                        "translation_key",
+                        "parent_id",
+                        "color_index",
+                        "transaction_count",
+                    },
                 ),
             ):
                 select_statements.clear()

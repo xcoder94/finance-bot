@@ -46,6 +46,7 @@ class CategoryAmount(BaseModel):
     category_id: uuid.UUID
     category_name: str
     category_translation_key: str | None = None
+    color_index: int
     amount: int = Field(ge=0)
 
 
@@ -55,6 +56,7 @@ class SubcategoryAmount(BaseModel):
     subcategory_id: uuid.UUID
     subcategory_name: str
     subcategory_translation_key: str | None = None
+    color_index: int
     amount: int = Field(ge=0)
 
 

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Index, String, text
+from sqlalchemy import ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +18,7 @@ class ExpenseCategory(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("expense_categories.id"), nullable=True
     )
+    color_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
 
 Index(

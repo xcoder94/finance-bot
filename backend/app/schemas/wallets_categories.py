@@ -74,6 +74,7 @@ class IncomeCategoryResponse(BaseModel):
     id: uuid.UUID
     name: str
     translation_key: str | None
+    color_index: int
     transaction_count: int = Field(default=0)
 
 
@@ -113,6 +114,7 @@ class ExpenseCategoryResponse(BaseModel):
     name: str
     translation_key: str | None
     parent_id: uuid.UUID | None
+    color_index: int
     transaction_count: int = Field(default=0)
 
 

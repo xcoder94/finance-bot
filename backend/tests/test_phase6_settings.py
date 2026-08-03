@@ -1,12 +1,15 @@
 import socket
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.expense_category import ExpenseCategory
 from app.models.income_category import IncomeCategory
+from app.models.transaction import Transaction
 from app.models.wallet import Wallet
 from app.services.entity_limits import (
     LIMIT_EXPENSE_PARENTS,
@@ -228,3 +231,173 @@ async def test_deleted_category_frees_parent_slot(
         json={"name": "Replacement parent"},
     )
     assert create_resp.status_code == 201
+
+
+async def test_new_income_category_gets_smallest_free_color(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    for color_index in (1, 2, 3):
+        session.add(
+            IncomeCategory(
+                family_budget_id=budget.id,
+                name=f"Income {color_index}",
+                color_index=color_index,
+            )
+        )
+    await session.flush()
+
+    response = await client.post(
+        "/api/v1/categories/income",
+        headers=headers,
+        json={"name": "Fourth income"},
+    )
+    assert response.status_code == 201
+    assert response.json()["color_index"] == 4
+
+
+async def test_delete_parent_reuses_longest_deleted_color(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    for color_index in range(1, 9):
+        session.add(
+            ExpenseCategory(
+                family_budget_id=budget.id,
+                name=f"Active {color_index}",
+                color_index=color_index,
+            )
+        )
+    await session.flush()
+
+    to_delete = await session.scalar(
+        select(ExpenseCategory).where(
+            ExpenseCategory.family_budget_id == budget.id,
+            ExpenseCategory.color_index == 5,
+            ExpenseCategory.is_deleted.is_(False),
+        )
+    )
+    assert to_delete is not None
+
+    delete_resp = await client.delete(
+        f"/api/v1/categories/expense/{to_delete.id}",
+        headers=headers,
+    )
+    assert delete_resp.status_code == 200
+
+    create_resp = await client.post(
+        "/api/v1/categories/expense",
+        headers=headers,
+        json={"name": "Replacement"},
+    )
+    assert create_resp.status_code == 201
+    assert create_resp.json()["color_index"] == 5
+
+
+async def test_no_free_color_reuses_oldest_deleted_color(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    now = datetime.now(UTC)
+    for color_index in range(1, 9):
+        session.add(
+            ExpenseCategory(
+                family_budget_id=budget.id,
+                name=f"Deleted {color_index}",
+                color_index=color_index,
+                is_deleted=True,
+                deleted_at=now - timedelta(days=300 - color_index),
+            )
+        )
+    for color_index in range(1, 9):
+        session.add(
+            ExpenseCategory(
+                family_budget_id=budget.id,
+                name=f"Active {color_index}",
+                color_index=color_index,
+            )
+        )
+    await session.flush()
+
+    to_delete = await session.scalar(
+        select(ExpenseCategory).where(
+            ExpenseCategory.family_budget_id == budget.id,
+            ExpenseCategory.name == "Active 1",
+        )
+    )
+    assert to_delete is not None
+
+    delete_resp = await client.delete(
+        f"/api/v1/categories/expense/{to_delete.id}",
+        headers=headers,
+    )
+    assert delete_resp.status_code == 200
+
+    create_resp = await client.post(
+        "/api/v1/categories/expense",
+        headers=headers,
+        json={"name": "Ninth attempt"},
+    )
+    assert create_resp.status_code == 201
+    assert create_resp.json()["color_index"] == 1
+
+
+async def test_soft_deleted_category_keeps_color_in_analytics(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    headers = auth_headers(telegram_id)
+
+    wallet = Wallet(family_budget_id=budget.id, name="Cash", currency="UZS")
+    income_cat = IncomeCategory(
+        family_budget_id=budget.id,
+        name="Зарплата",
+        translation_key="salary",
+        color_index=5,
+        is_deleted=True,
+        deleted_at=datetime.now(UTC),
+    )
+    session.add_all([wallet, income_cat])
+    await session.flush()
+
+    dt = datetime(2026, 11, 1, tzinfo=UTC)
+    session.add(
+        Transaction(
+            family_budget_id=budget.id,
+            type="income",
+            wallet_id=wallet.id,
+            amount=1000,
+            income_category_id=income_cat.id,
+            created_by_user_id=user.id,
+            transaction_date=dt,
+        )
+    )
+    await session.flush()
+
+    response = await client.get(
+        "/api/v1/analytics/income-by-category",
+        headers=headers,
+        params={
+            "currency": "UZS",
+            "date_from": dt.isoformat(),
+            "date_to": datetime(2026, 11, 30, tzinfo=UTC).isoformat(),
+        },
+    )
+    assert response.status_code == 200
+    row = response.json()[0]
+    assert row["category_name"] == "Зарплата"
+    assert row["color_index"] == 5

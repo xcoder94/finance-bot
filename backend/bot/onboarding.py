@@ -25,6 +25,7 @@ from app.models.family_budget import FamilyBudget
 from app.models.income_category import IncomeCategory
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.category_colors import assign_category_color
 from app.services.invite import (
     build_invite_link,
     cache_bot_username,
@@ -241,6 +242,9 @@ async def copy_seed_data(session: AsyncSession, family_budget_id: uuid.UUID) -> 
                 family_budget_id=family_budget_id,
                 name=name,
                 translation_key=translation_key,
+                color_index=await assign_category_color(
+                    session, family_budget_id, kind="income"
+                ),
             )
         )
 
@@ -261,6 +265,9 @@ async def copy_seed_data(session: AsyncSession, family_budget_id: uuid.UUID) -> 
             name=parent_name,
             parent_id=None,
             translation_key=parent_key,
+            color_index=await assign_category_color(
+                session, family_budget_id, kind="expense"
+            ),
         )
         session.add(parent)
         await session.flush()
@@ -271,6 +278,9 @@ async def copy_seed_data(session: AsyncSession, family_budget_id: uuid.UUID) -> 
                     name=sub_name,
                     parent_id=parent.id,
                     translation_key=sub_key,
+                    color_index=await assign_category_color(
+                        session, family_budget_id, kind="expense"
+                    ),
                 )
             )
 
