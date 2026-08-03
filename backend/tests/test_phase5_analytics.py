@@ -309,14 +309,18 @@ class TestWeekdayAverages:
         )
         await session.flush()
 
-        resp = await client.get(
-            "/api/v1/analytics/summary",
-            headers=auth_headers(telegram_id),
-            params={
-                "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
-                "date_to": datetime(2026, 3, 14, tzinfo=UTC).isoformat(),
-            },
-        )
+        now = datetime(2026, 3, 20, tzinfo=UTC)
+        with patch("app.services.history_analytics.datetime") as mock_dt:
+            mock_dt.now.return_value = now
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+            resp = await client.get(
+                "/api/v1/analytics/summary",
+                headers=auth_headers(telegram_id),
+                params={
+                    "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
+                    "date_to": datetime(2026, 3, 14, tzinfo=UTC).isoformat(),
+                },
+            )
         assert resp.status_code == 200
         expense_dow = resp.json()["day_of_week_expense"]["UZS"]
         assert expense_dow[0] == 200
@@ -364,14 +368,18 @@ class TestWeekdayAverages:
         )
         await session.flush()
 
-        resp = await client.get(
-            "/api/v1/analytics/summary",
-            headers=auth_headers(telegram_id),
-            params={
-                "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
-                "date_to": datetime(2026, 3, 14, tzinfo=UTC).isoformat(),
-            },
-        )
+        now = datetime(2026, 3, 20, tzinfo=UTC)
+        with patch("app.services.history_analytics.datetime") as mock_dt:
+            mock_dt.now.return_value = now
+            mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+            resp = await client.get(
+                "/api/v1/analytics/summary",
+                headers=auth_headers(telegram_id),
+                params={
+                    "date_from": datetime(2026, 3, 1, tzinfo=UTC).isoformat(),
+                    "date_to": datetime(2026, 3, 14, tzinfo=UTC).isoformat(),
+                },
+            )
         assert resp.status_code == 200
         uzs = next(row for row in resp.json()["by_currency"] if row["currency"] == "UZS")
         assert uzs["most_expensive_weekday"] == 0
