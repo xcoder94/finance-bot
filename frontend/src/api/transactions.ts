@@ -6,6 +6,7 @@ export type Wallet = {
   currency: string
   translation_key: string | null
   transaction_count: number
+  is_personal?: boolean
 }
 
 export type IncomeCategory = {
