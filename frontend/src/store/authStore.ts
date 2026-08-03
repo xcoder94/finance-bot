@@ -18,6 +18,8 @@ export type AuthUser = {
   firstName: string | null
   username: string | null
   language: string
+  budgetName: string
+  memberCount: number
 }
 
 type AuthState = {

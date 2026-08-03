@@ -9,6 +9,8 @@ type MeResponseJson = {
   first_name: string | null
   username: string | null
   language: string
+  budget_name: string
+  member_count: number
 }
 
 export type MeErrorType = 'unauthorized' | 'not_onboarded' | 'removed_from_family' | 'network'
@@ -31,6 +33,8 @@ function mapMeResponse(data: MeResponseJson): AuthUser {
     firstName: data.first_name,
     username: data.username,
     language: data.language,
+    budgetName: data.budget_name,
+    memberCount: data.member_count,
   }
 }
 

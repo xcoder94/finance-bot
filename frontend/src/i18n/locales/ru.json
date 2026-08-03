@@ -61,7 +61,15 @@
     "loadError": "Не удалось загрузить данные",
     "previousMonth": "Предыдущий месяц",
     "nextMonth": "Следующий месяц",
-    "loading": "Загрузка"
+    "loading": "Загрузка",
+    "roleLineOwner": "Общий бюджет · {{count}} · вы владелец",
+    "roleLineMember": "Общий бюджет · {{count}}",
+    "participant_one": "{{count}} участник",
+    "participant_few": "{{count}} участника",
+    "participant_many": "{{count}} участников",
+    "emptyMonthHint": "Напишите боту «такси 32000» — операция появится здесь.",
+    "opsNone": "нет операций",
+    "opsCount": "{{count}} за {{monthShort}}"
   },
   "addIncome": {
     "title": "Добавление дохода"
