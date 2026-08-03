@@ -1207,6 +1207,46 @@ body {
   color: var(--hint);
 }
 
+.settings-static-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--sep);
+}
+
+.settings-static-row:last-child {
+  border-bottom: none;
+}
+
+.settings-static-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-static-row__name {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--tx);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-static-row__subtitle {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--hint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 
 .history-page__range-fields {
   display: grid;
