@@ -1,5 +1,15 @@
 :root {
   color-scheme: light dark;
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --bg2: var(--tg-theme-secondary-bg-color, #f1f3f5);
+  --chip: var(--tg-theme-secondary-bg-color, #eceef1);
+  --tx: var(--tg-theme-text-color, #101317);
+  --hint: var(--tg-theme-hint-color, #6b727b);
+  --sep: var(--tg-theme-section-separator-color, rgba(16, 19, 23, 0.11));
+  --acc: var(--tg-theme-link-color, #2b7fd4);
+  --inc: #0f7a43;
+  --exp: #c02f2f;
+  --skel: rgba(16, 19, 23, 0.08);
   --app-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   --app-color-income: #237a3b;
   --app-color-expense: #c62828;
@@ -29,6 +39,16 @@
 }
 
 .app-theme[data-theme='dark'] {
+  --bg: var(--tg-theme-bg-color, #17212b);
+  --bg2: var(--tg-theme-secondary-bg-color, #111a23);
+  --chip: var(--tg-theme-secondary-bg-color, #243244);
+  --tx: var(--tg-theme-text-color, #f2f4f6);
+  --hint: var(--tg-theme-hint-color, #8e9aa7);
+  --sep: var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.11));
+  --acc: var(--tg-theme-link-color, #62a9ee);
+  --inc: #4fca85;
+  --exp: #f27272;
+  --skel: rgba(255, 255, 255, 0.08);
   --app-card-shadow: 0 2px 10px rgba(0, 0, 0, 0.42);
   --app-color-income: #62d987;
   --app-color-expense: #ff7770;
@@ -159,7 +179,7 @@ body {
   flex-direction: column;
   gap: 12px;
   padding: 10px 14px 22px;
-  background: var(--tg-theme-bg-color, #fff);
+  background: var(--bg);
 }
 
 .home-header {
@@ -178,7 +198,7 @@ body {
   font-size: 18px;
   font-weight: 600;
   line-height: 1.2;
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,7 +208,7 @@ body {
   margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.4;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
 }
 
 .home-currency-chip {
@@ -196,7 +216,7 @@ body {
   display: flex;
   padding: 2px;
   border-radius: 9px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f3);
+  background: var(--chip);
 }
 
 .home-currency-chip__btn {
@@ -209,12 +229,12 @@ body {
   padding: 8px 10px;
   border-radius: 7px;
   background: transparent;
-  color: var(--tg-theme-hint-color, #3d434a);
+  color: var(--hint);
 }
 
 .home-currency-chip__btn--active {
-  background: var(--tg-theme-text-color, #15181c);
-  color: var(--tg-theme-bg-color, #fff);
+  background: var(--tx);
+  color: var(--bg);
 }
 
 .home-month-bar {
@@ -223,13 +243,13 @@ body {
   justify-content: space-between;
   padding: 4px;
   border-radius: 10px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f3);
+  background: var(--chip);
 }
 
 .home-month-bar__nav {
   border: none;
   background: none;
-  color: var(--tg-theme-link-color, #2481cc);
+  color: var(--acc);
   cursor: pointer;
   font-size: 16px;
   font-weight: 500;
@@ -241,7 +261,7 @@ body {
   font-size: 14px;
   font-weight: 500;
   line-height: 1;
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
 }
 
 @keyframes home-shimmer {
@@ -263,7 +283,7 @@ body {
 
 .home-skeleton__figures,
 .home-skeleton__ops {
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--sep);
   border-radius: 14px;
   padding: 16px;
   display: flex;
@@ -278,7 +298,7 @@ body {
 
 .home-skeleton__line {
   border-radius: 4px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f3);
+  background: var(--skel);
   animation: home-shimmer 1.4s ease-in-out infinite;
 }
 
@@ -295,7 +315,7 @@ body {
 
 .home-skeleton__divider {
   height: 1px;
-  background: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  background: var(--sep);
 }
 
 .home-skeleton__stats {
@@ -318,7 +338,7 @@ body {
   flex: 1;
   height: 46px;
   border-radius: 12px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f3);
+  background: var(--skel);
   animation: home-shimmer 1.4s ease-in-out infinite;
 }
 
@@ -339,9 +359,9 @@ body {
 }
 
 .home-figures-card {
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--sep);
   border-radius: 14px;
-  background: var(--tg-theme-bg-color, #fff);
+  background: var(--bg);
   padding: 14px 16px 4px;
 }
 
@@ -350,7 +370,7 @@ body {
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0.02em;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
 }
 
 .home-figures-card__balance {
@@ -360,7 +380,7 @@ body {
   font-weight: 600;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -369,7 +389,7 @@ body {
 .home-figures-card__stats {
   display: flex;
   margin-top: 12px;
-  border-top: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border-top: 1px solid var(--sep);
 }
 
 .home-figures-card__stat {
@@ -384,13 +404,13 @@ body {
 .home-figures-card__stat-divider {
   width: 1px;
   margin: 8px 0;
-  background: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  background: var(--sep);
 }
 
 .home-figures-card__stat-label {
   font-size: 11.5px;
   line-height: 1;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
 }
 
 .home-figures-card__stat-value {
@@ -403,11 +423,11 @@ body {
 }
 
 .home-figures-card__stat-value--income {
-  color: var(--app-color-income);
+  color: var(--inc);
 }
 
 .home-figures-card__stat-value--expense {
-  color: var(--app-color-expense);
+  color: var(--exp);
 }
 
 .home-actions {
@@ -422,10 +442,10 @@ body {
   justify-content: center;
   gap: 6px;
   padding: 13px 4px;
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--sep);
   border-radius: 12px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f3);
-  color: var(--tg-theme-text-color, #000);
+  background: var(--chip);
+  color: var(--tx);
   font-size: 13.5px;
   font-weight: 500;
   line-height: 1;
@@ -455,17 +475,17 @@ body {
   font-size: 15px;
   font-weight: 600;
   line-height: 1;
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
 }
 
 .home-recent-header__chevron {
-  color: var(--tg-theme-link-color, #2481cc);
+  color: var(--acc);
 }
 
 .home-recent-header__count {
   font-size: 12px;
   line-height: 1;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
 }
 
 .home-empty-card {
@@ -474,7 +494,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 26px 20px;
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--sep);
   border-radius: 14px;
   text-align: center;
 }
@@ -483,25 +503,25 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f3);
+  background: var(--chip);
 }
 
 .home-empty-card__title {
   font-size: 14.5px;
   font-weight: 500;
   line-height: 1.3;
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
 }
 
 .home-empty-card__hint {
   max-width: 30ch;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
 }
 
 .home-ops-card {
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--sep);
   border-radius: 14px;
   overflow: hidden;
 }
@@ -514,7 +534,7 @@ body {
 }
 
 .home-ops-row + .home-ops-row {
-  border-top: 1px solid var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.12));
+  border-top: 1px solid var(--sep);
 }
 
 .home-ops-row__main {
@@ -526,7 +546,7 @@ body {
   font-size: 14.5px;
   font-weight: 500;
   line-height: 1.25;
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -536,7 +556,7 @@ body {
   margin-top: 3px;
   font-size: 11.5px;
   line-height: 1.3;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -557,15 +577,15 @@ body {
 }
 
 .home-ops-row__amount--income {
-  color: var(--app-color-income);
+  color: var(--inc);
 }
 
 .home-ops-row__amount--expense {
-  color: var(--app-color-expense);
+  color: var(--exp);
 }
 
 .home-ops-row__amount--neutral {
-  color: var(--tg-theme-text-color, #000);
+  color: var(--tx);
 }
 
 .home-ops-row__date {
@@ -573,7 +593,7 @@ body {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 11px;
   line-height: 1.3;
-  color: var(--tg-theme-hint-color, rgba(0, 0, 0, 0.55));
+  color: var(--hint);
 }
 
 .home-page__currency-toggle {
