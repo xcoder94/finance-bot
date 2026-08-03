@@ -19,6 +19,7 @@ from bot.onboarding import (
     MESSAGES,
     SEED_EXPENSE_CATEGORIES,
     SEED_WALLETS,
+    assign_default_card_uzs,
     copy_seed_data,
     count_seed_rows,
     get_active_user_by_telegram_id,
@@ -181,6 +182,7 @@ class TestLanguageCallbackSessionOrdering:
                     new=AsyncMock(return_value=None),
                 ),
                 patch("bot.onboarding.copy_seed_data", new=AsyncMock()),
+                patch("bot.onboarding.assign_default_card_uzs", new=AsyncMock()),
             ):
                 await language_callback(callback, state, bot)
 
@@ -261,8 +263,9 @@ class TestSeedDataCopy:
 
                 counts = await count_seed_rows(session, budget_id)
                 assert counts["wallets"] == 4
-                assert counts["income_categories"] == 4
-                assert counts["expense_top_level"] == 5
+                assert counts["income_categories"] == 5
+                assert counts["expense_top_level"] == 7
+                assert counts["expense_subcategories"] == 23
                 assert counts["expense_subcategories"] == EXPECTED_EXPENSE_SUBCATEGORY_COUNT
 
                 wallet_stmt = select(Wallet).where(
@@ -276,6 +279,16 @@ class TestSeedDataCopy:
                 assert {w.translation_key for w in wallets} == {
                     key for _, _, key in SEED_WALLETS
                 }
+                assert all(not w.is_personal for w in wallets)
+
+                events_parent = await session.scalar(
+                    select(ExpenseCategory).where(
+                        ExpenseCategory.family_budget_id == budget_id,
+                        ExpenseCategory.name == "События и тои",
+                        ExpenseCategory.parent_id.is_(None),
+                    )
+                )
+                assert events_parent is not None
 
                 stmt = select(ExpenseCategory).where(
                     ExpenseCategory.family_budget_id == budget_id,
@@ -288,5 +301,83 @@ class TestSeedDataCopy:
                     assert parent is not None
                     assert parent.parent_id is None
                     assert parent.family_budget_id == budget_id
+
+        asyncio.run(_run())
+
+
+class TestDefaultWalletAssignment:
+    def test_assign_default_card_uzs_after_owner_seed(self) -> None:
+        async def _run() -> None:
+            telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+            async with rollback_session() as session:
+                budget = FamilyBudget(invite_token=f"default-owner-{uuid.uuid4()}")
+                session.add(budget)
+                await session.flush()
+
+                user = User(
+                    telegram_id=telegram_id,
+                    family_budget_id=budget.id,
+                    role="owner",
+                    language="ru",
+                )
+                session.add(user)
+                await session.flush()
+                await copy_seed_data(session, budget.id)
+                await assign_default_card_uzs(session, user)
+                await session.flush()
+
+                card_wallet = await session.scalar(
+                    select(Wallet).where(
+                        Wallet.family_budget_id == budget.id,
+                        Wallet.name == "Карта сум",
+                        Wallet.is_deleted.is_(False),
+                        Wallet.is_personal.is_(False),
+                    )
+                )
+                assert card_wallet is not None
+                assert user.default_wallet_id == card_wallet.id
+
+        asyncio.run(_run())
+
+    def test_assign_default_card_uzs_after_member_join(self) -> None:
+        async def _run() -> None:
+            owner_telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+            member_telegram_id = owner_telegram_id + 1
+            async with rollback_session() as session:
+                budget = FamilyBudget(invite_token=f"default-member-{uuid.uuid4()}")
+                session.add(budget)
+                await session.flush()
+
+                owner = User(
+                    telegram_id=owner_telegram_id,
+                    family_budget_id=budget.id,
+                    role="owner",
+                    language="ru",
+                )
+                session.add(owner)
+                await session.flush()
+                await copy_seed_data(session, budget.id)
+                await assign_default_card_uzs(session, owner)
+
+                member = User(
+                    telegram_id=member_telegram_id,
+                    family_budget_id=budget.id,
+                    role="member",
+                    language="ru",
+                )
+                session.add(member)
+                await assign_default_card_uzs(session, member)
+                await session.flush()
+
+                card_wallet = await session.scalar(
+                    select(Wallet).where(
+                        Wallet.family_budget_id == budget.id,
+                        Wallet.name == "Карта сум",
+                        Wallet.is_deleted.is_(False),
+                        Wallet.is_personal.is_(False),
+                    )
+                )
+                assert card_wallet is not None
+                assert member.default_wallet_id == card_wallet.id
 
         asyncio.run(_run())

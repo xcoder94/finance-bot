@@ -39,6 +39,7 @@ SEED_INCOME_CATEGORIES: list[tuple[str, str]] = [
     ("Зарплата", "salary"),
     ("Подработка", "side_job"),
     ("Подарки", "gifts"),
+    ("Переводы от родных", "family_transfers"),
     ("Прочее", "income_other"),
 ]
 
@@ -47,17 +48,8 @@ SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
         "food",
         [
             ("Продукты", "groceries"),
-            ("Обед", "lunch"),
-            ("Вода и напитки", "drinks_water"),
-            ("Кафе", "cafe"),
-        ],
-    ),
-    "Развлечения": (
-        "entertainment",
-        [
-            ("Playstation", "playstation"),
-            ("Кино", "cinema"),
-            ("Подписки", "subscriptions"),
+            ("Кафе и рестораны", "cafes_restaurants"),
+            ("Доставка", "delivery"),
         ],
     ),
     "Транспорт": (
@@ -65,28 +57,58 @@ SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
         [
             ("Такси", "taxi"),
             ("Топливо", "fuel"),
+            ("Общественный транспорт", "public_transport"),
+            ("Обслуживание авто", "car_maintenance"),
         ],
     ),
     "Дом": (
         "home",
         [
             ("Аренда", "rent"),
-            ("Коммуналка", "utilities"),
+            ("Коммунальные услуги", "utilities"),
+            ("Связь и интернет", "telecom_internet"),
+            ("Ремонт и обустройство", "repairs_furnishing"),
         ],
     ),
-    "Прочее": (
-        "expense_other",
+    "Дети": (
+        "children",
         [
-            ("Другое", "subcategory_other"),
+            ("Садик и школа", "kindergarten_school"),
+            ("Кружки и репетиторы", "clubs_tutoring"),
+            ("Детские товары", "kids_goods"),
+        ],
+    ),
+    "Здоровье": (
+        "health",
+        [
+            ("Лекарства и аптека", "pharmacy"),
+            ("Врачи и клиники", "doctors_clinics"),
+            ("Стоматология", "dentistry"),
+        ],
+    ),
+    "События и тои": (
+        "events_celebrations",
+        [
+            ("Тои и маърака", "toi_celebrations"),
+            ("Подарки", "event_gifts"),
+        ],
+    ),
+    "Покупки и досуг": (
+        "shopping_leisure",
+        [
+            ("Одежда", "clothing"),
+            ("Развлечения", "entertainment"),
+            ("Подписки", "subscriptions"),
+            ("Красота и уход", "beauty_care"),
         ],
     ),
 }
 
 SEED_WALLETS: list[tuple[str, str, str]] = [
-    ("Карта сум", "UZS", "card_uzs"),
     ("Наличный сум", "UZS", "cash_uzs"),
-    ("Карта USD", "USD", "card_usd"),
+    ("Карта сум", "UZS", "card_uzs"),
     ("Наличный USD", "USD", "cash_usd"),
+    ("Карта USD", "USD", "card_usd"),
 ]
 
 MESSAGES: dict[str, dict[str, str]] = {
@@ -200,6 +222,18 @@ async def get_family_budget_by_invite_token(
     return await session.scalar(stmt)
 
 
+async def assign_default_card_uzs(session: AsyncSession, user: User) -> None:
+    stmt = select(Wallet).where(
+        Wallet.family_budget_id == user.family_budget_id,
+        Wallet.name == "Карта сум",
+        Wallet.is_deleted.is_(False),
+        Wallet.is_personal.is_(False),
+    )
+    wallet = await session.scalar(stmt)
+    if wallet is not None:
+        user.default_wallet_id = wallet.id
+
+
 async def copy_seed_data(session: AsyncSession, family_budget_id: uuid.UUID) -> None:
     for name, translation_key in SEED_INCOME_CATEGORIES:
         session.add(
@@ -217,6 +251,7 @@ async def copy_seed_data(session: AsyncSession, family_budget_id: uuid.UUID) -> 
                 name=name,
                 currency=currency,
                 translation_key=translation_key,
+                is_personal=False,
             )
         )
 
@@ -352,7 +387,9 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                     language=language,
                 )
                 session.add(user)
+                await session.flush()
                 await copy_seed_data(session, budget.id)
+                await assign_default_card_uzs(session, user)
             else:
                 budget_id = uuid.UUID(data["family_budget_id"])
                 user = User(
@@ -364,6 +401,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                     language=language,
                 )
                 session.add(user)
+                await assign_default_card_uzs(session, user)
 
     if existing_language is not None:
         await callback.message.edit_text(t("already_member", existing_language))
