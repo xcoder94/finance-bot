@@ -220,6 +220,7 @@ async def get_expenses_by_category(
             Transaction.is_deleted.is_(False),
             Transaction.type == "expense",
             wallet.currency == currency,
+            wallet.is_personal.is_(False),
             Transaction.transaction_date >= date_from,
             Transaction.transaction_date <= date_to,
         )
@@ -272,6 +273,7 @@ async def get_expenses_by_subcategory(
             Transaction.is_deleted.is_(False),
             Transaction.type == "expense",
             wallet.currency == currency,
+            wallet.is_personal.is_(False),
             expense_sub.parent_id == parent_category_id,
             Transaction.transaction_date >= date_from,
             Transaction.transaction_date <= date_to,
@@ -319,6 +321,7 @@ async def get_income_by_category(
             Transaction.is_deleted.is_(False),
             Transaction.type == "income",
             wallet.currency == currency,
+            wallet.is_personal.is_(False),
             Transaction.transaction_date >= date_from,
             Transaction.transaction_date <= date_to,
         )
@@ -366,6 +369,7 @@ async def get_trend(
             Transaction.family_budget_id == family_budget_id,
             Transaction.is_deleted.is_(False),
             Transaction.type.in_(("income", "expense")),
+            from_wallet.is_personal.is_(False),
             Transaction.transaction_date >= month_start(*months[0]),
         )
         .group_by(month_bucket, from_wallet.currency, Transaction.type)
@@ -435,7 +439,7 @@ async def get_summary(
             ).label("transfer_net"),
         )
         .join(from_wallet, Transaction.wallet_id == from_wallet.id)
-        .where(*base_filters)
+        .where(*base_filters, from_wallet.is_personal.is_(False))
         .group_by(from_wallet.currency)
     )
     destination_totals = (
@@ -450,6 +454,7 @@ async def get_summary(
             *base_filters,
             Transaction.type == "transfer",
             Transaction.to_amount.is_not(None),
+            to_wallet.is_personal.is_(False),
         )
         .group_by(to_wallet.currency)
     )
@@ -479,6 +484,7 @@ async def get_summary(
         .where(
             *base_filters,
             Transaction.type.in_(("income", "expense")),
+            from_wallet.is_personal.is_(False),
         )
         .group_by(from_wallet.currency, isodow, Transaction.type)
     )
