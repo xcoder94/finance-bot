@@ -1,12 +1,21 @@
-let cachedInitData: string | null = null
+export const PASS_STORAGE_KEY = 'chontak_app_pass'
 
-export function setInitData(initData: string): void {
-  cachedInitData = initData
+export function readAppPass(): string | null {
+  return localStorage.getItem(PASS_STORAGE_KEY)
+}
+
+export function setAppPass(token: string): void {
+  localStorage.setItem(PASS_STORAGE_KEY, token)
+}
+
+export function clearAppPass(): void {
+  localStorage.removeItem(PASS_STORAGE_KEY)
 }
 
 export function getAuthHeader(): string {
-  if (!cachedInitData) {
-    throw new Error('initData is not available — authenticate first')
+  const token = readAppPass()
+  if (!token) {
+    throw new Error('application pass is not available — authenticate first')
   }
-  return `tma ${cachedInitData}`
+  return `Bearer ${token}`
 }

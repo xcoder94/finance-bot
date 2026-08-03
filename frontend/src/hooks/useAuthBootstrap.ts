@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { useRawInitData } from '@tma.js/sdk-react'
 
-import { setInitData } from '../api/authHeader'
+import { exchangeInitDataForPass } from '../api/authPass'
 import { MeRequestError, fetchMe } from '../api/me'
 import i18n from '../i18n'
 import { useAuthStore } from '../store/authStore'
@@ -21,8 +21,8 @@ export function useAuthBootstrap() {
         return
       }
 
-      setInitData(rawInitData)
-      const user = await fetchMe(rawInitData)
+      await exchangeInitDataForPass(rawInitData)
+      const user = await fetchMe()
       await i18n.changeLanguage(user.language)
       setReady(user)
     } catch (error) {

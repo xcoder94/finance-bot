@@ -1,4 +1,5 @@
 import type { AuthUser } from '../store/authStore'
+import { getAuthHeader } from './authHeader'
 
 type MeResponseJson = {
   id: string
@@ -33,13 +34,13 @@ function mapMeResponse(data: MeResponseJson): AuthUser {
   }
 }
 
-export async function fetchMe(initData: string): Promise<AuthUser> {
+export async function fetchMe(): Promise<AuthUser> {
   let response: Response
 
   try {
     response = await fetch('/api/v1/me', {
       headers: {
-        Authorization: `tma ${initData}`,
+        Authorization: getAuthHeader(),
       },
     })
   } catch {
