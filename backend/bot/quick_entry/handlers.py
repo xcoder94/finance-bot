@@ -6,7 +6,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from app.db import async_session_factory
 from app.models.expense_category import ExpenseCategory
 from app.models.family_budget import FamilyBudget
 from app.models.income_category import IncomeCategory
+from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
@@ -35,6 +36,7 @@ from app.services.quick_entry_create import (
     create_quick_entry_income,
     resolve_category_id,
 )
+from app.services.transactions import get_active_transaction, soft_delete_transaction
 from app.services.quick_entry_dates import resolve_operation_date, strip_date_words
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
@@ -47,9 +49,11 @@ from bot.quick_entry.cards import (
     format_amount,
     format_card,
     type_question_keyboard,
+    wallet_picker_keyboard,
 )
-from bot.quick_entry.pending import create_pending
+from bot.quick_entry.pending import consume_pending, create_pending, get_pending
 from bot.quick_entry.texts import (
+    MSG_GONE,
     MSG_MODEL_FAIL,
     MSG_NO_AMOUNT,
     MSG_TOO_LONG,
@@ -114,6 +118,49 @@ def _operation_date_to_datetime(op_date: date) -> datetime:
         0,
         tzinfo=TASHKENT,
     )
+
+
+async def _txn_category_label(
+    session: AsyncSession, transaction: Transaction
+) -> str:
+    if transaction.type == "expense":
+        if transaction.expense_category_id is None:
+            return "Без категории"
+        category = await session.get(ExpenseCategory, transaction.expense_category_id)
+        if category is None or category.is_deleted:
+            return "Без категории"
+        return category.name
+
+    if transaction.income_category_id is None:
+        return "Без категории"
+    category = await session.get(IncomeCategory, transaction.income_category_id)
+    if category is None or category.is_deleted:
+        return "Без категории"
+    return category.name
+
+
+async def _format_transaction_card(
+    session: AsyncSession,
+    transaction: Transaction,
+    wallet: Wallet,
+) -> str:
+    sign = "➖" if transaction.type == "expense" else "➕"
+    balance = await wallet_balance(session, wallet.id)
+    op_date = transaction.transaction_date.astimezone(TASHKENT).date()
+    return format_card(
+        sign=sign,
+        amount=transaction.amount,
+        currency=wallet.currency,  # type: ignore[arg-type]
+        category_label=await _txn_category_label(session, transaction),
+        comment=transaction.comment,
+        wallet_name=wallet.name,
+        op_date=op_date,
+        balance=balance,
+    )
+
+
+async def _answer_gone(callback: CallbackQuery) -> None:
+    await callback.answer(MSG_GONE)
 
 
 async def _list_expense_category_names(
@@ -354,3 +401,218 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
 @router.message(F.text, ~F.text.startswith("/"))
 async def quick_entry_text_handler(message: Message, bot: Bot) -> None:
     await handle_quick_entry_text(message, bot)
+
+
+async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        return
+
+    try:
+        txn_id = uuid.UUID(callback.data.split(":", 2)[2])
+    except (IndexError, ValueError):
+        return
+
+    async with async_session_factory() as session:
+        user = await get_active_user_by_telegram_id(session, callback.from_user.id)
+        if user is None:
+            await _answer_gone(callback)
+            return
+
+        transaction = await get_active_transaction(
+            session, txn_id, user.family_budget_id
+        )
+        if transaction is None:
+            await _answer_gone(callback)
+            return
+
+        soft_delete_transaction(transaction)
+        await session.commit()
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.answer()
+
+
+async def handle_quick_entry_wallet_list(callback: CallbackQuery, bot: Bot) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        return
+
+    try:
+        txn_id = uuid.UUID(callback.data.split(":", 2)[2])
+    except (IndexError, ValueError):
+        return
+
+    async with async_session_factory() as session:
+        user = await get_active_user_by_telegram_id(session, callback.from_user.id)
+        if user is None:
+            await _answer_gone(callback)
+            return
+
+        transaction = await get_active_transaction(
+            session, txn_id, user.family_budget_id
+        )
+        if transaction is None:
+            await _answer_gone(callback)
+            return
+
+        wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
+        await callback.message.edit_reply_markup(
+            reply_markup=wallet_picker_keyboard(transaction.id, wallets)
+        )
+        await callback.answer()
+
+
+async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        return
+
+    parts = callback.data.split(":")
+    if len(parts) != 4:
+        return
+
+    try:
+        txn_id = uuid.UUID(parts[2])
+        wallet_id = uuid.UUID(parts[3])
+    except ValueError:
+        return
+
+    async with async_session_factory() as session:
+        user = await get_active_user_by_telegram_id(session, callback.from_user.id)
+        if user is None:
+            await _answer_gone(callback)
+            return
+
+        transaction = await get_active_transaction(
+            session, txn_id, user.family_budget_id
+        )
+        if transaction is None:
+            await _answer_gone(callback)
+            return
+
+        wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
+        wallet = next((w for w in wallets if w.id == wallet_id), None)
+        if wallet is None:
+            await _answer_gone(callback)
+            return
+
+        transaction.wallet_id = wallet.id
+        await session.commit()
+        await session.refresh(transaction)
+
+        card_text = await _format_transaction_card(session, transaction, wallet)
+        await callback.message.edit_text(
+            card_text,
+            reply_markup=card_keyboard(transaction.id),
+            parse_mode="Markdown",
+        )
+        await callback.answer()
+
+
+async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        return
+
+    parts = callback.data.split(":")
+    if len(parts) != 4:
+        return
+
+    try:
+        pending_id = uuid.UUID(parts[2])
+    except ValueError:
+        return
+
+    choice = parts[3]
+    if choice not in ("expense", "income"):
+        return
+
+    async with async_session_factory() as session:
+        user = await get_active_user_by_telegram_id(session, callback.from_user.id)
+        if user is None:
+            await _answer_gone(callback)
+            return
+
+        pending = await get_pending(session, pending_id)
+        if pending is None or pending.user_id != user.id:
+            await _answer_gone(callback)
+            return
+
+        budget = await session.get(FamilyBudget, user.family_budget_id)
+        if budget is None or budget.is_deleted:
+            await _answer_gone(callback)
+            return
+
+        today = tashkent_today_for_counters()
+        ensure_counters_day(budget, today)
+        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
+            await callback.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+            return
+
+        consumed = await consume_pending(session, pending_id)
+        if consumed is None:
+            await _answer_gone(callback)
+            return
+
+        spend_model_call(budget)
+
+        txn_datetime = _operation_date_to_datetime(consumed.operation_date)
+        category_id = await resolve_category_id(
+            session,
+            user.family_budget_id,
+            op_type=choice,  # type: ignore[arg-type]
+            category_name=consumed.category_raw,
+            button_choice=choice,  # type: ignore[arg-type]
+        )
+
+        if choice == "expense":
+            txn = await create_quick_entry_expense(
+                session,
+                user,
+                amount=consumed.amount,
+                wallet_id=consumed.wallet_id,
+                expense_category_id=category_id,
+                comment=consumed.comment,
+                transaction_date=txn_datetime,
+            )
+        else:
+            txn = await create_quick_entry_income(
+                session,
+                user,
+                amount=consumed.amount,
+                wallet_id=consumed.wallet_id,
+                income_category_id=category_id,
+                comment=consumed.comment,
+                transaction_date=txn_datetime,
+            )
+
+        wallet = await session.get(Wallet, consumed.wallet_id)
+        if wallet is None:
+            await _answer_gone(callback)
+            return
+
+        card_text = await _format_transaction_card(session, txn, wallet)
+        await callback.message.edit_text(
+            card_text,
+            reply_markup=card_keyboard(txn.id),
+            parse_mode="Markdown",
+        )
+        await callback.answer()
+
+
+@router.callback_query(F.data.startswith("qe:del:"))
+async def quick_entry_delete_callback(callback: CallbackQuery, bot: Bot) -> None:
+    await handle_quick_entry_delete(callback, bot)
+
+
+@router.callback_query(
+    F.data.startswith("qe:wal:") & ~F.data.startswith("qe:walset:")
+)
+async def quick_entry_wallet_list_callback(callback: CallbackQuery, bot: Bot) -> None:
+    await handle_quick_entry_wallet_list(callback, bot)
+
+
+@router.callback_query(F.data.startswith("qe:walset:"))
+async def quick_entry_wallet_set_callback(callback: CallbackQuery, bot: Bot) -> None:
+    await handle_quick_entry_wallet_set(callback, bot)
+
+
+@router.callback_query(F.data.startswith("qe:type:"))
+async def quick_entry_type_callback(callback: CallbackQuery, bot: Bot) -> None:
+    await handle_quick_entry_type(callback, bot)
