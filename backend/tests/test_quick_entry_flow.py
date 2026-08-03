@@ -351,6 +351,92 @@ class TestAmbiguousTypeQuestion:
             ).all()
             assert len(pending) == 1
 
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 0
+
+
+class TestMixedClearAndAmbiguous:
+    async def test_mixed_sends_cards_then_question_and_spends_one_model_call(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_003_002)
+            wallet = make_wallet(budget, name="Карта сум")
+            events = ExpenseCategory(family_budget_id=budget.id, name="События и тои")
+            food = ExpenseCategory(family_budget_id=budget.id, name="Еда")
+            session.add_all([wallet, events, food])
+            await session.flush()
+            gifts = ExpenseCategory(
+                family_budget_id=budget.id, name="Подарки", parent_id=events.id
+            )
+            groceries = ExpenseCategory(
+                family_budget_id=budget.id, name="Продукты", parent_id=food.id
+            )
+            session.add_all([gifts, groceries])
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            text = "продукты 10 тысяч и подарок 500 тысяч"
+            set_parser_override(
+                StubParser(
+                    responses={
+                        text: ParseResponse(
+                            operations=[
+                                ParsedOperation(
+                                    type="expense",
+                                    amount=10_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Продукты",
+                                    comment=None,
+                                ),
+                                ParsedOperation(
+                                    type="ambiguous",
+                                    amount=500_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Подарки",
+                                    comment=None,
+                                ),
+                            ]
+                        )
+                    }
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_message(telegram_id=user.telegram_id, text=text)
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            assert message.answer.await_count == 2
+            card_text = message.answer.await_args_list[0].args[0]
+            question_text = message.answer.await_args_list[1].args[0]
+            assert "➖" in card_text and "10 000 сум" in card_text
+            assert "**500 000 сум** · Подарки" in question_text
+            assert MSG_TYPE_QUESTION in question_text
+
+            txns = (
+                await session.scalars(
+                    select(Transaction).where(Transaction.family_budget_id == budget.id)
+                )
+            ).all()
+            assert len(txns) == 1
+
+            pending = (
+                await session.scalars(
+                    select(QuickEntryPending).where(
+                        QuickEntryPending.family_budget_id == budget.id
+                    )
+                )
+            ).all()
+            assert len(pending) == 1
+
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 1
+
 
 class TestCurrencyMissing:
     async def test_currency_missing_section_7_4(
@@ -417,6 +503,9 @@ class TestMessageLength:
 
             spy.parse.assert_not_awaited()
             message.answer.assert_awaited_once_with(MSG_TOO_LONG)
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 0
+            assert budget.daily_unparsed == 0
 
 
 class TestTooManyOperations:

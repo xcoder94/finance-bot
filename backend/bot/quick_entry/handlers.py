@@ -210,10 +210,19 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
             await session.commit()
             return
 
-        spend_model_call(budget)
-        await session.commit()
-
         countable = _filter_countable(response.operations)
+        clear_ops = [op for op in countable if _is_clear(op)]
+        ambiguous_ops = [op for op in countable if _is_ambiguous(op)]
+
+        ambiguous_only = (
+            not clear_ops
+            and bool(ambiguous_ops)
+            and len(countable) <= MAX_OPERATIONS
+        )
+        if not ambiguous_only:
+            spend_model_call(budget)
+            await session.commit()
+
         if len(countable) > MAX_OPERATIONS:
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
@@ -222,9 +231,6 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
             await session.commit()
             await message.answer(MSG_TOO_MANY_OPS)
             return
-
-        clear_ops = [op for op in countable if _is_clear(op)]
-        ambiguous_ops = [op for op in countable if _is_ambiguous(op)]
 
         if not clear_ops and not ambiguous_ops:
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
