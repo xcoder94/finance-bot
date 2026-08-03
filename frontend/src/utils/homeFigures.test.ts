@@ -16,6 +16,8 @@ const dualCurrencySummary: SummaryResponse = {
       transfer_net: 0,
       net_change: 400000,
       average_daily_expense: 3225.8,
+      most_expensive_weekday: 0,
+      most_expensive_weekday_average: 5000,
     },
     {
       currency: 'USD',
@@ -24,6 +26,8 @@ const dualCurrencySummary: SummaryResponse = {
       transfer_net: 0,
       net_change: 190,
       average_daily_expense: 0.32,
+      most_expensive_weekday: null,
+      most_expensive_weekday_average: 0,
     },
   ],
   day_of_week_expense: {},

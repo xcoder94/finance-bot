@@ -72,8 +72,9 @@ export async function fetchIncomeByCategory(
   return apiGet<CategoryAmount[]>(`/api/v1/analytics/income-by-category?${params}`)
 }
 
-export async function fetchTrend(): Promise<TrendEntry[]> {
-  return apiGet<TrendEntry[]>('/api/v1/analytics/trend')
+export async function fetchTrend(endMonth: string): Promise<TrendEntry[]> {
+  const params = new URLSearchParams({ end_month: endMonth })
+  return apiGet<TrendEntry[]>(`/api/v1/analytics/trend?${params}`)
 }
 
 export async function fetchExpensesBySubcategory(

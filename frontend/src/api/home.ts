@@ -7,6 +7,8 @@ export type PerCurrencySummary = {
   transfer_net: number
   net_change: number
   average_daily_expense: number
+  most_expensive_weekday: number | null
+  most_expensive_weekday_average: number
 }
 
 export type SummaryResponse = {

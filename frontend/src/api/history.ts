@@ -44,6 +44,7 @@ export async function fetchHistoryPage(
   dateTo: string,
   limit: number,
   offset: number,
+  expenseCategoryId?: string,
 ): Promise<HistoryResponse> {
   const params = new URLSearchParams({
     date_from: dateFrom,
@@ -51,5 +52,8 @@ export async function fetchHistoryPage(
     limit: String(limit),
     offset: String(offset),
   })
+  if (expenseCategoryId) {
+    params.set('expense_category_id', expenseCategoryId)
+  }
   return apiGet<HistoryResponse>(`/api/v1/transactions/history?${params}`)
 }

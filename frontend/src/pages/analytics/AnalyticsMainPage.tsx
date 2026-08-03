@@ -54,6 +54,8 @@ function getSummaryEntry(
     transfer_net: entry?.transfer_net ?? 0,
     net_change: entry?.net_change ?? 0,
     average_daily_expense: entry?.average_daily_expense ?? 0,
+    most_expensive_weekday: entry?.most_expensive_weekday ?? null,
+    most_expensive_weekday_average: entry?.most_expensive_weekday_average ?? 0,
   }
 }
 
@@ -141,7 +143,13 @@ export function AnalyticsMainPage() {
     rangeFetchEnabled,
   )
 
-  const trendFetch = useFetchBlock(useCallback(() => fetchTrend(), []), 'mount', true)
+  const trendEndMonth = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`
+
+  const trendFetch = useFetchBlock(
+    useCallback(() => fetchTrend(trendEndMonth), [trendEndMonth]),
+    fetchKey,
+    rangeFetchEnabled,
+  )
 
   const categoryMaps =
     categoriesFetch.state.status === 'success' ? categoriesFetch.state.data : null
