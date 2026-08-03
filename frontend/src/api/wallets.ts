@@ -22,6 +22,10 @@ export type WalletCreatePayload = {
   currency: 'UZS' | 'USD'
 }
 
+export type WalletUpdatePayload = {
+  name: string
+}
+
 async function apiGet<T>(url: string): Promise<T> {
   let response: Response
 
@@ -30,6 +34,29 @@ async function apiGet<T>(url: string): Promise<T> {
       headers: {
         Authorization: getAuthHeader(),
       },
+    })
+  } catch {
+    throw new HomeApiError()
+  }
+
+  if (!response.ok) {
+    throw new HomeApiError()
+  }
+
+  return (await response.json()) as T
+}
+
+async function apiPatch<T>(url: string, body: unknown): Promise<T> {
+  let response: Response
+
+  try {
+    response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: getAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     })
   } catch {
     throw new HomeApiError()
@@ -92,6 +119,13 @@ export async function getWallets(): Promise<WalletResponse[]> {
 
 export async function createWallet(payload: WalletCreatePayload): Promise<WalletResponse> {
   return apiPost<WalletResponse>('/api/v1/wallets', payload)
+}
+
+export async function patchWallet(
+  walletId: string,
+  payload: WalletUpdatePayload,
+): Promise<WalletResponse> {
+  return apiPatch<WalletResponse>(`/api/v1/wallets/${walletId}`, payload)
 }
 
 export async function deleteWallet(walletId: string): Promise<WalletDeleteResponse> {

@@ -1063,6 +1063,137 @@ body {
   color: var(--tx);
 }
 
+.settings-sub-page__action {
+  margin-top: 4px;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--acct);
+  background: var(--acc);
+  cursor: pointer;
+}
+
+.settings-entity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.settings-entity-group__title {
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hint);
+}
+
+.settings-entity-group__list {
+  border: 1px solid var(--sep);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.settings-entity-group__note {
+  padding: 0 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--hint);
+}
+
+.settings-entity-page__loading {
+  padding: 12px 0;
+}
+
+.settings-swipe-row {
+  position: relative;
+  background: var(--bg);
+  border-bottom: 1px solid var(--sep);
+}
+
+.settings-swipe-row:last-child {
+  border-bottom: none;
+}
+
+.settings-swipe-row__delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 96px;
+  border: none;
+  background: var(--exp);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-swipe-row__content {
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+  touch-action: pan-y;
+  transition: transform 0.15s ease-out;
+}
+
+.settings-swipe-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.settings-swipe-row__main:active {
+  background: var(--chip);
+}
+
+.settings-swipe-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-swipe-row__name {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--tx);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-swipe-row__subtitle {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--hint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-swipe-row__chevron {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--hint);
+}
+
 
 .history-page__range-fields {
   display: grid;
