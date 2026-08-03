@@ -121,3 +121,13 @@ Stop and ask:
 
 Default rule: if the answer is not in this file, the PRD, the phase spec
 or the plan — stop and ask, do not guess.
+
+## No dead controls
+
+Every button, link and field on a finished screen must perform its
+action. A control that does nothing, shows nothing or leads nowhere is a
+defect, not groundwork for later.
+
+If the feature belongs to a later phase, the control is not drawn at all
+— not drawn disabled. A disabled placeholder is allowed only when the
+PRD describes it explicitly.
