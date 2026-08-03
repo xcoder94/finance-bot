@@ -19,8 +19,17 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.stub import StubParser
-from app.parsing.types import ParseResponse, ParsedOperation, ParserUnavailable
-from bot.quick_entry.handlers import handle_quick_entry_text, set_parser_override
+from app.parsing.types import (
+    ParseResponse,
+    ParsedOperation,
+    ParserMalformed,
+    ParserUnavailable,
+)
+from bot.quick_entry.handlers import (
+    handle_quick_entry_text,
+    handle_quick_entry_type,
+    set_parser_override,
+)
 from bot.quick_entry.texts import (
     MSG_MODEL_FAIL,
     MSG_NO_AMOUNT,
@@ -103,6 +112,25 @@ def make_message(*, telegram_id: int, text: str) -> SimpleNamespace:
     return SimpleNamespace(
         from_user=SimpleNamespace(id=telegram_id),
         text=text,
+        answer=AsyncMock(),
+    )
+
+
+def make_callback(
+    *,
+    telegram_id: int,
+    data: str,
+    message_text: str = "card",
+) -> SimpleNamespace:
+    message = SimpleNamespace(
+        text=message_text,
+        edit_text=AsyncMock(),
+        edit_reply_markup=AsyncMock(),
+    )
+    return SimpleNamespace(
+        from_user=SimpleNamespace(id=telegram_id),
+        message=message,
+        data=data,
         answer=AsyncMock(),
     )
 
@@ -350,9 +378,73 @@ class TestAmbiguousTypeQuestion:
                 )
             ).all()
             assert len(pending) == 1
+            assert pending[0].charge_on_confirm is True
 
             await session.refresh(budget)
             assert budget.daily_model_calls == 0
+
+    async def test_ambiguous_type_tap_spends_one_model_call(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_003_003)
+            wallet = make_wallet(budget, name="Карта сум")
+            events = ExpenseCategory(family_budget_id=budget.id, name="События и тои")
+            session.add_all([wallet, events])
+            await session.flush()
+            gifts = ExpenseCategory(
+                family_budget_id=budget.id, name="Подарки", parent_id=events.id
+            )
+            session.add(gifts)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            text = "подарок 500 тысяч"
+            set_parser_override(
+                StubParser(
+                    responses={
+                        text: ParseResponse(
+                            operations=[
+                                ParsedOperation(
+                                    type="ambiguous",
+                                    amount=500_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Подарки",
+                                    comment=None,
+                                )
+                            ]
+                        )
+                    }
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_message(telegram_id=user.telegram_id, text=text)
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            pending = (
+                await session.scalars(
+                    select(QuickEntryPending).where(
+                        QuickEntryPending.family_budget_id == budget.id
+                    )
+                )
+            ).one()
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 0
+
+            callback = make_callback(
+                telegram_id=user.telegram_id,
+                data=f"qe:type:{pending.id}:expense",
+                message_text=f"**500 000 сум** · Подарки\n{MSG_TYPE_QUESTION}",
+            )
+            await handle_quick_entry_type(callback, SimpleNamespace())
+
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 1
 
 
 class TestMixedClearAndAmbiguous:
@@ -433,6 +525,82 @@ class TestMixedClearAndAmbiguous:
                 )
             ).all()
             assert len(pending) == 1
+            assert pending[0].charge_on_confirm is False
+
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 1
+
+    async def test_mixed_type_tap_does_not_double_spend(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_003_004)
+            wallet = make_wallet(budget, name="Карта сум")
+            events = ExpenseCategory(family_budget_id=budget.id, name="События и тои")
+            food = ExpenseCategory(family_budget_id=budget.id, name="Еда")
+            session.add_all([wallet, events, food])
+            await session.flush()
+            gifts = ExpenseCategory(
+                family_budget_id=budget.id, name="Подарки", parent_id=events.id
+            )
+            groceries = ExpenseCategory(
+                family_budget_id=budget.id, name="Продукты", parent_id=food.id
+            )
+            session.add_all([gifts, groceries])
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            text = "продукты 10 тысяч и подарок 500 тысяч"
+            set_parser_override(
+                StubParser(
+                    responses={
+                        text: ParseResponse(
+                            operations=[
+                                ParsedOperation(
+                                    type="expense",
+                                    amount=10_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Продукты",
+                                    comment=None,
+                                ),
+                                ParsedOperation(
+                                    type="ambiguous",
+                                    amount=500_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Подарки",
+                                    comment=None,
+                                ),
+                            ]
+                        )
+                    }
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_message(telegram_id=user.telegram_id, text=text)
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            pending = (
+                await session.scalars(
+                    select(QuickEntryPending).where(
+                        QuickEntryPending.family_budget_id == budget.id
+                    )
+                )
+            ).one()
+            await session.refresh(budget)
+            assert budget.daily_model_calls == 1
+
+            callback = make_callback(
+                telegram_id=user.telegram_id,
+                data=f"qe:type:{pending.id}:expense",
+                message_text=f"**500 000 сум** · Подарки\n{MSG_TYPE_QUESTION}",
+            )
+            await handle_quick_entry_type(callback, SimpleNamespace())
 
             await session.refresh(budget)
             assert budget.daily_model_calls == 1
@@ -567,6 +735,34 @@ class TestModelFailure:
                     raise ParserUnavailable("down")
 
             set_parser_override(FailingParser())
+
+            message = make_message(telegram_id=user.telegram_id, text="такси 25 тысяч")
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
+            assert budget.daily_model_calls == 0
+
+    async def test_parser_malformed_does_not_increment_unparsed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_007_002)
+            wallet = make_wallet(budget, name="Карта сум")
+            session.add(wallet)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            class MalformedParser:
+                async def parse(self, request: object) -> ParseResponse:
+                    raise ParserMalformed("bad json")
+
+            set_parser_override(MalformedParser())
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
 
             message = make_message(telegram_id=user.telegram_id, text="такси 25 тысяч")
             await handle_quick_entry_text(message, SimpleNamespace())

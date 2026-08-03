@@ -20,7 +20,12 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
-from app.parsing.types import ParseRequest, ParsedOperation, ParserUnavailable
+from app.parsing.types import (
+    ParseRequest,
+    ParsedOperation,
+    ParserMalformed,
+    ParserUnavailable,
+)
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.quick_entry_counters import (
@@ -252,7 +257,7 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
         parser = _get_parser()
         try:
             response = await parser.parse(parse_request)
-        except ParserUnavailable:
+        except (ParserUnavailable, ParserMalformed):
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return
@@ -390,6 +395,7 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
                 category_raw=op.category,
                 comment=strip_date_words(op.comment, text),
                 operation_date=op_date,
+                charge_on_confirm=not bool(clear_ops),
             )
             await message.answer(
                 _format_type_question(op.amount, currency, op.category),
@@ -550,7 +556,8 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
             await _answer_gone(callback)
             return
 
-        spend_model_call(budget)
+        if consumed.charge_on_confirm:
+            spend_model_call(budget)
 
         txn_datetime = _operation_date_to_datetime(consumed.operation_date)
         category_id = await resolve_category_id(

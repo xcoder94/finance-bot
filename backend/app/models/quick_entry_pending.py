@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,3 +25,6 @@ class QuickEntryPending(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     category_raw: Mapped[str | None] = mapped_column(String, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     operation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    charge_on_confirm: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
