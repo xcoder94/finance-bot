@@ -354,6 +354,9 @@ class TestVoiceAcceptance:
             assert call_order[0] == "typing"
             assert "answer" in call_order
             assert call_order.index("typing") < call_order.index("answer")
+            bot.send_chat_action.assert_awaited_with(
+                chat_id=message.chat.id, action="typing"
+            )
 
     async def test_voice_transcribed_text_reaches_card_path(
         self, monkeypatch: pytest.MonkeyPatch
