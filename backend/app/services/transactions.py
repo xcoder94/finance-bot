@@ -18,6 +18,7 @@ from app.schemas.transactions import (
     TransferCreate,
     TransferUpdate,
 )
+from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import (
     get_active_expense_category,
     get_active_income_category,
@@ -49,6 +50,50 @@ def require_modify_permission(user: User, transaction: Transaction) -> None:
         raise HTTPException(status_code=403)
 
 
+async def get_transaction_wallets(
+    session: AsyncSession,
+    transaction: Transaction,
+    family_budget_id: uuid.UUID,
+) -> tuple[Wallet | None, Wallet | None]:
+    from_wallet = await get_active_wallet(session, transaction.wallet_id, family_budget_id)
+    to_wallet = None
+    if transaction.to_wallet_id is not None:
+        to_wallet = await get_active_wallet(session, transaction.to_wallet_id, family_budget_id)
+    return from_wallet, to_wallet
+
+
+def is_personal_wallet_transaction(from_wallet: Wallet, to_wallet: Wallet | None) -> bool:
+    return from_wallet.is_personal or (to_wallet is not None and to_wallet.is_personal)
+
+
+def require_transaction_visible(
+    from_wallet: Wallet | None,
+    to_wallet: Wallet | None,
+    user: User,
+) -> None:
+    if from_wallet is None:
+        raise HTTPException(status_code=404)
+    require_wallet_visible(from_wallet, user)
+    if to_wallet is not None:
+        require_wallet_visible(to_wallet, user)
+
+
+def require_transaction_modify_permission(
+    user: User,
+    transaction: Transaction,
+    from_wallet: Wallet,
+    to_wallet: Wallet | None,
+) -> None:
+    require_transaction_visible(from_wallet, to_wallet, user)
+    if is_personal_wallet_transaction(from_wallet, to_wallet):
+        if from_wallet.is_personal and from_wallet.owner_user_id != user.id:
+            raise HTTPException(status_code=404)
+        if to_wallet is not None and to_wallet.is_personal and to_wallet.owner_user_id != user.id:
+            raise HTTPException(status_code=404)
+        return
+    require_modify_permission(user, transaction)
+
+
 def soft_delete_transaction(transaction: Transaction) -> None:
     transaction.is_deleted = True
     transaction.deleted_at = datetime.now(UTC)
@@ -59,10 +104,10 @@ async def validate_income_refs(
     family_budget_id: uuid.UUID,
     wallet_id: uuid.UUID,
     income_category_id: uuid.UUID,
+    user: User,
 ) -> None:
     wallet = await get_active_wallet(session, wallet_id, family_budget_id)
-    if wallet is None:
-        raise HTTPException(status_code=404)
+    require_wallet_visible(wallet, user)
     category = await get_active_income_category(session, income_category_id, family_budget_id)
     if category is None:
         raise HTTPException(status_code=404)
@@ -73,10 +118,10 @@ async def validate_expense_refs(
     family_budget_id: uuid.UUID,
     wallet_id: uuid.UUID,
     expense_category_id: uuid.UUID,
+    user: User,
 ) -> None:
     wallet = await get_active_wallet(session, wallet_id, family_budget_id)
-    if wallet is None:
-        raise HTTPException(status_code=404)
+    require_wallet_visible(wallet, user)
     category = await get_active_expense_category(session, expense_category_id, family_budget_id)
     if category is None:
         raise HTTPException(status_code=404)
@@ -87,10 +132,10 @@ async def validate_quick_entry_expense_refs(
     family_budget_id: uuid.UUID,
     wallet_id: uuid.UUID,
     expense_category_id: uuid.UUID | None,
+    user: User,
 ) -> None:
     wallet = await get_active_wallet(session, wallet_id, family_budget_id)
-    if wallet is None:
-        raise HTTPException(status_code=404)
+    require_wallet_visible(wallet, user)
     if expense_category_id is None:
         return
     category = await get_active_expense_category(session, expense_category_id, family_budget_id)
@@ -103,10 +148,10 @@ async def validate_quick_entry_income_refs(
     family_budget_id: uuid.UUID,
     wallet_id: uuid.UUID,
     income_category_id: uuid.UUID | None,
+    user: User,
 ) -> None:
     wallet = await get_active_wallet(session, wallet_id, family_budget_id)
-    if wallet is None:
-        raise HTTPException(status_code=404)
+    require_wallet_visible(wallet, user)
     if income_category_id is None:
         return
     category = await get_active_income_category(session, income_category_id, family_budget_id)
@@ -148,13 +193,12 @@ async def validate_transfer_refs(
     to_wallet_id: uuid.UUID,
     amount: int,
     rate: Decimal | None,
+    user: User,
 ) -> tuple[Wallet, Wallet, int, Decimal | None]:
     from_wallet = await get_active_wallet(session, wallet_id, family_budget_id)
-    if from_wallet is None:
-        raise HTTPException(status_code=404)
+    require_wallet_visible(from_wallet, user)
     to_wallet = await get_active_wallet(session, to_wallet_id, family_budget_id)
-    if to_wallet is None:
-        raise HTTPException(status_code=404)
+    require_wallet_visible(to_wallet, user)
     to_amount, stored_rate = compute_transfer_amounts(from_wallet, to_wallet, amount, rate)
     return from_wallet, to_wallet, to_amount, stored_rate
 
@@ -169,6 +213,7 @@ async def create_income_transaction(
         user.family_budget_id,
         body.wallet_id,
         body.income_category_id,
+        user,
     )
     transaction = Transaction(
         family_budget_id=user.family_budget_id,
@@ -196,6 +241,7 @@ async def create_expense_transaction(
         user.family_budget_id,
         body.wallet_id,
         body.expense_category_id,
+        user,
     )
     transaction = Transaction(
         family_budget_id=user.family_budget_id,
@@ -225,6 +271,7 @@ async def create_transfer_transaction(
         body.to_wallet_id,
         body.amount,
         body.rate,
+        user,
     )
     transaction = Transaction(
         family_budget_id=user.family_budget_id,
@@ -248,12 +295,14 @@ async def update_income_transaction(
     session: AsyncSession,
     transaction: Transaction,
     body: IncomeUpdate,
+    user: User,
 ) -> Transaction:
     await validate_income_refs(
         session,
         transaction.family_budget_id,
         body.wallet_id,
         body.income_category_id,
+        user,
     )
     transaction.transaction_date = body.transaction_date
     transaction.amount = body.amount
@@ -273,12 +322,14 @@ async def update_expense_transaction(
     session: AsyncSession,
     transaction: Transaction,
     body: ExpenseUpdate,
+    user: User,
 ) -> Transaction:
     await validate_expense_refs(
         session,
         transaction.family_budget_id,
         body.wallet_id,
         body.expense_category_id,
+        user,
     )
     transaction.transaction_date = body.transaction_date
     transaction.amount = body.amount
@@ -298,6 +349,7 @@ async def update_transfer_transaction(
     session: AsyncSession,
     transaction: Transaction,
     body: TransferUpdate,
+    user: User,
 ) -> Transaction:
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
@@ -306,6 +358,7 @@ async def update_transfer_transaction(
         body.to_wallet_id,
         body.amount,
         body.rate,
+        user,
     )
     transaction.transaction_date = body.transaction_date
     transaction.wallet_id = body.wallet_id

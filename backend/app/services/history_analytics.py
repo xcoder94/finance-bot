@@ -22,6 +22,7 @@ from app.schemas.history_analytics import (
     TrendEntry,
     WalletBalancesResponse,
 )
+from app.services.wallet_visibility import personal_ops_hidden_clause
 from app.services.wallets_categories import get_expense_parent_including_deleted
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
@@ -144,6 +145,7 @@ def last_twelve_months(now: datetime | None = None) -> list[tuple[int, int]]:
 async def get_history(
     session: AsyncSession,
     family_budget_id: uuid.UUID,
+    viewer: User,
     date_from: datetime,
     date_to: datetime,
     limit: int,
@@ -167,11 +169,18 @@ async def get_history(
             Transaction.expense_category_id == expense_category_id,
         )
 
-    count_stmt = select(func.count()).select_from(Transaction).where(*base_filters)
-    total_count = int(await session.scalar(count_stmt) or 0)
-
     from_wallet = aliased(Wallet)
     to_wallet = aliased(Wallet)
+    visibility = personal_ops_hidden_clause(viewer, from_wallet, to_wallet)
+
+    count_stmt = (
+        select(func.count())
+        .select_from(Transaction)
+        .join(from_wallet, Transaction.wallet_id == from_wallet.id)
+        .outerjoin(to_wallet, Transaction.to_wallet_id == to_wallet.id)
+        .where(*base_filters, visibility)
+    )
+    total_count = int(await session.scalar(count_stmt) or 0)
     expense_sub = aliased(ExpenseCategory)
     expense_parent = aliased(ExpenseCategory)
     income_cat = aliased(IncomeCategory)
@@ -206,7 +215,7 @@ async def get_history(
         .outerjoin(income_cat, Transaction.income_category_id == income_cat.id)
         .outerjoin(expense_sub, Transaction.expense_category_id == expense_sub.id)
         .outerjoin(expense_parent, expense_sub.parent_id == expense_parent.id)
-        .where(*base_filters)
+        .where(*base_filters, visibility)
         .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
         .limit(limit)
         .offset(offset)

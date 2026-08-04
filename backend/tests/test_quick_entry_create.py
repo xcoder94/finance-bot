@@ -201,10 +201,10 @@ class TestCreateQuickEntryIncome:
 class TestApiValidateExpenseRefs:
     async def test_api_accepts_parent_category(self) -> None:
         async with rollback_session() as session:
-            _, budget = await create_user(session, telegram_id=1_001_005)
+            user, budget = await create_user(session, telegram_id=1_001_005)
             wallet, food, _, _, _ = await seed_expense_tree(session, budget)
 
-            await validate_expense_refs(session, budget.id, wallet.id, food.id)
+            await validate_expense_refs(session, budget.id, wallet.id, food.id, user)
 
 
 class TestResolveCategoryId:

@@ -201,6 +201,7 @@ async def create_quick_entry_transfer(
         to_wallet_id,
         amount,
         rate,
+        user,
     )
     transaction = Transaction(
         family_budget_id=user.family_budget_id,
