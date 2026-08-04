@@ -8,6 +8,11 @@ import re
 import httpx
 import pytest
 
+from app.parsing.google_cache import (
+    CACHE_DISPLAY_PREFIX,
+    GooglePromptCache,
+    cache_display_name,
+)
 from app.parsing.http_adapter import HttpParser
 from app.parsing.prompt import (
     IMMUTABLE_PARSER_INSTRUCTIONS,
@@ -126,6 +131,124 @@ async def test_google_full_prompt_parse_succeeds():
     assert json.loads(seen["body"]["contents"][0]["parts"][0]["text"])["text"] == (
         "такси 25 тысяч"
     )
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_ensure_cache_creates_with_static_only():
+    calls: list[tuple[str, str, dict | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode()) if request.content else None
+        calls.append((request.method, str(request.url), body))
+        if request.method == "GET" and request.url.path.endswith("/cachedContents"):
+            return httpx.Response(200, json={"cachedContents": []})
+        if request.method == "POST" and request.url.path.endswith("/cachedContents"):
+            assert body["systemInstruction"]["parts"][0]["text"] == static_cache_text()
+            assert body["displayName"] == cache_display_name(prompt_version())
+            assert body["model"] == "models/test-model-from-env"
+            for marker in FAMILY_MARKERS:
+                assert marker not in json.dumps(body, ensure_ascii=False)
+            return httpx.Response(
+                200,
+                json={
+                    "name": "cachedContents/abc123",
+                    "displayName": body["displayName"],
+                    "expireTime": "2099-01-01T00:00:00Z",
+                },
+            )
+        return httpx.Response(500, json={"error": "unexpected"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = GooglePromptCache("test-key", "test-model-from-env", client=client)
+    name = await cache.ensure_cache()
+    assert name == "cachedContents/abc123"
+    assert cache.get_cached_name() == name
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_prompt_version_change_deletes_old_cache():
+    deleted: list[str] = []
+    post_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_count
+        if request.method == "GET" and request.url.path.endswith("/cachedContents"):
+            return httpx.Response(
+                200,
+                json={
+                    "cachedContents": [
+                        {
+                            "name": "cachedContents/old1",
+                            "displayName": f"{CACHE_DISPLAY_PREFIX}deadbeefdeadbeef",
+                        }
+                    ]
+                },
+            )
+        if request.method == "DELETE":
+            deleted.append(str(request.url.path))
+            return httpx.Response(200, json={})
+        if request.method == "POST" and request.url.path.endswith("/cachedContents"):
+            post_count += 1
+            return httpx.Response(
+                200,
+                json={
+                    "name": "cachedContents/new1",
+                    "displayName": cache_display_name(prompt_version()),
+                },
+            )
+        return httpx.Response(500, json={"error": "unexpected"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = GooglePromptCache("test-key", "test-model-from-env", client=client)
+    name = await cache.ensure_cache()
+    assert name == "cachedContents/new1"
+    assert post_count == 1
+    assert any("cachedContents/old1" in d for d in deleted)
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_ensure_cache_reuses_matching_display_name():
+    post_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_count
+        if request.method == "GET" and request.url.path.endswith("/cachedContents"):
+            return httpx.Response(
+                200,
+                json={
+                    "cachedContents": [
+                        {
+                            "name": "cachedContents/existing",
+                            "displayName": cache_display_name(prompt_version()),
+                        }
+                    ]
+                },
+            )
+        if request.method == "POST" and request.url.path.endswith("/cachedContents"):
+            post_count += 1
+            return httpx.Response(200, json={"name": "cachedContents/new"})
+        return httpx.Response(500, json={"error": "unexpected"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = GooglePromptCache("test-key", "test-model-from-env", client=client)
+    name = await cache.ensure_cache()
+    assert name == "cachedContents/existing"
+    assert post_count == 0
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_ensure_cache_returns_none_on_failure():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "down"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = GooglePromptCache("test-key", "test-model-from-env", client=client)
+    assert await cache.ensure_cache() is None
+    assert cache.get_cached_name() is None
     await client.aclose()
 
 
