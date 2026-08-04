@@ -2496,3 +2496,236 @@ button.home-ops-row:focus-visible {
   cursor: not-allowed;
   opacity: 0.72;
 }
+
+.page-content.goals-page {
+  padding: 10px 14px 22px;
+}
+
+.goals-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goals-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.goals-page__title {
+  margin: 0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--tx);
+}
+
+.goals-page__new-btn {
+  flex: none;
+  border: 1px solid var(--sep);
+  background: none;
+  color: var(--acc);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 8px 11px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.goals-page__tabs {
+  flex: none;
+}
+
+.goals-page__loading {
+  min-height: 120px;
+}
+
+.goals-page__empty {
+  border: 1px solid var(--sep);
+  border-radius: 14px;
+  padding: 32px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  text-align: center;
+  margin-top: 6px;
+}
+
+.goals-page__empty-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--chip);
+}
+
+.goals-page__empty-title {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--tx);
+}
+
+.goals-page__empty-subtitle {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--hint);
+  max-width: 32ch;
+}
+
+.goals-page__empty-create {
+  margin-top: 6px;
+  border: none;
+  background: var(--acc);
+  color: var(--acct);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 12px 18px;
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.goals-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goals-card {
+  border: 1px solid var(--sep);
+  border-radius: 14px;
+  padding: 13px 14px;
+}
+
+.goals-card--editable {
+  cursor: pointer;
+}
+
+.goals-card__header {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.goals-card__name {
+  flex: 1;
+  min-width: 0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--tx);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goals-card__pct {
+  flex: none;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--tx);
+}
+
+.goals-card__pct--closed {
+  color: var(--hint);
+}
+
+.goals-card__bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--chip);
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.goals-card__bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--acc);
+}
+
+.goals-card__amounts {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.goals-card__saved {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--tx);
+  font-variant-numeric: tabular-nums;
+}
+
+.goals-card__target {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
+.goals-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.goals-card__left,
+.goals-card__due {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--hint);
+}
+
+.goals-card__close {
+  width: 100%;
+  margin-top: 11px;
+  border: 1px solid var(--sep);
+  background: none;
+  color: var(--tx);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.goals-card__close:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.goals-card__owner-note {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--hint);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sep);
+}
