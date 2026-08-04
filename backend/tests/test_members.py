@@ -153,18 +153,16 @@ class TestListMembers:
         owner_members = owner_resp.json()
         assert len(owner_members) == 2
         by_id = {row["id"]: row for row in owner_members}
-        assert by_id[str(owner.id)] == {
-            "id": str(owner.id),
-            "first_name": "Alice",
-            "username": "alice",
-            "role": "owner",
-        }
-        assert by_id[str(member.id)] == {
-            "id": str(member.id),
-            "first_name": "Bob",
-            "username": "bob",
-            "role": "member",
-        }
+        assert by_id[str(owner.id)]["id"] == str(owner.id)
+        assert by_id[str(owner.id)]["first_name"] == "Alice"
+        assert by_id[str(owner.id)]["username"] == "alice"
+        assert by_id[str(owner.id)]["role"] == "owner"
+        assert "created_at" in by_id[str(owner.id)]
+        assert by_id[str(member.id)]["id"] == str(member.id)
+        assert by_id[str(member.id)]["first_name"] == "Bob"
+        assert by_id[str(member.id)]["username"] == "bob"
+        assert by_id[str(member.id)]["role"] == "member"
+        assert "created_at" in by_id[str(member.id)]
 
         member_resp = await client.get("/api/v1/members", headers=auth_headers(member_tid))
         assert member_resp.status_code == 200

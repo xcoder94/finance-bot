@@ -99,15 +99,7 @@ async def list_members(
         .order_by(User.created_at)
     )
     members = (await session.scalars(stmt)).all()
-    return [
-        MemberResponse(
-            id=member.id,
-            first_name=member.first_name,
-            username=member.username,
-            role=member.role,
-        )
-        for member in members
-    ]
+    return [MemberResponse.model_validate(member) for member in members]
 
 
 @router.get("/members/invite-link")

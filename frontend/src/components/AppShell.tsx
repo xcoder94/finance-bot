@@ -28,7 +28,8 @@ import { ExpenseCategoriesSettingsPage } from '../pages/settings/ExpenseCategori
 import { ExpenseSubcategoriesSettingsPage } from '../pages/settings/ExpenseSubcategoriesSettingsPage'
 import { IncomeCategoriesSettingsPage } from '../pages/settings/IncomeCategoriesSettingsPage'
 import { LanguageSettingsPage } from '../pages/settings/LanguageSettingsPage'
-import { MembersSettingsShellPage } from '../pages/settings/MembersSettingsShellPage'
+import { MembersSettingsPage } from '../pages/settings/MembersSettingsPage'
+import { MemberDetailPage } from '../pages/settings/MemberDetailPage'
 import { NotificationsSettingsShellPage } from '../pages/settings/NotificationsSettingsShellPage'
 import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
@@ -196,7 +197,8 @@ export function AppShell() {
             path="settings/expense-categories/:parentId"
             element={<ExpenseSubcategoriesSettingsPage />}
           />
-          <Route path="settings/members" element={<MembersSettingsShellPage />} />
+          <Route path="settings/members" element={<MembersSettingsPage />} />
+          <Route path="settings/members/:id" element={<MemberDetailPage />} />
           <Route path="settings/notifications" element={<NotificationsSettingsShellPage />} />
           <Route path="settings/language" element={<LanguageSettingsPage />} />
         </Route>

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,6 +11,7 @@ class MemberResponse(BaseModel):
     first_name: str | None
     username: str | None
     role: str
+    created_at: datetime
 
 
 class InviteLinkResponse(BaseModel):
