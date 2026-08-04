@@ -11,6 +11,7 @@ Currency = Literal["UZS", "USD"]
 class WalletCreate(BaseModel):
     name: str = Field(max_length=ENTITY_NAME_MAX)
     currency: Currency
+    is_personal: bool = False
 
     @field_validator("name", mode="before")
     @classmethod
