@@ -34,7 +34,7 @@ from bot.quick_entry.handlers import (
     set_parser_override,
     set_speech_client_override,
 )
-from bot.quick_entry.texts import MSG_NO_AMOUNT, MSG_VOICE_NOT_RECOGNIZED
+from bot.quick_entry.texts import MSG_MODEL_FAIL, MSG_NO_AMOUNT, MSG_VOICE_NOT_RECOGNIZED
 
 MSG_VOICE_NOT_RECOGNIZED_EXPECTED = (
     "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом."
@@ -438,6 +438,33 @@ class TestVoiceAcceptance:
             message.answer.assert_awaited_once_with(MSG_VOICE_NOT_RECOGNIZED)
             await session.refresh(budget)
             assert budget.daily_unparsed == 1
+            assert budget.daily_model_calls == 0
+
+    async def test_voice_speech_unavailable_returns_model_fail_without_unparsed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_014_007)
+            wallet = make_wallet(budget, name="Карта сум")
+            session.add(wallet)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            set_speech_client_override(
+                StubSpeech(exc=SpeechUnavailable("down"))
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_voice_message(telegram_id=user.telegram_id)
+            bot = make_voice_bot()
+            await handle_quick_entry_voice(message, bot)
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
             assert budget.daily_model_calls == 0
 
     async def test_voice_no_amount_reuses_msg_no_amount(
