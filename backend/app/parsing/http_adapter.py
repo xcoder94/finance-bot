@@ -8,6 +8,7 @@ from app.parsing.prompt import (
     IMMUTABLE_PARSER_INSTRUCTIONS,
     build_mutable_parser_payload,
     build_parser_messages,
+    static_cache_text,
 )
 from app.parsing.types import (
     ParseRequest,
@@ -117,6 +118,24 @@ def _extract_text_from_provider_body(provider: str, body: dict[str, Any]) -> str
             raise ParserMalformed("anthropic response missing text")
         return text
 
+    if provider == "google":
+        candidates = body.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            raise ParserMalformed("google response missing candidates")
+        content = candidates[0].get("content")
+        if not isinstance(content, dict):
+            raise ParserMalformed("google response missing content")
+        parts = content.get("parts")
+        if not isinstance(parts, list) or not parts:
+            raise ParserMalformed("google response missing parts")
+        texts: list[str] = []
+        for part in parts:
+            if isinstance(part, dict) and isinstance(part.get("text"), str):
+                texts.append(part["text"])
+        if not texts:
+            raise ParserMalformed("google response missing text")
+        return "".join(texts)
+
     raise ParserMalformed(f"unsupported parser provider: {provider!r}")
 
 
@@ -138,7 +157,7 @@ class HttpParser:
         self._client = client
 
     async def parse(self, request: ParseRequest) -> ParseResponse:
-        if self._provider not in ("openai", "anthropic"):
+        if self._provider not in ("openai", "anthropic", "google"):
             raise ParserMalformed(f"unsupported parser provider: {self._provider!r}")
         if not self._model:
             raise ParserMalformed("parser model is not configured")
@@ -210,6 +229,29 @@ class HttpParser:
                 json={
                     "model": self._model,
                     "messages": build_parser_messages(request),
+                },
+            )
+
+        if self._provider == "google":
+            model = self._model
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent"
+            )
+            return await client.post(
+                url,
+                params={"key": self._api_key},
+                headers={"Content-Type": "application/json"},
+                json={
+                    "systemInstruction": {
+                        "parts": [{"text": static_cache_text()}]
+                    },
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [{"text": user_content}],
+                        }
+                    ],
                 },
             )
 
