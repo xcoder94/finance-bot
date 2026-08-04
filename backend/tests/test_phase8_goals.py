@@ -17,6 +17,7 @@ from app.services.goal_notify import format_achievement_message
 from app.services.goals import check_goal_achievement
 from app.services.quick_entry_balance import wallet_balance
 from bot.goals import handle_goal_close
+from bot.quick_entry.cards import format_card
 from tests.test_wallets_categories import api_client, auth_headers, create_user_with_budget
 
 
@@ -616,3 +617,111 @@ async def test_close_via_callback_member_ignored(
     goal = await session.get(Goal, uuid.UUID(goal_id))
     assert goal is not None
     assert goal.status == "active"
+
+
+def test_quick_entry_card_has_no_goal_progress() -> None:
+    text = format_card(
+        sign="➖",
+        amount=25_000,
+        currency="UZS",
+        category_label="Такси",
+        comment="такси до работы",
+        wallet_name="Наличный сум",
+        op_date=date(2026, 8, 1),
+        balance=1_275_000,
+    )
+    assert "Цель" not in text
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_transfer_into_wallet_triggers_achievement(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet_from = await _create_shared_wallet(session, owner.family_budget_id, name="Источник")
+    wallet_to = await _create_shared_wallet(session, owner.family_budget_id, name="Накопления")
+    await _seed_income(session, owner.family_budget_id, wallet_from.id, owner.id, 1_000)
+    await session.flush()
+
+    bot = _mock_bot(monkeypatch)
+
+    goal_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet_to.id), "target_amount": 1_000},
+    )
+    assert goal_resp.status_code == 201, goal_resp.text
+    bot.send_message.reset_mock()
+
+    transfer_resp = await client.post(
+        "/api/v1/transactions/transfer",
+        headers=auth_headers(owner_tid),
+        json={
+            "wallet_id": str(wallet_from.id),
+            "to_wallet_id": str(wallet_to.id),
+            "amount": 1_000,
+            "transaction_date": "2026-04-01T12:00:00+00:00",
+        },
+    )
+    assert transfer_resp.status_code == 201, transfer_resp.text
+    assert bot.send_message.await_count == 2
+    calls_by_tid = {c.args[0] for c in bot.send_message.await_args_list}
+    assert owner_tid in calls_by_tid
+    assert member_tid in calls_by_tid
+
+
+def test_quick_entry_card_has_no_goal_progress() -> None:
+    text = format_card(
+        sign="➖",
+        amount=25_000,
+        currency="UZS",
+        category_label="Такси",
+        comment="такси до работы",
+        wallet_name="Наличный сум",
+        op_date=date(2026, 8, 1),
+        balance=1_275_000,
+    )
+    assert "Цель" not in text
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_transfer_into_wallet_triggers_achievement(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet_from = await _create_shared_wallet(session, owner.family_budget_id, name="Источник")
+    wallet_to = await _create_shared_wallet(session, owner.family_budget_id, name="Накопления")
+    await _seed_income(session, owner.family_budget_id, wallet_from.id, owner.id, 1_000)
+    await session.flush()
+
+    bot = _mock_bot(monkeypatch)
+
+    goal_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet_to.id), "target_amount": 1_000},
+    )
+    assert goal_resp.status_code == 201, goal_resp.text
+    bot.send_message.reset_mock()
+
+    transfer_resp = await client.post(
+        "/api/v1/transactions/transfer",
+        headers=auth_headers(owner_tid),
+        json={
+            "wallet_id": str(wallet_from.id),
+            "to_wallet_id": str(wallet_to.id),
+            "amount": 1_000,
+            "transaction_date": "2026-04-01T12:00:00+00:00",
+        },
+    )
+    assert transfer_resp.status_code == 201, transfer_resp.text
+    assert bot.send_message.await_count == 2
+    calls_by_tid = {c.args[0] for c in bot.send_message.await_args_list}
+    assert owner_tid in calls_by_tid
+    assert member_tid in calls_by_tid

@@ -28,6 +28,7 @@ from app.parsing.types import (
     ParserMalformed,
     ParserUnavailable,
 )
+from app.services.goals import check_goal_achievement
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.quick_entry_counters import (
@@ -140,6 +141,15 @@ def _operation_date_to_datetime(op_date: date) -> datetime:
         0,
         tzinfo=TASHKENT,
     )
+
+
+async def _check_wallets_after_write(
+    session: AsyncSession,
+    wallet_ids: set[uuid.UUID],
+    bot: Bot,
+) -> None:
+    for wallet_id in wallet_ids:
+        await check_goal_achievement(session, wallet_id, bot=bot)
 
 
 async def _txn_category_label(
@@ -374,6 +384,12 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
                 await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
                 continue
 
+            await _check_wallets_after_write(
+                session,
+                {resolved.from_wallet.id, resolved.to_wallet.id},
+                bot,
+            )
+
             from_balance = await wallet_balance(session, resolved.from_wallet.id)
             to_balance = await wallet_balance(session, resolved.to_wallet.id)
             if (
@@ -460,6 +476,8 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
                 )
                 sign = "➕"
 
+            await _check_wallets_after_write(session, {wallet.id}, bot)
+
             balance = await wallet_balance(session, wallet.id)
             card_text = format_card(
                 sign=sign,
@@ -545,6 +563,10 @@ async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
 
         soft_delete_transaction(transaction)
         await session.commit()
+        affected = {transaction.wallet_id}
+        if transaction.to_wallet_id is not None:
+            affected.add(transaction.to_wallet_id)
+        await _check_wallets_after_write(session, affected, bot)
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer()
 
@@ -611,9 +633,15 @@ async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> No
             await _answer_gone(callback)
             return
 
+        old_wallet_id = transaction.wallet_id
         transaction.wallet_id = wallet.id
         await session.commit()
         await session.refresh(transaction)
+        await _check_wallets_after_write(
+            session,
+            {old_wallet_id, wallet.id},
+            bot,
+        )
 
         card_text = await _format_transaction_card(session, transaction, wallet)
         await callback.message.edit_text(
@@ -705,6 +733,8 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
         if wallet is None:
             await _answer_gone(callback)
             return
+
+        await _check_wallets_after_write(session, {consumed.wallet_id}, bot)
 
         card_text = await _format_transaction_card(session, txn, wallet)
         await callback.message.edit_text(

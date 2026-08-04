@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from aiogram import Bot
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,12 +19,23 @@ from app.schemas.transactions import (
     TransferCreate,
     TransferUpdate,
 )
+from app.services.goals import check_goal_achievement
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import (
     get_active_expense_category,
     get_active_income_category,
     get_active_wallet,
 )
+
+
+async def _check_affected_wallets(
+    session: AsyncSession,
+    wallet_ids: set[uuid.UUID],
+    *,
+    bot: Bot | None = None,
+) -> None:
+    for wallet_id in wallet_ids:
+        await check_goal_achievement(session, wallet_id, bot=bot)
 
 
 def transaction_to_response(transaction: Transaction) -> TransactionResponse:
@@ -207,6 +219,8 @@ async def create_income_transaction(
     session: AsyncSession,
     user: User,
     body: IncomeCreate,
+    *,
+    bot: Bot | None = None,
 ) -> Transaction:
     await validate_income_refs(
         session,
@@ -228,6 +242,7 @@ async def create_income_transaction(
     session.add(transaction)
     await session.commit()
     await session.refresh(transaction)
+    await _check_affected_wallets(session, {body.wallet_id}, bot=bot)
     return transaction
 
 
@@ -235,6 +250,8 @@ async def create_expense_transaction(
     session: AsyncSession,
     user: User,
     body: ExpenseCreate,
+    *,
+    bot: Bot | None = None,
 ) -> Transaction:
     await validate_expense_refs(
         session,
@@ -256,6 +273,7 @@ async def create_expense_transaction(
     session.add(transaction)
     await session.commit()
     await session.refresh(transaction)
+    await _check_affected_wallets(session, {body.wallet_id}, bot=bot)
     return transaction
 
 
@@ -263,6 +281,8 @@ async def create_transfer_transaction(
     session: AsyncSession,
     user: User,
     body: TransferCreate,
+    *,
+    bot: Bot | None = None,
 ) -> Transaction:
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
@@ -288,6 +308,11 @@ async def create_transfer_transaction(
     session.add(transaction)
     await session.commit()
     await session.refresh(transaction)
+    await _check_affected_wallets(
+        session,
+        {body.wallet_id, body.to_wallet_id},
+        bot=bot,
+    )
     return transaction
 
 
@@ -296,6 +321,8 @@ async def update_income_transaction(
     transaction: Transaction,
     body: IncomeUpdate,
     user: User,
+    *,
+    bot: Bot | None = None,
 ) -> Transaction:
     await validate_income_refs(
         session,
@@ -304,6 +331,7 @@ async def update_income_transaction(
         body.income_category_id,
         user,
     )
+    affected = {transaction.wallet_id, body.wallet_id}
     transaction.transaction_date = body.transaction_date
     transaction.amount = body.amount
     transaction.wallet_id = body.wallet_id
@@ -315,6 +343,7 @@ async def update_income_transaction(
     transaction.expense_category_id = None
     await session.commit()
     await session.refresh(transaction)
+    await _check_affected_wallets(session, affected, bot=bot)
     return transaction
 
 
@@ -323,6 +352,8 @@ async def update_expense_transaction(
     transaction: Transaction,
     body: ExpenseUpdate,
     user: User,
+    *,
+    bot: Bot | None = None,
 ) -> Transaction:
     await validate_expense_refs(
         session,
@@ -331,6 +362,7 @@ async def update_expense_transaction(
         body.expense_category_id,
         user,
     )
+    affected = {transaction.wallet_id, body.wallet_id}
     transaction.transaction_date = body.transaction_date
     transaction.amount = body.amount
     transaction.wallet_id = body.wallet_id
@@ -342,6 +374,7 @@ async def update_expense_transaction(
     transaction.income_category_id = None
     await session.commit()
     await session.refresh(transaction)
+    await _check_affected_wallets(session, affected, bot=bot)
     return transaction
 
 
@@ -350,6 +383,8 @@ async def update_transfer_transaction(
     transaction: Transaction,
     body: TransferUpdate,
     user: User,
+    *,
+    bot: Bot | None = None,
 ) -> Transaction:
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
@@ -360,6 +395,10 @@ async def update_transfer_transaction(
         body.rate,
         user,
     )
+    affected = {transaction.wallet_id, body.wallet_id}
+    if transaction.to_wallet_id is not None:
+        affected.add(transaction.to_wallet_id)
+    affected.add(body.to_wallet_id)
     transaction.transaction_date = body.transaction_date
     transaction.wallet_id = body.wallet_id
     transaction.to_wallet_id = body.to_wallet_id
@@ -371,4 +410,20 @@ async def update_transfer_transaction(
     transaction.expense_category_id = None
     await session.commit()
     await session.refresh(transaction)
+    await _check_affected_wallets(session, affected, bot=bot)
+    return transaction
+
+
+async def delete_transaction_record(
+    session: AsyncSession,
+    transaction: Transaction,
+    *,
+    bot: Bot | None = None,
+) -> Transaction:
+    affected = {transaction.wallet_id}
+    if transaction.to_wallet_id is not None:
+        affected.add(transaction.to_wallet_id)
+    soft_delete_transaction(transaction)
+    await session.commit()
+    await _check_affected_wallets(session, affected, bot=bot)
     return transaction
