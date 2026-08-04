@@ -3,15 +3,27 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import socket
 import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+
+import pytest
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiogram.filters import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
 from app.models.user import User
 from app.services.member_texts import welcome_invited, welcome_solo
+from app.services.release_announcement import (
+    RELEASE_ANNOUNCEMENT_TEXT,
+    send_release_announcements,
+)
+from tests.test_wallets_categories import api_client, create_user_with_budget
 from bot.goals import router as goals_router
 from bot.membership import router as membership_router
 from bot.onboarding import (
@@ -241,3 +253,118 @@ def test_invited_language_callback_keeps_18_2_and_uses_markdown() -> None:
         assert kwargs.get("parse_mode") == "Markdown"
 
     asyncio.run(_run())
+
+
+ANNOUNCEMENT_TEXT = (
+    "Теперь трату можно записать прямо здесь, сообщением.\n"
+    "Напишите, например: `такси 25 тысяч`\n"
+    "\n"
+    "В приложении появились личные кошельки, цели и управление участниками."
+)
+
+
+def _db_available() -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def _tid() -> int:
+    return int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+
+
+async def _mark_prior_users_delivered(session: AsyncSession) -> None:
+    """Exclude committed fixture users so only users created in-test are eligible."""
+    await session.execute(
+        update(User)
+        .where(User.release_announcement_delivered_at.is_(None))
+        .values(release_announcement_delivered_at=datetime.now(timezone.utc))
+    )
+    await session.commit()
+
+
+def test_release_announcement_text_exact_18_4() -> None:
+    assert RELEASE_ANNOUNCEMENT_TEXT == ANNOUNCEMENT_TEXT
+
+
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
+@pytest.mark.anyio
+async def test_announcement_sent_once_then_skipped(
+    api_client: tuple[object, AsyncSession],
+) -> None:
+    _, session = api_client
+    await _mark_prior_users_delivered(session)
+    tid = _tid()
+    user, _budget = await create_user_with_budget(session, telegram_id=tid, role="owner")
+    await session.commit()
+    await session.refresh(user)
+
+    cutoff = datetime.now(timezone.utc) + timedelta(hours=1)
+    bot = AsyncMock()
+
+    sent1 = await send_release_announcements(session, bot, cutoff, dry_run=False)
+    assert sent1 == 1
+    assert bot.send_message.await_count == 1
+    call = bot.send_message.await_args
+    assert call.args[0] == tid
+    assert call.args[1] == ANNOUNCEMENT_TEXT
+    assert call.kwargs.get("parse_mode") == "Markdown"
+    await session.refresh(user)
+    assert user.release_announcement_delivered_at is not None
+
+    bot.reset_mock()
+    sent2 = await send_release_announcements(session, bot, cutoff, dry_run=False)
+    assert sent2 == 0
+    bot.send_message.assert_not_awaited()
+
+
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
+@pytest.mark.anyio
+async def test_user_created_after_cutoff_never_eligible(
+    api_client: tuple[object, AsyncSession],
+) -> None:
+    _, session = api_client
+    await _mark_prior_users_delivered(session)
+    tid = _tid()
+    user, _budget = await create_user_with_budget(session, telegram_id=tid, role="owner")
+    await session.commit()
+    await session.refresh(user)
+
+    cutoff = user.created_at - timedelta(seconds=1)
+    bot = AsyncMock()
+    sent = await send_release_announcements(session, bot, cutoff, dry_run=False)
+    assert sent == 0
+    bot.send_message.assert_not_awaited()
+    await session.refresh(user)
+    assert user.release_announcement_delivered_at is None
+
+
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
+@pytest.mark.anyio
+async def test_dry_run_sends_nothing(
+    api_client: tuple[object, AsyncSession],
+) -> None:
+    _, session = api_client
+    await _mark_prior_users_delivered(session)
+    tid = _tid()
+    user, _budget = await create_user_with_budget(session, telegram_id=tid, role="owner")
+    await session.commit()
+    await session.refresh(user)
+
+    cutoff = datetime.now(timezone.utc) + timedelta(hours=1)
+    bot = AsyncMock()
+    count = await send_release_announcements(session, bot, cutoff, dry_run=True)
+    assert count == 1
+    bot.send_message.assert_not_awaited()
+    await session.refresh(user)
+    assert user.release_announcement_delivered_at is None
+
+
+def test_script_not_wired_into_bot_main() -> None:
+    import bot.main as bot_main
+
+    src = inspect.getsource(bot_main)
+    assert "release_announcement" not in src
+    assert "send_release_announcement" not in src
