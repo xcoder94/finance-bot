@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import base64
 import io
 import json
@@ -24,8 +26,10 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.parsing.prompt import IMMUTABLE_PARSER_INSTRUCTIONS, build_mutable_parser_payload
 from app.parsing.stub import StubParser
-from app.parsing.types import ParseResponse, ParsedOperation
+from app.parsing.types import ParseRequest, ParseResponse, ParsedOperation
+from app.services.quick_entry_dates import apply_date_hint
 from app.speech.base import SpeechUnavailable
 from app.speech.factory import get_speech_client
 from app.speech.google_client import GoogleSpeechClient
@@ -40,6 +44,54 @@ MSG_VOICE_NOT_RECOGNIZED_EXPECTED = (
     "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом."
 )
 SECRET_TRANSCRIPT = "СЕКРЕТНАЯ_РАСШИФРОВКА_такси_25_тысяч"
+
+
+# --- Task 1 (phase 14b): types, prompt, date_hint ---
+
+
+def test_parse_request_accepts_optional_audio_fields():
+    req = ParseRequest(
+        text="",
+        wallet_names=[],
+        expense_category_names=[],
+        income_category_names=[],
+        audio_base64="AAAA",
+        audio_mime_type="audio/ogg",
+    )
+    assert req.audio_base64 == "AAAA"
+    assert req.audio_mime_type == "audio/ogg"
+
+
+def test_parse_response_accepts_speech_status_and_date_hint():
+    r = ParseResponse(operations=[], speech_status="not_recognized", date_hint="2026-08-03")
+    assert r.speech_status == "not_recognized"
+    assert r.date_hint == "2026-08-03"
+
+
+def test_mutable_payload_includes_today():
+    req = ParseRequest(text="x", wallet_names=[], expense_category_names=[], income_category_names=[])
+    payload = build_mutable_parser_payload(req)
+    assert '"today"' in payload
+
+
+def test_instructions_document_speech_status_and_date_hint():
+    assert "speech_status" in IMMUTABLE_PARSER_INSTRUCTIONS
+    assert "date_hint" in IMMUTABLE_PARSER_INSTRUCTIONS
+
+
+def test_apply_date_hint_yesterday_iso():
+    today = date(2026, 8, 4)
+    assert apply_date_hint("2026-08-03", today) == date(2026, 8, 3)
+
+
+def test_apply_date_hint_too_old_becomes_today():
+    today = date(2026, 8, 4)
+    assert apply_date_hint("2026-01-01", today) == today
+
+
+def test_apply_date_hint_none_is_today():
+    today = date(2026, 8, 4)
+    assert apply_date_hint(None, today) == today
 
 
 def _db_available() -> bool:
