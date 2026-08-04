@@ -11,6 +11,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.entity_limits import LIMIT_PERSONAL_WALLETS
+from app.services.quick_entry_wallets import list_wallets_for_parse
 from tests.test_wallets_categories import (
     api_client,
     auth_headers,
@@ -656,3 +657,45 @@ async def test_shared_summary_unaffected(
         row["currency"]: row["balance"] for row in balances_resp.json()["balances"]
     }
     assert shared_balances["UZS"] == -SHARED_EXPENSE
+
+
+async def test_parse_wallet_list_excludes_other_members_personal_names(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """§7.3 regression: parse sees shared + writer's personal wallets only."""
+    _, session = api_client
+    owner_tid, member_tid, owner, member = await _create_owner_and_member(session)
+    del owner_tid, member_tid
+
+    shared = Wallet(
+        family_budget_id=owner.family_budget_id,
+        name="Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    owner_personal = Wallet(
+        family_budget_id=owner.family_budget_id,
+        name="Owner Personal",
+        currency="UZS",
+        is_personal=True,
+        owner_user_id=owner.id,
+    )
+    member_personal = Wallet(
+        family_budget_id=owner.family_budget_id,
+        name="Member Personal",
+        currency="UZS",
+        is_personal=True,
+        owner_user_id=member.id,
+    )
+    session.add_all([shared, owner_personal, member_personal])
+    await session.flush()
+
+    owner_names = {w.name for w in await list_wallets_for_parse(session, owner.family_budget_id, owner)}
+    assert "Shared" in owner_names
+    assert "Owner Personal" in owner_names
+    assert "Member Personal" not in owner_names
+
+    member_names = {w.name for w in await list_wallets_for_parse(session, owner.family_budget_id, member)}
+    assert "Shared" in member_names
+    assert "Member Personal" in member_names
+    assert "Owner Personal" not in member_names
