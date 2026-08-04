@@ -44,6 +44,7 @@ from app.services.membership_lifecycle import (
     detach_member_to_own_budget,
     evaluate_join_from_own_budget,
 )
+from app.services.history_analytics import should_include_created_by
 from app.services.ownership_transfer import (
     TransferNotPendingError,
     TransferStaleError,
@@ -1300,3 +1301,178 @@ async def test_accept_stale_when_recipient_no_longer_in_family(
         assert recipient.role == "owner"
         assert transfer.status == "cancelled"
         bot.send_message.assert_not_awaited()
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_history_shows_departed_label_after_member_removed(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    member_tid = owner_tid + 1
+    owner, budget = await create_user_with_budget(
+        session,
+        telegram_id=owner_tid,
+        role="owner",
+    )
+    member, _ = await create_user_with_budget(
+        session,
+        telegram_id=member_tid,
+        role="member",
+        first_name="Рустам",
+        family_budget_id=budget.id,
+    )
+    shared_wallet = Wallet(
+        family_budget_id=budget.id,
+        name="Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    session.add(shared_wallet)
+    await session.flush()
+    txn_date = datetime(2026, 7, 15, tzinfo=UTC)
+    session.add(
+        Transaction(
+            family_budget_id=budget.id,
+            type="expense",
+            wallet_id=shared_wallet.id,
+            amount=300,
+            created_by_user_id=member.id,
+            transaction_date=txn_date,
+        )
+    )
+    await session.flush()
+
+    _mock_bot(monkeypatch)
+    delete_resp = await client.delete(
+        f"/api/v1/members/{member.id}",
+        headers=auth_headers(owner_tid),
+    )
+    assert delete_resp.status_code == 200
+
+    history_resp = await client.get(
+        "/api/v1/transactions/history",
+        headers=auth_headers(owner_tid),
+        params={
+            "date_from": datetime(2026, 7, 1, tzinfo=UTC).isoformat(),
+            "date_to": datetime(2026, 7, 31, tzinfo=UTC).isoformat(),
+        },
+    )
+    assert history_resp.status_code == 200
+    assert history_resp.json()["items"][0]["created_by"] == departed_label("Рустам")
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_should_include_created_by_when_departed_author_has_transactions(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    member_tid = owner_tid + 1
+    owner, budget = await create_user_with_budget(
+        session,
+        telegram_id=owner_tid,
+        role="owner",
+    )
+    member, _ = await create_user_with_budget(
+        session,
+        telegram_id=member_tid,
+        role="member",
+        first_name="Bob",
+        family_budget_id=budget.id,
+    )
+    shared_wallet = Wallet(
+        family_budget_id=budget.id,
+        name="Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    session.add(shared_wallet)
+    await session.flush()
+    session.add(
+        Transaction(
+            family_budget_id=budget.id,
+            type="income",
+            wallet_id=shared_wallet.id,
+            amount=100,
+            created_by_user_id=member.id,
+            transaction_date=datetime(2026, 8, 1, tzinfo=UTC),
+        )
+    )
+    await session.flush()
+
+    assert await should_include_created_by(session, budget.id) is True
+
+    _mock_bot(monkeypatch)
+    delete_resp = await client.delete(
+        f"/api/v1/members/{member.id}",
+        headers=auth_headers(owner_tid),
+    )
+    assert delete_resp.status_code == 200
+
+    assert await should_include_created_by(session, budget.id) is True
+
+    history_resp = await client.get(
+        "/api/v1/transactions/history",
+        headers=auth_headers(owner_tid),
+        params={
+            "date_from": datetime(2026, 8, 1, tzinfo=UTC).isoformat(),
+            "date_to": datetime(2026, 8, 31, tzinfo=UTC).isoformat(),
+        },
+    )
+    assert history_resp.status_code == 200
+    assert "created_by" in history_resp.json()["items"][0]
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_shared_wallet_delete_reassigns_member_default_silently(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    member_tid = owner_tid + 1
+    owner, budget = await create_user_with_budget(
+        session,
+        telegram_id=owner_tid,
+        role="owner",
+    )
+    member, _ = await create_user_with_budget(
+        session,
+        telegram_id=member_tid,
+        role="member",
+        family_budget_id=budget.id,
+    )
+    older_shared = Wallet(
+        family_budget_id=budget.id,
+        name="Older Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    newer_shared = Wallet(
+        family_budget_id=budget.id,
+        name="Newer Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    session.add(older_shared)
+    await session.flush()
+    session.add(newer_shared)
+    await session.flush()
+    member.default_wallet_id = newer_shared.id
+    await session.flush()
+
+    delete_resp = await client.delete(
+        f"/api/v1/wallets/{newer_shared.id}",
+        headers=auth_headers(owner_tid),
+    )
+    assert delete_resp.status_code == 200
+
+    await session.refresh(member)
+    await session.refresh(newer_shared)
+    assert newer_shared.is_deleted is True
+    assert member.default_wallet_id == older_shared.id

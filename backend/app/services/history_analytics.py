@@ -27,6 +27,7 @@ from app.schemas.history_analytics import (
 )
 from app.services.wallet_visibility import personal_ops_hidden_clause
 from app.services.wallets_categories import get_expense_parent_including_deleted
+from app.services.member_texts import departed_label
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
 
@@ -56,8 +57,62 @@ async def count_family_users(session: AsyncSession, family_budget_id: uuid.UUID)
     stmt = select(func.count()).select_from(User).where(User.family_budget_id == family_budget_id)
     return int(await session.scalar(stmt) or 0)
 
+
+async def count_active_family_members(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> int:
+    stmt = (
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.family_budget_id == family_budget_id,
+            User.is_deleted.is_(False),
+        )
+    )
+    return int(await session.scalar(stmt) or 0)
+
+
+def _resolve_display_name(user: User) -> str:
+    return user.first_name or user.username or "Unknown"
+
+
+def format_history_author(
+    user: User | None, *, family_budget_id: uuid.UUID
+) -> str | None:
+    if user is None:
+        return "Unknown"
+    name = _resolve_display_name(user)
+    if user.family_budget_id != family_budget_id or user.is_deleted:
+        return departed_label(name)
+    return name
+
+
+async def _has_departed_transaction_authors(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> bool:
+    active_member_ids = select(User.id).where(
+        User.family_budget_id == family_budget_id,
+        User.is_deleted.is_(False),
+    )
+    stmt = (
+        select(func.count())
+        .select_from(Transaction)
+        .where(
+            Transaction.family_budget_id == family_budget_id,
+            Transaction.is_deleted.is_(False),
+            Transaction.created_by_user_id.not_in(active_member_ids),
+        )
+        .limit(1)
+    )
+    return int(await session.scalar(stmt) or 0) > 0
+
+
 async def should_include_created_by(session: AsyncSession, family_budget_id: uuid.UUID) -> bool:
-    return await count_family_users(session, family_budget_id) >= 2
+    if await count_active_family_members(session, family_budget_id) >= 2:
+        return True
+    if await count_family_users(session, family_budget_id) >= 2:
+        return True
+    return await _has_departed_transaction_authors(session, family_budget_id)
 
 
 def tashkent_today(now: datetime) -> datetime.date:
@@ -206,8 +261,11 @@ async def get_history(
     if include_created_by:
         selected_columns.extend(
             [
+                User.id.label("user_id"),
                 User.first_name.label("user_first_name"),
                 User.username.label("user_username"),
+                User.family_budget_id.label("user_family_budget_id"),
+                User.is_deleted.label("user_is_deleted"),
             ]
         )
 
@@ -232,12 +290,21 @@ async def get_history(
         txn: Transaction = row[0]
         created_by: str | None = None
         if include_created_by:
-            if row.user_first_name:
-                created_by = row.user_first_name
-            elif row.user_username:
-                created_by = row.user_username
-            else:
-                created_by = "Unknown"
+            author_user: User | None = None
+            if row.user_id is not None:
+                author_user = User(
+                    id=row.user_id,
+                    telegram_id=0,
+                    family_budget_id=row.user_family_budget_id,
+                    role="member",
+                    language="ru",
+                    first_name=row.user_first_name,
+                    username=row.user_username,
+                    is_deleted=row.user_is_deleted,
+                )
+            created_by = format_history_author(
+                author_user, family_budget_id=family_budget_id
+            )
 
         items.append(
             HistoryItem(

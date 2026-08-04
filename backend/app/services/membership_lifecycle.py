@@ -212,3 +212,35 @@ async def detach_member_to_own_budget(
             await resolved_bot.session.close()
 
     return new_budget
+
+
+async def reassign_defaults_after_shared_wallet_deleted(
+    session: AsyncSession,
+    *,
+    family_budget_id: uuid.UUID,
+    deleted_wallet_id: uuid.UUID,
+) -> None:
+    oldest_shared = await session.scalar(
+        select(Wallet)
+        .where(
+            Wallet.family_budget_id == family_budget_id,
+            Wallet.is_deleted.is_(False),
+            Wallet.is_personal.is_(False),
+        )
+        .order_by(Wallet.created_at)
+        .limit(1)
+    )
+    if oldest_shared is None:
+        return
+
+    users = (
+        await session.scalars(
+            select(User).where(
+                User.family_budget_id == family_budget_id,
+                User.is_deleted.is_(False),
+                User.default_wallet_id == deleted_wallet_id,
+            )
+        )
+    ).all()
+    for user in users:
+        user.default_wallet_id = oldest_shared.id

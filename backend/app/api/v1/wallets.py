@@ -23,6 +23,7 @@ from app.services.entity_limits import (
     SHARED_WALLET_LIMIT,
 )
 from app.services.goals import get_active_goal_for_wallet
+from app.services.membership_lifecycle import reassign_defaults_after_shared_wallet_deleted
 from app.services.wallet_visibility import require_wallet_visible, visible_wallets_clause
 from app.services.wallets_categories import (
     count_wallet_transactions,
@@ -204,7 +205,15 @@ async def delete_wallet(
         raise HTTPException(status_code=403)
 
     affected_transactions_count = await count_wallet_transactions(session, wallet.id)
+    deleted_wallet_id = wallet.id
+    was_shared = not wallet.is_personal
     soft_delete(wallet)
+    if was_shared:
+        await reassign_defaults_after_shared_wallet_deleted(
+            session,
+            family_budget_id=user.family_budget_id,
+            deleted_wallet_id=deleted_wallet_id,
+        )
     await session.commit()
     return WalletDeleteResponse(
         id=wallet.id,
