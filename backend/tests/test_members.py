@@ -252,7 +252,7 @@ class TestInviteLink:
 
 
 class TestDeleteMember:
-    async def test_owner_soft_deletes_member_and_transactions_unchanged(
+    async def test_owner_removes_member_personal_follows_shared_transactions_unchanged(
         self, api_client: tuple[AsyncClient, AsyncSession]
     ) -> None:
         client, session = api_client
@@ -281,7 +281,13 @@ class TestDeleteMember:
         await session.flush()
         headers = auth_headers(owner_tid)
 
-        delete_resp = await client.delete(f"/api/v1/members/{member.id}", headers=headers)
+        with patch(
+            "app.services.membership_lifecycle.resolve_bot",
+            new=AsyncMock(return_value=(AsyncMock(), False)),
+        ):
+            delete_resp = await client.delete(
+                f"/api/v1/members/{member.id}", headers=headers
+            )
         assert delete_resp.status_code == 200
         assert delete_resp.json() == {
             "id": str(member.id),
@@ -296,6 +302,11 @@ class TestDeleteMember:
         await session.refresh(txn)
         assert txn.created_by_user_id == member.id
         assert txn.is_deleted is False
+
+        await session.refresh(member)
+        assert member.is_deleted is False
+        assert member.role == "owner"
+        assert member.family_budget_id != budget.id
 
         await session.refresh(budget)
         assert budget.invite_token is not None
@@ -329,7 +340,13 @@ class TestDeleteMember:
         )
         headers = auth_headers(owner_tid)
 
-        first_delete = await client.delete(f"/api/v1/members/{member.id}", headers=headers)
+        with patch(
+            "app.services.membership_lifecycle.resolve_bot",
+            new=AsyncMock(return_value=(AsyncMock(), False)),
+        ):
+            first_delete = await client.delete(
+                f"/api/v1/members/{member.id}", headers=headers
+            )
         assert first_delete.status_code == 200
 
         second_delete = await client.delete(f"/api/v1/members/{member.id}", headers=headers)

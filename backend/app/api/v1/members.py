@@ -1,6 +1,5 @@
 import secrets
 import uuid
-from datetime import UTC, datetime
 from typing import Annotated
 
 from aiogram import Bot
@@ -14,6 +13,10 @@ from app.db import get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
 from app.schemas.members import InviteLinkResponse, MemberDeleteResponse, MemberResponse
+from app.services.membership_lifecycle import (
+    OwnerCannotDetachError,
+    detach_member_to_own_budget,
+)
 from app.services.invite import (
     build_invite_link,
     cache_bot_username,
@@ -139,12 +142,59 @@ async def delete_member(
     if member is None:
         raise HTTPException(status_code=404)
 
-    member.is_deleted = True
-    member.deleted_at = datetime.now(UTC)
+    old_budget = await get_active_family_budget(session, user.family_budget_id)
+    if old_budget is None:
+        raise HTTPException(status_code=404)
+
+    member_role = member.role
+    member_first_name = member.first_name
+
+    await detach_member_to_own_budget(
+        session,
+        departing_user=member,
+        old_budget=old_budget,
+        reason="removed",
+        bot=None,
+    )
     await session.commit()
 
     return MemberDeleteResponse(
         id=member.id,
-        first_name=member.first_name,
-        role=member.role,
+        first_name=member_first_name,
+        role=member_role,
+    )
+
+
+@router.post("/members/leave")
+async def leave_family(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> MemberDeleteResponse:
+    if user.role == "owner":
+        raise HTTPException(status_code=400, detail="owner_cannot_leave")
+
+    old_budget = await get_active_family_budget(session, user.family_budget_id)
+    if old_budget is None:
+        raise HTTPException(status_code=404)
+
+    member_role = user.role
+    member_first_name = user.first_name
+
+    try:
+        await detach_member_to_own_budget(
+            session,
+            departing_user=user,
+            old_budget=old_budget,
+            reason="left",
+            bot=None,
+        )
+    except OwnerCannotDetachError:
+        raise HTTPException(status_code=400, detail="owner_cannot_leave") from None
+
+    await session.commit()
+
+    return MemberDeleteResponse(
+        id=user.id,
+        first_name=member_first_name,
+        role=member_role,
     )
