@@ -509,3 +509,150 @@ async def test_analytics_summary_excludes_personal(
     assert resp.status_code == 200
     by_currency = {row["currency"]: row for row in resp.json()["by_currency"]}
     assert by_currency["UZS"]["expense"] == SHARED_EXPENSE
+
+
+def _summary_params() -> dict[str, str]:
+    return {
+        "date_from": SELECTED_MONTH_START.isoformat(),
+        "date_to": SELECTED_MONTH_END.isoformat(),
+    }
+
+
+async def test_personal_summary_includes_holder_expense(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, member = await _create_owner_and_member(session)
+    await _seed_member_personal_expense(session, owner.family_budget_id, member)
+
+    resp = await client.get(
+        "/api/v1/analytics/personal-summary",
+        headers=auth_headers(member_tid),
+        params=_summary_params(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "UZS" in body["currencies_with_wallets"]
+    by_currency = {row["currency"]: row for row in body["by_currency"]}
+    assert by_currency["UZS"]["expense"] == MEMBER_PERSONAL_EXPENSE
+    assert by_currency["UZS"]["income"] == 0
+
+
+async def test_personal_currencies_with_wallet_no_ops(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    _, member_tid, _, member = await _create_owner_and_member(session)
+    session.add(
+        Wallet(
+            family_budget_id=member.family_budget_id,
+            name="Empty Personal",
+            currency="UZS",
+            is_personal=True,
+            owner_user_id=member.id,
+        )
+    )
+    await session.flush()
+
+    summary_resp = await client.get(
+        "/api/v1/analytics/personal-summary",
+        headers=auth_headers(member_tid),
+        params=_summary_params(),
+    )
+    assert summary_resp.status_code == 200
+    summary = summary_resp.json()
+    assert summary["currencies_with_wallets"] == ["UZS"]
+    by_currency = {row["currency"]: row for row in summary["by_currency"]}
+    assert by_currency["UZS"]["income"] == 0
+    assert by_currency["UZS"]["expense"] == 0
+
+    balances_resp = await client.get(
+        "/api/v1/analytics/personal-wallet-balances",
+        headers=auth_headers(member_tid),
+    )
+    assert balances_resp.status_code == 200
+    balances = balances_resp.json()
+    assert balances["currencies_with_wallets"] == ["UZS"]
+    balance_by_currency = {row["currency"]: row["balance"] for row in balances["balances"]}
+    assert balance_by_currency["UZS"] == 0
+
+
+async def test_personal_not_visible_to_owner(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, member = await _create_owner_and_member(session)
+    await _seed_member_personal_expense(session, owner.family_budget_id, member)
+
+    summary_resp = await client.get(
+        "/api/v1/analytics/personal-summary",
+        headers=auth_headers(owner_tid),
+        params=_summary_params(),
+    )
+    assert summary_resp.status_code == 200
+    assert summary_resp.json()["currencies_with_wallets"] == []
+    assert summary_resp.json()["by_currency"] == []
+
+    balances_resp = await client.get(
+        "/api/v1/analytics/personal-wallet-balances",
+        headers=auth_headers(owner_tid),
+    )
+    assert balances_resp.status_code == 200
+    balances = balances_resp.json()
+    assert balances["currencies_with_wallets"] == []
+    assert all(row["balance"] == 0 for row in balances["balances"])
+
+
+async def test_shared_summary_unaffected(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid, _, owner, member = await _create_owner_and_member(session)
+    shared = Wallet(
+        family_budget_id=owner.family_budget_id,
+        name="Shared",
+        currency="UZS",
+        is_personal=False,
+    )
+    food = ExpenseCategory(family_budget_id=owner.family_budget_id, name="Food")
+    session.add_all([shared, food])
+    await session.flush()
+    sub = ExpenseCategory(
+        family_budget_id=owner.family_budget_id, name="Groceries", parent_id=food.id
+    )
+    session.add(sub)
+    await session.flush()
+    session.add(
+        Transaction(
+            family_budget_id=owner.family_budget_id,
+            type="expense",
+            wallet_id=shared.id,
+            amount=SHARED_EXPENSE,
+            expense_category_id=sub.id,
+            created_by_user_id=owner.id,
+            transaction_date=SELECTED_MONTH_DATE,
+        )
+    )
+    await session.flush()
+    await _seed_member_personal_expense(session, owner.family_budget_id, member)
+
+    shared_resp = await client.get(
+        "/api/v1/analytics/summary",
+        headers=auth_headers(owner_tid),
+        params=_summary_params(),
+    )
+    assert shared_resp.status_code == 200
+    shared_by_currency = {
+        row["currency"]: row for row in shared_resp.json()["by_currency"]
+    }
+    assert shared_by_currency["UZS"]["expense"] == SHARED_EXPENSE
+
+    balances_resp = await client.get(
+        "/api/v1/analytics/wallet-balances",
+        headers=auth_headers(owner_tid),
+    )
+    assert balances_resp.status_code == 200
+    shared_balances = {
+        row["currency"]: row["balance"] for row in balances_resp.json()["balances"]
+    }
+    assert shared_balances["UZS"] == -SHARED_EXPENSE

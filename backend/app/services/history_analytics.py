@@ -17,6 +17,9 @@ from app.schemas.history_analytics import (
     CurrencyBalance,
     HistoryItem,
     PerCurrencySummary,
+    PersonalPerCurrencySummary,
+    PersonalSummaryResponse,
+    PersonalWalletBalancesResponse,
     SubcategoryAmount,
     SummaryResponse,
     TrendEntry,
@@ -692,3 +695,148 @@ async def get_wallet_balances(
     ]
 
     return WalletBalancesResponse(balances=balances)
+
+
+async def list_personal_wallet_currencies(
+    session: AsyncSession,
+    family_budget_id: uuid.UUID,
+    viewer_id: uuid.UUID,
+) -> list[str]:
+    stmt = (
+        select(Wallet.currency)
+        .where(
+            Wallet.family_budget_id == family_budget_id,
+            Wallet.is_deleted.is_(False),
+            Wallet.is_personal.is_(True),
+            Wallet.owner_user_id == viewer_id,
+        )
+        .distinct()
+        .order_by(Wallet.currency)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def get_personal_summary(
+    session: AsyncSession,
+    family_budget_id: uuid.UUID,
+    viewer: User,
+    date_from: datetime,
+    date_to: datetime,
+) -> PersonalSummaryResponse:
+    currencies_with_wallets = await list_personal_wallet_currencies(
+        session, family_budget_id, viewer.id
+    )
+
+    from_wallet = aliased(Wallet)
+
+    base_filters = (
+        Transaction.family_budget_id == family_budget_id,
+        Transaction.is_deleted.is_(False),
+        Transaction.transaction_date >= date_from,
+        Transaction.transaction_date <= date_to,
+    )
+
+    totals_stmt = (
+        select(
+            from_wallet.currency.label("currency"),
+            func.sum(
+                case((Transaction.type == "income", Transaction.amount), else_=0)
+            ).label("income"),
+            func.sum(
+                case((Transaction.type == "expense", Transaction.amount), else_=0)
+            ).label("expense"),
+        )
+        .join(from_wallet, Transaction.wallet_id == from_wallet.id)
+        .where(
+            *base_filters,
+            from_wallet.is_personal.is_(True),
+            from_wallet.owner_user_id == viewer.id,
+        )
+        .group_by(from_wallet.currency)
+    )
+    total_rows = (await session.execute(totals_stmt)).all()
+    currency_data = {
+        row.currency: {"income": int(row.income), "expense": int(row.expense)}
+        for row in total_rows
+    }
+
+    by_currency = [
+        PersonalPerCurrencySummary(
+            currency=currency,
+            income=currency_data.get(currency, {}).get("income", 0),
+            expense=currency_data.get(currency, {}).get("expense", 0),
+        )
+        for currency in currencies_with_wallets
+    ]
+
+    return PersonalSummaryResponse(
+        currencies_with_wallets=currencies_with_wallets,
+        by_currency=by_currency,
+    )
+
+
+async def get_personal_wallet_balances(
+    session: AsyncSession,
+    family_budget_id: uuid.UUID,
+    viewer: User,
+) -> PersonalWalletBalancesResponse:
+    currencies_with_wallets = await list_personal_wallet_currencies(
+        session, family_budget_id, viewer.id
+    )
+
+    from_wallet = aliased(Wallet)
+    to_wallet = aliased(Wallet)
+
+    source_ledger = (
+        select(
+            from_wallet.currency.label("currency"),
+            case(
+                (Transaction.type == "income", Transaction.amount),
+                (Transaction.type == "expense", -Transaction.amount),
+                (Transaction.type == "transfer", -Transaction.amount),
+                else_=0,
+            ).label("amount"),
+        )
+        .join(from_wallet, Transaction.wallet_id == from_wallet.id)
+        .where(
+            Transaction.family_budget_id == family_budget_id,
+            Transaction.is_deleted.is_(False),
+            from_wallet.is_personal.is_(True),
+            from_wallet.owner_user_id == viewer.id,
+        )
+    )
+    destination_ledger = (
+        select(
+            to_wallet.currency.label("currency"),
+            Transaction.to_amount.label("amount"),
+        )
+        .join(to_wallet, Transaction.to_wallet_id == to_wallet.id)
+        .where(
+            Transaction.family_budget_id == family_budget_id,
+            Transaction.is_deleted.is_(False),
+            Transaction.type == "transfer",
+            Transaction.to_amount.is_not(None),
+            to_wallet.is_personal.is_(True),
+            to_wallet.owner_user_id == viewer.id,
+        )
+    )
+    ledger = union_all(source_ledger, destination_ledger).subquery()
+    stmt = select(
+        ledger.c.currency,
+        func.sum(ledger.c.amount).label("balance"),
+    ).group_by(ledger.c.currency)
+    rows = (await session.execute(stmt)).all()
+    balance_by_currency = {row.currency: int(row.balance) for row in rows}
+
+    balances = [
+        CurrencyBalance(
+            currency=currency,
+            balance=balance_by_currency.get(currency, 0),
+        )
+        for currency in WALLET_BALANCE_CURRENCIES
+    ]
+
+    return PersonalWalletBalancesResponse(
+        currencies_with_wallets=currencies_with_wallets,
+        balances=balances,
+    )

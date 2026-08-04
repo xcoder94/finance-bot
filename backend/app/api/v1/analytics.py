@@ -10,6 +10,8 @@ from app.db import get_session
 from app.schemas.history_analytics import (
     CategoryAmount,
     Currency,
+    PersonalSummaryResponse,
+    PersonalWalletBalancesResponse,
     SubcategoryAmount,
     SummaryResponse,
     TrendEntry,
@@ -19,6 +21,8 @@ from app.services.history_analytics import (
     get_expenses_by_category,
     get_expenses_by_subcategory,
     get_income_by_category,
+    get_personal_summary,
+    get_personal_wallet_balances,
     get_summary,
     get_trend,
     get_wallet_balances,
@@ -122,3 +126,28 @@ async def wallet_balances(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletBalancesResponse:
     return await get_wallet_balances(session, user.family_budget_id)
+
+
+@router.get("/personal-summary")
+async def personal_summary(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> PersonalSummaryResponse:
+    resolved_from, resolved_to = resolve_analytics_date_range(date_from, date_to)
+    return await get_personal_summary(
+        session,
+        user.family_budget_id,
+        user,
+        resolved_from,
+        resolved_to,
+    )
+
+
+@router.get("/personal-wallet-balances")
+async def personal_wallet_balances(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> PersonalWalletBalancesResponse:
+    return await get_personal_wallet_balances(session, user.family_budget_id, user)

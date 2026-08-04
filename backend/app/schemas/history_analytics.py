@@ -101,3 +101,25 @@ class WalletBalancesResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     balances: list[CurrencyBalance]
+
+
+class PersonalPerCurrencySummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str
+    income: int = Field(ge=0)
+    expense: int = Field(ge=0)
+
+
+class PersonalSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currencies_with_wallets: list[str]
+    by_currency: list[PersonalPerCurrencySummary]
+
+
+class PersonalWalletBalancesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currencies_with_wallets: list[str]
+    balances: list[CurrencyBalance]
