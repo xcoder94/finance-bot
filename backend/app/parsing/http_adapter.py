@@ -24,6 +24,7 @@ from app.parsing.types import (
 logger = logging.getLogger(__name__)
 
 _TIMEOUT_SECONDS = 10.0
+_IMAGE_TIMEOUT_SECONDS = 20.0
 _MAX_ATTEMPTS = 3
 
 
@@ -105,10 +106,18 @@ def _parse_response_payload(data: Any) -> ParseResponse:
     if date_hint is not None and not isinstance(date_hint, str):
         raise ParserMalformed("date_hint must be string or null")
 
+    receipt_status = data.get("receipt_status")
+    if receipt_status is not None:
+        if not isinstance(receipt_status, str):
+            raise ParserMalformed("receipt_status must be string or null")
+        if receipt_status not in ("ok", "unreadable"):
+            raise ParserMalformed(f"invalid receipt_status: {receipt_status!r}")
+
     return ParseResponse(
         operations=operations,
         speech_status=speech_status,
         date_hint=date_hint,
+        receipt_status=receipt_status,
     )
 
 
@@ -201,9 +210,16 @@ class HttpParser:
             raise ParserMalformed("parser model is not configured")
         if request.audio_base64 and self._provider != "google":
             raise ParserUnavailable("audio requires google parser")
+        if request.image_base64 and self._provider != "google":
+            raise ParserUnavailable("image requires google parser")
 
         owns_client = self._client is None
-        client = self._client or httpx.AsyncClient(timeout=_TIMEOUT_SECONDS)
+        timeout = (
+            _IMAGE_TIMEOUT_SECONDS
+            if request.image_base64
+            else _TIMEOUT_SECONDS
+        )
+        client = self._client or httpx.AsyncClient(timeout=timeout)
         google_cache_used = False
         try:
             for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -326,6 +342,15 @@ class HttpParser:
                     "inlineData": {
                         "mimeType": request.audio_mime_type,
                         "data": request.audio_base64,
+                    }
+                }
+            )
+        if request.image_base64 and request.image_mime_type:
+            parts.append(
+                {
+                    "inlineData": {
+                        "mimeType": request.image_mime_type,
+                        "data": request.image_base64,
                     }
                 }
             )
