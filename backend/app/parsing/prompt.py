@@ -13,7 +13,8 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     '"rate":integer_or_null,'
     '"category":string_or_null,"comment":string_or_null}],'
     '"speech_status":"recognized|not_recognized"|null,'
-    '"date_hint":"YYYY-MM-DD"|null}\n'
+    '"date_hint":"YYYY-MM-DD"|null,'
+    '"receipt_status":"ok|unreadable"|null}\n'
     "Rules:\n"
     "- Same-currency move between two wallets → type transfer; set from_wallet_hint and to_wallet_hint; rate null.\n"
     "- Different-currency move → type exchange; set from_wallet_hint, to_wallet_hint, and rate only when the text "
@@ -24,7 +25,13 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     "- Text-only user turns: speech_status must be null; date_hint null unless the text contains a relative/absolute "
     "date you resolve against the provided today.\n"
     "- Audio-carrying turns: set speech_status to not_recognized when there is no intelligible speech "
-    "(silence, noise, empty); otherwise recognized. Never invent operations when not_recognized."
+    "(silence, noise, empty); otherwise recognized. Never invent operations when not_recognized.\n"
+    "- Text-only and audio turns: receipt_status must be null.\n"
+    "- Receipt-image turns: set receipt_status to ok when the total amount is legible; unreadable "
+    "when the image is not a receipt or the total cannot be read. One receipt = one expense for the "
+    "total only — no line items. Put the merchant name in comment; infer category from merchant "
+    "name and visible contents. Set date_hint from the receipt date when legible and within 31 days "
+    "of today; otherwise null. When receipt_status is unreadable, return no operations."
 )
 
 # Inert ballast so Gemini explicit-cache minimum (≥4096 tokens on Gemini 3)

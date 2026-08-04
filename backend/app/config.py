@@ -21,6 +21,15 @@ PARSER_MODEL = os.environ.get("PARSER_MODEL") or None
 DAILY_MODEL_CALL_LIMIT = int(os.environ.get("DAILY_MODEL_CALL_LIMIT", "50"))
 DAILY_UNPARSED_LIMIT = int(os.environ.get("DAILY_UNPARSED_LIMIT", "20"))
 
+RECEIPT_PHOTO_ENABLED = os.environ.get("RECEIPT_PHOTO_ENABLED")
+
+
+def receipt_photo_enabled() -> bool:
+    raw = RECEIPT_PHOTO_ENABLED
+    if raw is None:
+        return False
+    return raw.lower() in {"1", "true", "yes", "on"}
+
 
 def asyncpg_dsn() -> str:
     """Convert SQLAlchemy async URL to an asyncpg-compatible DSN."""
