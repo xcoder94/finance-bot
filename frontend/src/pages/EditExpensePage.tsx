@@ -15,6 +15,7 @@ import {
 } from '../api/transactions'
 import { DeleteConfirmSheet } from '../components/forms/DeleteConfirmSheet'
 import { CategoryPickerSheet } from '../components/forms/CategoryPickerSheet'
+import { ChangesBlock } from '../components/forms/ChangesBlock'
 import { FormSheet } from '../components/forms/FormSheet'
 import { FormSheetField } from '../components/forms/FormSheetField'
 import {
@@ -283,6 +284,7 @@ export function EditExpensePage() {
         open
         title={sheetTitle}
         onClose={closeSheet}
+        changes={<ChangesBlock lines={transaction.changes ?? []} />}
         onPrimary={() => void handleSubmit()}
         primaryDisabled={!canSubmit}
         primaryLoading={submitting}

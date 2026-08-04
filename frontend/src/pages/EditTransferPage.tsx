@@ -12,6 +12,7 @@ import {
   type Wallet,
 } from '../api/transactions'
 import { DeleteConfirmSheet } from '../components/forms/DeleteConfirmSheet'
+import { ChangesBlock } from '../components/forms/ChangesBlock'
 import { FormSheet } from '../components/forms/FormSheet'
 import { FormSheetField } from '../components/forms/FormSheetField'
 import {
@@ -338,6 +339,7 @@ export function EditTransferPage() {
         title={sheetTitle}
         intro={sheetIntro}
         onClose={closeSheet}
+        changes={<ChangesBlock lines={transaction.changes ?? []} />}
         onPrimary={() => void handleSubmit()}
         primaryDisabled={!canSubmit}
         primaryLoading={submitting}
