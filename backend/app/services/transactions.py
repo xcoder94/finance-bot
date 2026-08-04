@@ -103,7 +103,8 @@ def require_transaction_modify_permission(
         if to_wallet is not None and to_wallet.is_personal and to_wallet.owner_user_id != user.id:
             raise HTTPException(status_code=404)
         return
-    require_modify_permission(user, transaction)
+    # Shared: any family member who can see it may modify.
+    return
 
 
 def soft_delete_transaction(transaction: Transaction) -> None:
