@@ -39,6 +39,8 @@ async def _build_me_response(session: AsyncSession, db_user: User) -> MeResponse
         budget_name=budget.name if budget is not None else "",
         member_count=member_count or 0,
         default_wallet_id=db_user.default_wallet_id,
+        evening_reminder_enabled=db_user.evening_reminder_enabled,
+        weekly_digest_enabled=db_user.weekly_digest_enabled,
     )
 
 
@@ -77,6 +79,14 @@ async def patch_me(
 
     if "language" in body.model_fields_set and body.language is not None:
         user.language = body.language
+
+    if "evening_reminder_enabled" in body.model_fields_set:
+        if body.evening_reminder_enabled is not None:
+            user.evening_reminder_enabled = body.evening_reminder_enabled
+
+    if "weekly_digest_enabled" in body.model_fields_set:
+        if body.weekly_digest_enabled is not None:
+            user.weekly_digest_enabled = body.weekly_digest_enabled
 
     await session.commit()
     await session.refresh(user)

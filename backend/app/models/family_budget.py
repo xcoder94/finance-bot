@@ -27,3 +27,5 @@ class FamilyBudget(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
         Integer, nullable=False, default=0, server_default="0"
     )
     counters_day: Mapped[date | None] = mapped_column(Date, nullable=True)
+    last_evening_reminder_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    last_weekly_digest_on: Mapped[date | None] = mapped_column(Date, nullable=True)

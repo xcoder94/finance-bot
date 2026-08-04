@@ -179,6 +179,8 @@ async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
                 "budget_name": "Семейный бюджет",
                 "member_count": 1,
                 "default_wallet_id": None,
+                "evening_reminder_enabled": True,
+                "weekly_digest_enabled": True,
             }
 
             me_tma = await client.get(
