@@ -23,6 +23,14 @@ import { GoalsPage } from '../pages/GoalsPage'
 import { HistoryPage } from '../pages/HistoryPage'
 import { HomePage } from '../pages/HomePage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { DefaultWalletSettingsPage } from '../pages/settings/DefaultWalletSettingsPage'
+import { ExpenseCategoriesSettingsPage } from '../pages/settings/ExpenseCategoriesSettingsPage'
+import { ExpenseSubcategoriesSettingsPage } from '../pages/settings/ExpenseSubcategoriesSettingsPage'
+import { IncomeCategoriesSettingsPage } from '../pages/settings/IncomeCategoriesSettingsPage'
+import { LanguageSettingsPage } from '../pages/settings/LanguageSettingsPage'
+import { MembersSettingsShellPage } from '../pages/settings/MembersSettingsShellPage'
+import { NotificationsSettingsShellPage } from '../pages/settings/NotificationsSettingsShellPage'
+import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
 
@@ -180,6 +188,17 @@ export function AppShell() {
           <Route path="goals" element={<GoalsPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/wallets" element={<WalletsSettingsPage />} />
+          <Route path="settings/default-wallet" element={<DefaultWalletSettingsPage />} />
+          <Route path="settings/income-categories" element={<IncomeCategoriesSettingsPage />} />
+          <Route path="settings/expense-categories" element={<ExpenseCategoriesSettingsPage />} />
+          <Route
+            path="settings/expense-categories/:parentId"
+            element={<ExpenseSubcategoriesSettingsPage />}
+          />
+          <Route path="settings/members" element={<MembersSettingsShellPage />} />
+          <Route path="settings/notifications" element={<NotificationsSettingsShellPage />} />
+          <Route path="settings/language" element={<LanguageSettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

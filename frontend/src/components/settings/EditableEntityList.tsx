@@ -74,7 +74,7 @@ export function EditableEntityList<T extends EditableEntity>({
     nameValidationError === 'required'
       ? 'settings.nameRequired'
       : nameValidationError === 'tooLong'
-        ? 'settings.nameTooLong'
+        ? 'settings.nameTooLong30'
         : null
 
   const resetAddForm = () => {

@@ -272,6 +272,7 @@ async def get_expenses_by_category(
             expense_parent.id.label("category_id"),
             expense_parent.name.label("category_name"),
             expense_parent.translation_key.label("category_translation_key"),
+            expense_parent.color_index.label("color_index"),
             func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
@@ -290,6 +291,7 @@ async def get_expenses_by_category(
             expense_parent.id,
             expense_parent.name,
             expense_parent.translation_key,
+            expense_parent.color_index,
         )
         .order_by(func.sum(Transaction.amount).desc())
     )
@@ -300,6 +302,7 @@ async def get_expenses_by_category(
             category_id=row.category_id,
             category_name=row.category_name,
             category_translation_key=row.category_translation_key,
+            color_index=row.color_index,
             amount=int(row.amount),
         )
         for row in rows
@@ -328,6 +331,7 @@ async def get_expenses_by_subcategory(
             expense_sub.id.label("subcategory_id"),
             expense_sub.name.label("subcategory_name"),
             expense_sub.translation_key.label("subcategory_translation_key"),
+            expense_sub.color_index.label("color_index"),
             func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
@@ -346,6 +350,7 @@ async def get_expenses_by_subcategory(
             expense_sub.id,
             expense_sub.name,
             expense_sub.translation_key,
+            expense_sub.color_index,
         )
         .order_by(func.sum(Transaction.amount).desc())
     )
@@ -356,6 +361,7 @@ async def get_expenses_by_subcategory(
             subcategory_id=row.subcategory_id,
             subcategory_name=row.subcategory_name,
             subcategory_translation_key=row.subcategory_translation_key,
+            color_index=row.color_index,
             amount=int(row.amount),
         )
         for row in rows
@@ -376,6 +382,7 @@ async def get_income_by_category(
             IncomeCategory.id.label("category_id"),
             IncomeCategory.name.label("category_name"),
             IncomeCategory.translation_key.label("category_translation_key"),
+            IncomeCategory.color_index.label("color_index"),
             func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
@@ -393,6 +400,7 @@ async def get_income_by_category(
             IncomeCategory.id,
             IncomeCategory.name,
             IncomeCategory.translation_key,
+            IncomeCategory.color_index,
         )
         .order_by(func.sum(Transaction.amount).desc())
     )
@@ -403,6 +411,7 @@ async def get_income_by_category(
             category_id=row.category_id,
             category_name=row.category_name,
             category_translation_key=row.category_translation_key,
+            color_index=row.color_index,
             amount=int(row.amount),
         )
         for row in rows

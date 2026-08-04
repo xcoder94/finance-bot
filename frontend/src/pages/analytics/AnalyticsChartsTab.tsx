@@ -38,7 +38,7 @@ import {
   isChartsTabEmpty,
   mergeCategoryIds,
 } from '../../utils/analyticsChartsTab'
-import { OTHER_CATEGORY_COLOR_INDEX } from '../../utils/chartColors'
+import { OTHER_CATEGORY_COLOR_INDEX, mergeStoredCategoryColorIndices } from '../../utils/chartColors'
 import { dayWordRu } from '../../utils/dayCountLabel'
 import {
   formatCurrency,
@@ -203,10 +203,15 @@ export function AnalyticsChartsTab() {
       .filter((entry) => entry.amount > 0)
       .map((entry) => entry.category_id)
     const orderedParentIds = mergeCategoryIds(categoryMaps.expenseParentIds, apiCategoryIds)
+    const storedColorIndices = mergeStoredCategoryColorIndices(
+      categoryMaps.expenseCategories.filter((category) => category.parent_id === null),
+      expensesFetch.state.data,
+      'category_id',
+    )
     return prepareDonutSlices(
       expensesFetch.state.data,
       orderedParentIds,
-      extendCategoryColorMap(categoryMaps.expenseParentIds, apiCategoryIds),
+      extendCategoryColorMap(categoryMaps.expenseParentIds, apiCategoryIds, storedColorIndices),
       t('analytics.other'),
       t,
       categoryMaps.expenseDisplayNameById,
@@ -237,8 +242,15 @@ export function AnalyticsChartsTab() {
       categoryMaps.expenseCategories,
     )
     const apiIds = subcategoryEntries.map((entry) => entry.subcategory_id)
-    return extendCategoryColorMap(orderedIds, apiIds)
-  }, [drillParent, categoryMaps, subcategoryEntries])
+    const storedColorIndices = mergeStoredCategoryColorIndices(
+      categoryMaps.expenseCategories.filter(
+        (category) => category.parent_id === drillParent.id,
+      ),
+      subcategoriesFetch.state.status === 'success' ? subcategoriesFetch.state.data : [],
+      'subcategory_id',
+    )
+    return extendCategoryColorMap(orderedIds, apiIds, storedColorIndices)
+  }, [drillParent, categoryMaps, subcategoryEntries, subcategoriesFetch.state])
 
   const drillSlices = useMemo(() => {
     if (!drillParent || subcategoryEntries.length === 0) {

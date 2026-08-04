@@ -6,6 +6,7 @@ export type Wallet = {
   currency: string
   translation_key: string | null
   transaction_count: number
+  is_personal: boolean
 }
 
 export type IncomeCategory = {
@@ -13,6 +14,7 @@ export type IncomeCategory = {
   name: string
   translation_key: string | null
   transaction_count: number
+  color_index: number
 }
 
 export type ExpenseCategory = {
@@ -21,6 +23,7 @@ export type ExpenseCategory = {
   translation_key: string | null
   parent_id: string | null
   transaction_count: number
+  color_index: number
 }
 
 export type IncomeCreatePayload = {

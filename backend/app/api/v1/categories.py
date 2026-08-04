@@ -20,6 +20,14 @@ from app.schemas.wallets_categories import (
     IncomeCategoryResponse,
     IncomeCategoryUpdate,
 )
+from app.services.category_colors import assign_category_color
+from app.services.entity_limits import (
+    LIMIT_EXPENSE_PARENTS,
+    LIMIT_INCOME_CATEGORIES,
+    PARENT_CATEGORY_LIMIT,
+    SUBCATEGORY_LIMIT,
+    limit_subcategories,
+)
 from app.services.wallets_categories import (
     count_expense_category_transactions,
     count_income_category_transactions,
@@ -73,6 +81,7 @@ async def list_income_categories(
             id=category.id,
             name=category.name,
             translation_key=category.translation_key,
+            color_index=category.color_index,
             transaction_count=int(transaction_count),
         )
         for category, transaction_count in rows
@@ -85,9 +94,23 @@ async def create_income_category(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> IncomeCategoryResponse:
+    income_count = await session.scalar(
+        select(func.count())
+        .select_from(IncomeCategory)
+        .where(
+            IncomeCategory.family_budget_id == user.family_budget_id,
+            IncomeCategory.is_deleted.is_(False),
+        )
+    )
+    if income_count is not None and income_count >= PARENT_CATEGORY_LIMIT:
+        raise HTTPException(status_code=409, detail=LIMIT_INCOME_CATEGORIES)
+
     category = IncomeCategory(
         family_budget_id=user.family_budget_id,
         name=body.name,
+        color_index=await assign_category_color(
+            session, user.family_budget_id, kind="income"
+        ),
     )
     session.add(category)
     await session.commit()
@@ -96,6 +119,7 @@ async def create_income_category(
         id=category.id,
         name=category.name,
         translation_key=category.translation_key,
+        color_index=category.color_index,
         transaction_count=0,
     )
 
@@ -118,6 +142,7 @@ async def update_income_category(
         id=category.id,
         name=category.name,
         translation_key=category.translation_key,
+        color_index=category.color_index,
         transaction_count=await count_income_category_transactions(session, category.id),
     )
 
@@ -184,6 +209,7 @@ async def list_expense_categories(
             name=category.name,
             translation_key=category.translation_key,
             parent_id=category.parent_id,
+            color_index=category.color_index,
             transaction_count=int(transaction_count),
         )
         for category, transaction_count in rows
@@ -196,7 +222,19 @@ async def create_expense_category(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ExpenseCategoryResponse:
-    if body.parent_id is not None:
+    if body.parent_id is None:
+        parent_count = await session.scalar(
+            select(func.count())
+            .select_from(ExpenseCategory)
+            .where(
+                ExpenseCategory.family_budget_id == user.family_budget_id,
+                ExpenseCategory.is_deleted.is_(False),
+                ExpenseCategory.parent_id.is_(None),
+            )
+        )
+        if parent_count is not None and parent_count >= PARENT_CATEGORY_LIMIT:
+            raise HTTPException(status_code=409, detail=LIMIT_EXPENSE_PARENTS)
+    else:
         parent = await get_active_expense_parent(session, body.parent_id, user.family_budget_id)
         if parent is None:
             raise HTTPException(status_code=404)
@@ -205,11 +243,28 @@ async def create_expense_category(
                 status_code=400,
                 detail="parent_id must reference a top-level category",
             )
+        subcategory_count = await session.scalar(
+            select(func.count())
+            .select_from(ExpenseCategory)
+            .where(
+                ExpenseCategory.family_budget_id == user.family_budget_id,
+                ExpenseCategory.is_deleted.is_(False),
+                ExpenseCategory.parent_id == body.parent_id,
+            )
+        )
+        if subcategory_count is not None and subcategory_count >= SUBCATEGORY_LIMIT:
+            raise HTTPException(
+                status_code=409,
+                detail=limit_subcategories(parent.name),
+            )
 
     category = ExpenseCategory(
         family_budget_id=user.family_budget_id,
         name=body.name,
         parent_id=body.parent_id,
+        color_index=await assign_category_color(
+            session, user.family_budget_id, kind="expense"
+        ),
     )
     session.add(category)
     await session.commit()
@@ -219,6 +274,7 @@ async def create_expense_category(
         name=category.name,
         translation_key=category.translation_key,
         parent_id=category.parent_id,
+        color_index=category.color_index,
         transaction_count=0,
     )
 
@@ -242,6 +298,7 @@ async def update_expense_category(
         name=category.name,
         translation_key=category.translation_key,
         parent_id=category.parent_id,
+        color_index=category.color_index,
         transaction_count=await count_expense_category_transactions(session, category.id),
     )
 

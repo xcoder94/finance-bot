@@ -15,6 +15,10 @@ from app.schemas.wallets_categories import (
     WalletResponse,
     WalletUpdate,
 )
+from app.services.entity_limits import (
+    LIMIT_SHARED_WALLETS,
+    SHARED_WALLET_LIMIT,
+)
 from app.services.wallets_categories import (
     count_wallet_transactions,
     get_active_wallet,
@@ -69,6 +73,7 @@ async def list_wallets(
             name=wallet.name,
             currency=wallet.currency,
             translation_key=wallet.translation_key,
+            is_personal=wallet.is_personal,
             transaction_count=int(transaction_count),
         )
         for wallet, transaction_count in rows
@@ -81,6 +86,18 @@ async def create_wallet(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletResponse:
+    shared_count = await session.scalar(
+        select(func.count())
+        .select_from(Wallet)
+        .where(
+            Wallet.family_budget_id == user.family_budget_id,
+            Wallet.is_deleted.is_(False),
+            Wallet.is_personal.is_(False),
+        )
+    )
+    if shared_count is not None and shared_count >= SHARED_WALLET_LIMIT:
+        raise HTTPException(status_code=409, detail=LIMIT_SHARED_WALLETS)
+
     wallet = Wallet(
         family_budget_id=user.family_budget_id,
         name=body.name,
@@ -94,6 +111,7 @@ async def create_wallet(
         name=wallet.name,
         currency=wallet.currency,
         translation_key=wallet.translation_key,
+        is_personal=wallet.is_personal,
         transaction_count=0,
     )
 
@@ -117,6 +135,7 @@ async def update_wallet(
         name=wallet.name,
         currency=wallet.currency,
         translation_key=wallet.translation_key,
+        is_personal=wallet.is_personal,
         transaction_count=await count_wallet_transactions(session, wallet.id),
     )
 

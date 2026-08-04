@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next'
 import type { ExpenseCategory, IncomeCategory } from '../../api/transactions'
 import { getDisplayName } from '../../utils/getDisplayName'
 import {
-  buildExpenseCategoryDisplayLabel,
-  filterUncategorizedCategories,
-} from '../../utils/transactionFormFields'
+  getExpensePickerParentCategories,
+  getExpensePickerSubcategories,
+} from '../../utils/categoryPickerLists'
+import { buildExpenseCategoryDisplayLabel, filterUncategorizedCategories } from '../../utils/transactionFormFields'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from './FormSheet'
 
@@ -36,16 +37,14 @@ type CategoryPickerSheetProps =
     }
 
 function getTopLevelExpenseCategories(categories: ExpenseCategory[]): ExpenseCategory[] {
-  return filterUncategorizedCategories(categories.filter((category) => category.parent_id === null))
+  return getExpensePickerParentCategories(categories)
 }
 
 function getExpenseSubcategories(
   categories: ExpenseCategory[],
   parentId: string,
 ): ExpenseCategory[] {
-  return filterUncategorizedCategories(
-    categories.filter((category) => category.parent_id === parentId),
-  )
+  return getExpensePickerSubcategories(categories, parentId)
 }
 
 export function CategoryPickerSheet(props: CategoryPickerSheetProps) {

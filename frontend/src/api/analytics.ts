@@ -9,6 +9,7 @@ export type CategoryAmount = {
   category_id: string
   category_name: string
   category_translation_key: string | null
+  color_index?: number
   amount: number
 }
 
@@ -23,6 +24,7 @@ export type SubcategoryAmount = {
   subcategory_id: string
   subcategory_name: string
   subcategory_translation_key: string | null
+  color_index?: number
   amount: number
 }
 

@@ -80,6 +80,10 @@ export function mergeCategoryIds(orderedIds: string[], additionalIds: string[]):
 export function extendCategoryColorMap(
   orderedIds: string[],
   additionalIds: string[],
+  storedColorIndexById?: Map<string, number>,
 ): Map<string, number> {
-  return buildCategoryColorIndexMap(mergeCategoryIds(orderedIds, additionalIds))
+  return buildCategoryColorIndexMap(
+    mergeCategoryIds(orderedIds, additionalIds),
+    storedColorIndexById,
+  )
 }

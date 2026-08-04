@@ -1,20 +1,32 @@
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.services.entity_limits import ENTITY_NAME_MAX, normalize_entity_name
 
 Currency = Literal["UZS", "USD"]
 
 
 class WalletCreate(BaseModel):
-    name: str
+    name: str = Field(max_length=ENTITY_NAME_MAX)
     currency: Currency
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_entity_name(value)
 
 
 class WalletUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
+    name: str = Field(max_length=ENTITY_NAME_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_entity_name(value)
 
 
 class WalletResponse(BaseModel):
@@ -24,6 +36,7 @@ class WalletResponse(BaseModel):
     name: str
     currency: str
     translation_key: str | None
+    is_personal: bool
     transaction_count: int = Field(default=0)
 
 
@@ -37,13 +50,23 @@ class WalletDeleteResponse(BaseModel):
 
 
 class IncomeCategoryCreate(BaseModel):
-    name: str
+    name: str = Field(max_length=ENTITY_NAME_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_entity_name(value)
 
 
 class IncomeCategoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
+    name: str = Field(max_length=ENTITY_NAME_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_entity_name(value)
 
 
 class IncomeCategoryResponse(BaseModel):
@@ -52,6 +75,7 @@ class IncomeCategoryResponse(BaseModel):
     id: uuid.UUID
     name: str
     translation_key: str | None
+    color_index: int
     transaction_count: int = Field(default=0)
 
 
@@ -64,14 +88,24 @@ class IncomeCategoryDeleteResponse(BaseModel):
 
 
 class ExpenseCategoryCreate(BaseModel):
-    name: str
+    name: str = Field(max_length=ENTITY_NAME_MAX)
     parent_id: uuid.UUID | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_entity_name(value)
 
 
 class ExpenseCategoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
+    name: str = Field(max_length=ENTITY_NAME_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return normalize_entity_name(value)
 
 
 class ExpenseCategoryResponse(BaseModel):
@@ -81,6 +115,7 @@ class ExpenseCategoryResponse(BaseModel):
     name: str
     translation_key: str | None
     parent_id: uuid.UUID | None
+    color_index: int
     transaction_count: int = Field(default=0)
 
 
