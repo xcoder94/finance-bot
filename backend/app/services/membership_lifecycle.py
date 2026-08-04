@@ -1,12 +1,15 @@
 import secrets
 import uuid
+from datetime import UTC, datetime
+from enum import Enum
 from typing import Literal
 
 from aiogram import Bot
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.family_budget import FamilyBudget
+from app.models.goal import Goal
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
@@ -15,12 +18,22 @@ from app.services.budget_seed import (
     copy_seed_categories_only,
     copy_seed_wallets_only,
 )
+from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT
 from app.services.goal_notify import resolve_bot
 from app.services.member_texts import left_notice, removed_notice
 from app.services.transaction_category_remap import remap_transaction_categories_to_budget
 
 
 class OwnerCannotDetachError(Exception):
+    pass
+
+
+class JoinBlockReason(str, Enum):
+    HAS_OTHER_MEMBERS = "has_other_members"
+    PERSONAL_WALLET_CAP = "personal_wallet_cap"
+
+
+class FamilyFullError(Exception):
     pass
 
 
@@ -50,6 +63,78 @@ async def count_all_wallets_for_user_budget(
         )
     )
     return int(await session.scalar(stmt) or 0)
+
+
+async def evaluate_join_from_own_budget(
+    session: AsyncSession,
+    user: User,
+    target_budget: FamilyBudget,
+) -> JoinBlockReason | None:
+    del target_budget
+    if await count_active_members(session, user.family_budget_id) > 1:
+        return JoinBlockReason.HAS_OTHER_MEMBERS
+    if await count_all_wallets_for_user_budget(session, user) > PERSONAL_WALLET_LIMIT:
+        return JoinBlockReason.PERSONAL_WALLET_CAP
+    return None
+
+
+async def convert_join_with_own_budget(
+    session: AsyncSession,
+    *,
+    user: User,
+    target: FamilyBudget,
+) -> None:
+    if await count_active_members(session, target.id) >= MEMBER_LIMIT:
+        raise FamilyFullError()
+
+    old_budget_id = user.family_budget_id
+    old_budget = await session.get(FamilyBudget, old_budget_id)
+    if old_budget is None or old_budget.is_deleted:
+        raise ValueError("user has no active budget to convert")
+
+    wallets = (
+        await session.scalars(
+            select(Wallet)
+            .where(
+                Wallet.family_budget_id == old_budget_id,
+                Wallet.is_deleted.is_(False),
+            )
+            .order_by(Wallet.created_at)
+        )
+    ).all()
+    wallet_ids = [wallet.id for wallet in wallets]
+
+    if wallet_ids:
+        await session.execute(
+            delete(Goal).where(
+                Goal.wallet_id.in_(wallet_ids),
+                Goal.status == "active",
+            )
+        )
+
+    for wallet in wallets:
+        wallet.family_budget_id = target.id
+        wallet.is_personal = True
+        wallet.owner_user_id = user.id
+
+    if wallet_ids:
+        moved_txns = (
+            await session.scalars(
+                select(Transaction).where(
+                    Transaction.wallet_id.in_(wallet_ids),
+                    Transaction.is_deleted.is_(False),
+                )
+            )
+        ).all()
+        for txn in moved_txns:
+            txn.family_budget_id = target.id
+        await remap_transaction_categories_to_budget(session, moved_txns, target.id)
+
+    old_budget.is_deleted = True
+    old_budget.deleted_at = datetime.now(UTC)
+
+    user.family_budget_id = target.id
+    user.role = "member"
 
 
 async def detach_member_to_own_budget(

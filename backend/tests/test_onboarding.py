@@ -344,7 +344,10 @@ class TestDefaultWalletAssignment:
             owner_telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
             member_telegram_id = owner_telegram_id + 1
             async with rollback_session() as session:
-                budget = FamilyBudget(invite_token=f"default-member-{uuid.uuid4()}")
+                budget = FamilyBudget(
+                    invite_token=f"default-member-{uuid.uuid4()}",
+                    name="Семья Юсуповых",
+                )
                 session.add(budget)
                 await session.flush()
 
@@ -379,5 +382,81 @@ class TestDefaultWalletAssignment:
                 )
                 assert card_wallet is not None
                 assert member.default_wallet_id == card_wallet.id
+
+        asyncio.run(_run())
+
+    def test_member_welcome_uses_invited_text(self) -> None:
+        async def _run() -> None:
+            from app.services.member_texts import welcome_invited
+
+            session = SimpleNamespace(
+                add=lambda _model: None,
+                flush=AsyncMock(),
+                get=AsyncMock(
+                    return_value=SimpleNamespace(
+                        name="Семья Юсуповых",
+                        is_deleted=False,
+                    )
+                ),
+            )
+
+            class TransactionContext:
+                async def __aenter__(self) -> None:
+                    return None
+
+                async def __aexit__(self, *_args: object) -> None:
+                    return None
+
+            session.begin = lambda: TransactionContext()
+
+            class SessionContext:
+                async def __aenter__(self) -> SimpleNamespace:
+                    return session
+
+                async def __aexit__(self, *_args: object) -> None:
+                    return None
+
+            message = SimpleNamespace(answer=AsyncMock(), delete=AsyncMock())
+            callback = SimpleNamespace(
+                from_user=SimpleNamespace(id=456),
+                message=message,
+                data="lang:ru",
+                answer=AsyncMock(),
+            )
+            state = SimpleNamespace(
+                get_data=AsyncMock(
+                    return_value={
+                        "flow": "member",
+                        "telegram_id": 456,
+                        "family_budget_id": str(uuid.uuid4()),
+                        "first_name": "New",
+                        "username": "newbie",
+                    }
+                ),
+                clear=AsyncMock(),
+            )
+            bot = SimpleNamespace(get_me=AsyncMock())
+
+            with (
+                patch(
+                    "bot.onboarding.async_session_factory",
+                    return_value=SessionContext(),
+                ),
+                patch(
+                    "bot.onboarding.get_active_user_by_telegram_id",
+                    new=AsyncMock(return_value=None),
+                ),
+                patch(
+                    "bot.onboarding.count_active_members",
+                    new=AsyncMock(return_value=1),
+                ),
+                patch("bot.onboarding.assign_default_card_uzs", new=AsyncMock()),
+            ):
+                await language_callback(callback, state, bot)
+
+            message.answer.assert_awaited_once()
+            assert message.answer.await_args.args[0] == welcome_invited(
+                "Семья Юсуповых"
+            )
 
         asyncio.run(_run())

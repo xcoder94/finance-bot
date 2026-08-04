@@ -14,21 +14,29 @@ from app.db import engine, get_session
 from app.main import app
 from app.models.family_budget import FamilyBudget
 from app.models.expense_category import ExpenseCategory
+from app.models.goal import Goal
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
-from app.services.budget_seed import SEED_WALLETS
-from app.services.entity_limits import LIMIT_MEMBERS, MEMBER_LIMIT
+from app.services.budget_seed import SEED_WALLETS, copy_seed_data
+from app.services.entity_limits import LIMIT_MEMBERS, MEMBER_LIMIT, PERSONAL_WALLET_LIMIT
 from app.services.member_texts import (
     departed_label,
     invite_already_member,
     invite_family_full_chat,
     invite_link_invalid,
+    join_confirm_prompt,
     join_has_other_members,
     join_personal_wallet_cap,
     left_notice,
     removed_notice,
     welcome_invited,
+)
+from app.services.membership_lifecycle import (
+    FamilyFullError,
+    JoinBlockReason,
+    convert_join_with_own_budget,
+    evaluate_join_from_own_budget,
 )
 from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
 from tests.test_members import auth_headers, create_user_with_budget
@@ -499,3 +507,453 @@ async def test_owner_cannot_leave(api_client: tuple[AsyncClient, AsyncSession]) 
     )
     assert leave_resp.status_code == 400
     assert leave_resp.json()["detail"] == "owner_cannot_leave"
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_evaluate_join_other_members_before_wallet_cap() -> None:
+    async with rollback_session() as session:
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        solo_tid = owner_tid + 1
+        target_tid = owner_tid + 2
+        _, target = await create_user_with_budget(
+            session, telegram_id=target_tid, invite_token=f"target-{uuid.uuid4()}"
+        )
+        owner, shared_budget = await create_user_with_budget(
+            session, telegram_id=owner_tid, role="owner"
+        )
+        member, _ = await create_user_with_budget(
+            session,
+            telegram_id=solo_tid,
+            role="member",
+            family_budget_id=shared_budget.id,
+        )
+        for i in range(PERSONAL_WALLET_LIMIT + 2):
+            session.add(
+                Wallet(
+                    family_budget_id=shared_budget.id,
+                    name=f"Extra {i}",
+                    currency="UZS",
+                    is_personal=False,
+                )
+            )
+        await session.flush()
+
+        block = await evaluate_join_from_own_budget(session, owner, target)
+        assert block == JoinBlockReason.HAS_OTHER_MEMBERS
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_evaluate_join_wallet_cap_when_solo() -> None:
+    async with rollback_session() as session:
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_tid = solo_tid + 1
+        solo, solo_budget = await create_user_with_budget(
+            session, telegram_id=solo_tid, role="owner"
+        )
+        _, target = await create_user_with_budget(
+            session, telegram_id=target_tid, invite_token=f"target-{uuid.uuid4()}"
+        )
+        for i in range(PERSONAL_WALLET_LIMIT + 1):
+            session.add(
+                Wallet(
+                    family_budget_id=solo_budget.id,
+                    name=f"Wallet {i}",
+                    currency="UZS",
+                    is_personal=False,
+                )
+            )
+        await session.flush()
+
+        block = await evaluate_join_from_own_budget(session, solo, target)
+        assert block == JoinBlockReason.PERSONAL_WALLET_CAP
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_convert_join_moves_all_wallets_as_personal_and_closes_old_budget() -> None:
+    async with rollback_session() as session:
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_tid = solo_tid + 1
+        solo, solo_budget = await create_user_with_budget(
+            session, telegram_id=solo_tid, role="owner"
+        )
+        _, target = await create_user_with_budget(
+            session,
+            telegram_id=target_tid,
+            role="owner",
+            invite_token=f"target-{uuid.uuid4()}",
+        )
+        await copy_seed_data(session, solo_budget.id)
+        await session.flush()
+
+        default_wallet = Wallet(
+            family_budget_id=solo_budget.id,
+            name="Default",
+            currency="UZS",
+            is_personal=False,
+        )
+        session.add(default_wallet)
+        await session.flush()
+        solo.default_wallet_id = default_wallet.id
+
+        old_wallet_ids = [
+            w.id
+            for w in (
+                await session.scalars(
+                    select(Wallet).where(
+                        Wallet.family_budget_id == solo_budget.id,
+                        Wallet.is_deleted.is_(False),
+                    )
+                )
+            ).all()
+        ]
+        assert len(old_wallet_ids) >= len(SEED_WALLETS) + 1
+
+        session.add(
+            Transaction(
+                family_budget_id=solo_budget.id,
+                type="income",
+                wallet_id=default_wallet.id,
+                amount=900,
+                created_by_user_id=solo.id,
+                transaction_date=datetime.now(UTC),
+            )
+        )
+        await session.flush()
+        old_budget_id = solo_budget.id
+
+        await convert_join_with_own_budget(session, user=solo, target=target)
+        await session.flush()
+
+        await session.refresh(solo)
+        await session.refresh(solo_budget)
+        assert solo.role == "member"
+        assert solo.family_budget_id == target.id
+        assert solo.default_wallet_id == default_wallet.id
+        assert solo_budget.is_deleted is True
+
+        moved_wallets = (
+            await session.scalars(
+                select(Wallet).where(
+                    Wallet.family_budget_id == target.id,
+                    Wallet.owner_user_id == solo.id,
+                    Wallet.is_deleted.is_(False),
+                )
+            )
+        ).all()
+        assert len(moved_wallets) == len(old_wallet_ids)
+        assert all(w.is_personal for w in moved_wallets)
+
+        txn = (
+            await session.scalars(
+                select(Transaction).where(
+                    Transaction.wallet_id == default_wallet.id,
+                    Transaction.is_deleted.is_(False),
+                )
+            )
+        ).one()
+        assert txn.family_budget_id == target.id
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_convert_join_deletes_active_goals() -> None:
+    async with rollback_session() as session:
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_tid = solo_tid + 1
+        solo, solo_budget = await create_user_with_budget(
+            session, telegram_id=solo_tid, role="owner"
+        )
+        _, target = await create_user_with_budget(
+            session, telegram_id=target_tid, role="owner"
+        )
+        wallet = Wallet(
+            family_budget_id=solo_budget.id,
+            name="Shared",
+            currency="UZS",
+            is_personal=False,
+        )
+        session.add(wallet)
+        await session.flush()
+        session.add(
+            Goal(
+                family_budget_id=solo_budget.id,
+                wallet_id=wallet.id,
+                name="Накопления",
+                target_amount=1_000_000,
+                currency="UZS",
+                status="active",
+            )
+        )
+        await session.flush()
+
+        await convert_join_with_own_budget(session, user=solo, target=target)
+        await session.flush()
+
+        remaining = await session.scalar(
+            select(func.count()).select_from(Goal).where(Goal.wallet_id == wallet.id)
+        )
+        assert remaining == 0
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_convert_join_remaps_invented_category_to_null() -> None:
+    async with rollback_session() as session:
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_tid = solo_tid + 1
+        solo, solo_budget = await create_user_with_budget(
+            session, telegram_id=solo_tid, role="owner"
+        )
+        target_owner, target = await create_user_with_budget(
+            session, telegram_id=target_tid, role="owner"
+        )
+        await copy_seed_data(session, target.id)
+        await session.flush()
+
+        parent = ExpenseCategory(
+            family_budget_id=solo_budget.id,
+            name="Еда",
+            translation_key="food",
+        )
+        session.add(parent)
+        await session.flush()
+        invented = ExpenseCategory(
+            family_budget_id=solo_budget.id,
+            name="Моя",
+            parent_id=parent.id,
+            translation_key=None,
+        )
+        session.add(invented)
+        wallet = Wallet(
+            family_budget_id=solo_budget.id,
+            name="W",
+            currency="UZS",
+            is_personal=False,
+        )
+        session.add(wallet)
+        await session.flush()
+        txn = Transaction(
+            family_budget_id=solo_budget.id,
+            type="expense",
+            wallet_id=wallet.id,
+            amount=100,
+            expense_category_id=invented.id,
+            created_by_user_id=solo.id,
+            transaction_date=datetime.now(UTC),
+        )
+        session.add(txn)
+        await session.flush()
+
+        await convert_join_with_own_budget(session, user=solo, target=target)
+        await session.flush()
+
+        await session.refresh(txn)
+        assert txn.expense_category_id is None
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_convert_join_raises_when_target_family_full() -> None:
+    async with rollback_session() as session:
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        solo, _ = await create_user_with_budget(
+            session, telegram_id=solo_tid, role="owner"
+        )
+        target = FamilyBudget(invite_token=f"full-{uuid.uuid4()}")
+        session.add(target)
+        await session.flush()
+        for i in range(MEMBER_LIMIT):
+            session.add(
+                User(
+                    telegram_id=solo_tid + i + 10,
+                    family_budget_id=target.id,
+                    role="owner" if i == 0 else "member",
+                    language="ru",
+                )
+            )
+        await session.flush()
+
+        with pytest.raises(FamilyFullError):
+            await convert_join_with_own_budget(session, user=solo, target=target)
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_convert_join_leaves_target_shared_aggregates_unchanged() -> None:
+    async with rollback_session() as session:
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_tid = solo_tid + 1
+        solo, solo_budget = await create_user_with_budget(
+            session, telegram_id=solo_tid, role="owner"
+        )
+        target_owner, target = await create_user_with_budget(
+            session, telegram_id=target_tid, role="owner"
+        )
+        shared = Wallet(
+            family_budget_id=target.id,
+            name="Family Shared",
+            currency="UZS",
+            is_personal=False,
+        )
+        session.add(shared)
+        await session.flush()
+        session.add(
+            Transaction(
+                family_budget_id=target.id,
+                type="expense",
+                wallet_id=shared.id,
+                amount=400,
+                created_by_user_id=target_owner.id,
+                transaction_date=datetime.now(UTC),
+            )
+        )
+        solo_wallet = Wallet(
+            family_budget_id=solo_budget.id,
+            name="Solo",
+            currency="UZS",
+            is_personal=False,
+        )
+        session.add(solo_wallet)
+        await session.flush()
+
+        before_income, before_expense = await _wallet_txn_totals(session, shared.id)
+
+        await convert_join_with_own_budget(session, user=solo, target=target)
+        await session.flush()
+
+        after_income, after_expense = await _wallet_txn_totals(session, shared.id)
+        assert after_income == before_income
+        assert after_expense == before_expense
+
+
+class TestInviteStartRefusals:
+    @pytest.mark.anyio
+    async def test_existing_user_invalid_invite_gets_prd_text(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=telegram_id),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args="invite_bad-token")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            await create_user_with_budget(session, telegram_id=telegram_id)
+            user = await session.scalar(
+                select(User).where(User.telegram_id == telegram_id)
+            )
+            assert user is not None
+
+            class SessionContext:
+                async def __aenter__(self):
+                    return session
+
+                async def __aexit__(self, *_args):
+                    return None
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=SessionContext(),
+            ):
+                await start_handler(message, command, state)
+
+        message.answer.assert_awaited_once()
+        assert invite_link_invalid() in message.answer.await_args.args[0]
+
+    @pytest.mark.anyio
+    async def test_solo_owner_with_too_many_wallets_gets_cap_not_confirm(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=owner_tid),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args=f"invite_{target_token}")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            owner, budget = await create_user_with_budget(
+                session, telegram_id=owner_tid, role="owner"
+            )
+            target = FamilyBudget(invite_token=target_token, name="Target Family")
+            session.add(target)
+            await session.flush()
+            for i in range(PERSONAL_WALLET_LIMIT + 1):
+                session.add(
+                    Wallet(
+                        family_budget_id=budget.id,
+                        name=f"W{i}",
+                        currency="UZS",
+                        is_personal=False,
+                    )
+                )
+            await session.flush()
+
+            class SessionContext:
+                async def __aenter__(self):
+                    return session
+
+                async def __aexit__(self, *_args):
+                    return None
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=SessionContext(),
+            ):
+                await start_handler(message, command, state)
+
+        text = message.answer.await_args.args[0]
+        assert join_confirm_prompt("Target Family") not in text
+        assert str(PERSONAL_WALLET_LIMIT + 1) in text
+        assert "личных можно иметь не больше 5" in text
+
+    @pytest.mark.anyio
+    async def test_solo_owner_eligible_gets_confirm_prompt(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=owner_tid),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args=f"invite_{target_token}")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            await create_user_with_budget(session, telegram_id=owner_tid, role="owner")
+            target = FamilyBudget(
+                invite_token=target_token, name="Семья Юсуповых"
+            )
+            session.add(target)
+            await session.flush()
+
+            class SessionContext:
+                async def __aenter__(self):
+                    return session
+
+                async def __aexit__(self, *_args):
+                    return None
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=SessionContext(),
+            ):
+                await start_handler(message, command, state)
+
+        text = message.answer.await_args.args[0]
+        assert text == join_confirm_prompt("Семья Юсуповых")
+        assert message.answer.await_args.kwargs["reply_markup"] is not None

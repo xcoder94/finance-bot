@@ -35,6 +35,24 @@ from app.services.invite import (
     cache_bot_username,
     get_cached_bot_username,
 )
+from app.services.member_texts import (
+    invite_already_member,
+    invite_family_full_chat,
+    invite_link_invalid,
+    join_confirm_prompt,
+    join_has_other_members,
+    join_personal_wallet_cap,
+    welcome_invited,
+)
+from app.services.membership_lifecycle import (
+    JoinBlockReason,
+    count_active_members,
+    count_all_wallets_for_user_budget,
+    evaluate_join_from_own_budget,
+)
+from app.services.entity_limits import MEMBER_LIMIT
+
+router = Router()
 
 router = Router()
 
@@ -124,6 +142,20 @@ def open_app_keyboard(language: str) -> ReplyKeyboardMarkup:
     )
 
 
+def join_confirm_keyboard(token: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Присоединиться",
+                    callback_data=f"join_accept:{token}",
+                )
+            ],
+            [InlineKeyboardButton(text="Отмена", callback_data="join_cancel")],
+        ]
+    )
+
+
 async def resolve_bot_username(bot: Bot) -> str:
     bot_username = get_cached_bot_username()
     if bot_username is None:
@@ -159,20 +191,60 @@ async def start_handler(
         return
 
     telegram_id = message.from_user.id
+    flow, invite_token = parse_start_payload(command.args)
+
     async with async_session_factory() as session:
         existing_user = await get_active_user_by_telegram_id(session, telegram_id)
+
         if existing_user is not None:
+            if flow == "member" and invite_token:
+                budget = await get_family_budget_by_invite_token(
+                    session, invite_token
+                )
+                if budget is None:
+                    await message.answer(invite_link_invalid())
+                    return
+
+                if existing_user.family_budget_id == budget.id:
+                    await message.answer(invite_already_member(budget.name))
+                    return
+
+                if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
+                    await message.answer(invite_family_full_chat())
+                    return
+
+                block = await evaluate_join_from_own_budget(
+                    session, existing_user, budget
+                )
+                if block == JoinBlockReason.HAS_OTHER_MEMBERS:
+                    await message.answer(join_has_other_members())
+                    return
+                if block == JoinBlockReason.PERSONAL_WALLET_CAP:
+                    wallet_count = await count_all_wallets_for_user_budget(
+                        session, existing_user
+                    )
+                    await message.answer(join_personal_wallet_cap(wallet_count))
+                    return
+
+                await message.answer(
+                    join_confirm_prompt(budget.name),
+                    reply_markup=join_confirm_keyboard(invite_token),
+                )
+                return
+
             await message.answer(t("already_member", existing_user.language))
             return
 
-        flow, invite_token = parse_start_payload(command.args)
         target_budget_id: uuid.UUID | None = None
 
         if flow == "member":
             assert invite_token is not None
             budget = await get_family_budget_by_invite_token(session, invite_token)
             if budget is None:
-                await message.answer(t("invalid_invite", "ru"))
+                await message.answer(invite_link_invalid())
+                return
+            if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
+                await message.answer(invite_family_full_chat())
                 return
             target_budget_id = budget.id
 
@@ -202,6 +274,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
     telegram_id = data.get("telegram_id", callback.from_user.id)
     existing_language: str | None = None
     invite_token: str | None = None
+    member_budget_name = ""
 
     async with async_session_factory() as session:
         async with session.begin():
@@ -228,6 +301,19 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 await assign_default_card_uzs(session, user)
             else:
                 budget_id = uuid.UUID(data["family_budget_id"])
+                budget = await session.get(FamilyBudget, budget_id)
+                if budget is None or budget.is_deleted:
+                    existing_language = language
+                    await callback.message.edit_text(invite_link_invalid())
+                    await state.clear()
+                    await callback.answer()
+                    return
+                if await count_active_members(session, budget_id) >= MEMBER_LIMIT:
+                    existing_language = language
+                    await callback.message.edit_text(invite_family_full_chat())
+                    await state.clear()
+                    await callback.answer()
+                    return
                 user = User(
                     telegram_id=telegram_id,
                     family_budget_id=budget_id,
@@ -238,6 +324,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 )
                 session.add(user)
                 await assign_default_card_uzs(session, user)
+                member_budget_name = budget.name
 
     if existing_language is not None:
         await callback.message.edit_text(t("already_member", existing_language))
@@ -248,7 +335,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
     if flow == "owner":
         welcome = t("welcome_owner", language)
     else:
-        welcome = t("welcome_member", language)
+        welcome = welcome_invited(member_budget_name)
 
     await callback.message.answer(welcome, reply_markup=open_app_keyboard(language))
     await callback.message.delete()
