@@ -54,8 +54,6 @@ from app.services.entity_limits import MEMBER_LIMIT
 
 router = Router()
 
-router = Router()
-
 FlowType = Literal["owner", "member"]
 
 MESSAGES: dict[str, dict[str, str]] = {

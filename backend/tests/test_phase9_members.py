@@ -41,6 +41,7 @@ from app.services.membership_lifecycle import (
     FamilyFullError,
     JoinBlockReason,
     convert_join_with_own_budget,
+    count_active_members,
     detach_member_to_own_budget,
     evaluate_join_from_own_budget,
 )
@@ -167,6 +168,50 @@ async def _count_wallets_in_budget(
         )
         or 0
     )
+
+
+def _prepare_session_for_callback_handlers(session: AsyncSession) -> None:
+    session.begin = session.begin_nested  # type: ignore[method-assign]
+
+
+def _session_factory_context(session: AsyncSession):
+    _prepare_session_for_callback_handlers(session)
+
+    class SessionContext:
+        async def __aenter__(self):
+            return session
+
+        async def __aexit__(self, *_args):
+            return None
+
+    return SessionContext()
+
+
+async def _create_family_at_member_limit(
+    session: AsyncSession,
+    *,
+    invite_token: str,
+    name: str = "Full Family",
+) -> FamilyBudget:
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    _, budget = await create_user_with_budget(
+        session,
+        telegram_id=owner_tid,
+        role="owner",
+        invite_token=invite_token,
+    )
+    budget.name = name
+    for index in range(MEMBER_LIMIT - 1):
+        await create_user_with_budget(
+            session,
+            telegram_id=owner_tid + index + 1,
+            role="member",
+            family_budget_id=budget.id,
+            first_name=f"Member{index}",
+        )
+    await session.flush()
+    assert await count_active_members(session, budget.id) == MEMBER_LIMIT
+    return budget
 
 
 def test_member_limit_constant_and_app_message():
@@ -676,7 +721,7 @@ async def test_convert_join_moves_all_wallets_as_personal_and_closes_old_budget(
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")
 @pytest.mark.anyio
-async def test_convert_join_deletes_active_goals() -> None:
+async def test_convert_join_deletes_all_goals_including_closed() -> None:
     async with rollback_session() as session:
         solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
         target_tid = solo_tid + 1
@@ -698,10 +743,22 @@ async def test_convert_join_deletes_active_goals() -> None:
             Goal(
                 family_budget_id=solo_budget.id,
                 wallet_id=wallet.id,
-                name="Накопления",
+                name="Active goal",
                 target_amount=1_000_000,
                 currency="UZS",
                 status="active",
+            )
+        )
+        session.add(
+            Goal(
+                family_budget_id=solo_budget.id,
+                wallet_id=wallet.id,
+                name="Closed goal",
+                target_amount=500_000,
+                currency="UZS",
+                status="closed",
+                frozen_balance=100_000,
+                closed_at=datetime.now(UTC),
             )
         )
         await session.flush()
@@ -974,6 +1031,354 @@ class TestInviteStartRefusals:
         text = message.answer.await_args.args[0]
         assert text == join_confirm_prompt("Семья Юсуповых")
         assert message.answer.await_args.kwargs["reply_markup"] is not None
+
+    @pytest.mark.anyio
+    async def test_new_invitee_family_full_gets_refusal(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        new_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=new_tid),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args=f"invite_{target_token}")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            await _create_family_at_member_limit(
+                session, invite_token=target_token, name="Full Family"
+            )
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await start_handler(message, command, state)
+
+        message.answer.assert_awaited_once_with(invite_family_full_chat())
+        state.set_state.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_existing_user_family_full_gets_refusal(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=solo_tid),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args=f"invite_{target_token}")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            await create_user_with_budget(session, telegram_id=solo_tid, role="owner")
+            await _create_family_at_member_limit(
+                session, invite_token=target_token, name="Full Family"
+            )
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await start_handler(message, command, state)
+
+        message.answer.assert_awaited_once_with(invite_family_full_chat())
+
+    @pytest.mark.anyio
+    async def test_existing_user_already_member_gets_refusal(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        member_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=member_tid),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args=f"invite_{target_token}")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            owner_tid = member_tid + 1
+            _, budget = await create_user_with_budget(
+                session,
+                telegram_id=owner_tid,
+                role="owner",
+                invite_token=target_token,
+            )
+            budget.name = "Семья Юсуповых"
+            await create_user_with_budget(
+                session,
+                telegram_id=member_tid,
+                role="member",
+                family_budget_id=budget.id,
+            )
+            await session.flush()
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await start_handler(message, command, state)
+
+        message.answer.assert_awaited_once_with(
+            invite_already_member("Семья Юсуповых")
+        )
+
+    @pytest.mark.anyio
+    async def test_existing_user_with_other_members_gets_refusal(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.onboarding import start_handler
+
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        message = SimpleNamespace(
+            from_user=SimpleNamespace(id=owner_tid),
+            answer=AsyncMock(),
+        )
+        command = SimpleNamespace(args=f"invite_{target_token}")
+        state = SimpleNamespace(set_state=AsyncMock(), update_data=AsyncMock())
+
+        async with rollback_session() as session:
+            _, budget = await create_user_with_budget(
+                session, telegram_id=owner_tid, role="owner"
+            )
+            await create_user_with_budget(
+                session,
+                telegram_id=owner_tid + 1,
+                role="member",
+                family_budget_id=budget.id,
+            )
+            target = FamilyBudget(invite_token=target_token, name="Target Family")
+            session.add(target)
+            await session.flush()
+
+            with patch(
+                "bot.onboarding.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await start_handler(message, command, state)
+
+        message.answer.assert_awaited_once_with(join_has_other_members())
+
+
+class TestMembershipCallbacks:
+    @pytest.mark.anyio
+    async def test_join_accept_converts_solo_owner_and_sends_welcome(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.membership import join_accept
+
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        callback = SimpleNamespace(
+            from_user=SimpleNamespace(id=solo_tid),
+            data=f"join_accept:{target_token}",
+            message=SimpleNamespace(
+                edit_text=AsyncMock(),
+                answer=AsyncMock(),
+                delete=AsyncMock(),
+            ),
+            answer=AsyncMock(),
+        )
+
+        async with rollback_session() as session:
+            solo, solo_budget = await create_user_with_budget(
+                session, telegram_id=solo_tid, role="owner"
+            )
+            target = FamilyBudget(
+                invite_token=target_token, name="Семья Юсуповых"
+            )
+            session.add(target)
+            await create_user_with_budget(
+                session, telegram_id=solo_tid + 1, role="owner", family_budget_id=target.id
+            )
+            await session.flush()
+            await session.refresh(solo_budget)
+
+            with patch(
+                "bot.membership.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await join_accept(callback)
+
+            await session.refresh(solo)
+            assert solo.family_budget_id == target.id
+            assert solo.role == "member"
+            assert solo_budget.is_deleted is True
+
+        callback.message.answer.assert_awaited_once()
+        assert welcome_invited("Семья Юсуповых") in callback.message.answer.await_args.args[0]
+        callback.message.delete.assert_awaited_once()
+
+    @pytest.mark.anyio
+    async def test_join_accept_family_full_on_recheck(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.membership import join_accept
+
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        target_token = f"invite-{uuid.uuid4()}"
+        callback = SimpleNamespace(
+            from_user=SimpleNamespace(id=solo_tid),
+            data=f"join_accept:{target_token}",
+            message=SimpleNamespace(
+                edit_text=AsyncMock(),
+                answer=AsyncMock(),
+                delete=AsyncMock(),
+            ),
+            answer=AsyncMock(),
+        )
+
+        async with rollback_session() as session:
+            await create_user_with_budget(session, telegram_id=solo_tid, role="owner")
+            await _create_family_at_member_limit(
+                session, invite_token=target_token, name="Full Family"
+            )
+
+            with patch(
+                "bot.membership.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await join_accept(callback)
+
+        callback.message.edit_text.assert_awaited_once_with(invite_family_full_chat())
+        callback.message.answer.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_join_accept_invalid_token(self) -> None:
+        from types import SimpleNamespace
+
+        from bot.membership import join_accept
+
+        solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        callback = SimpleNamespace(
+            from_user=SimpleNamespace(id=solo_tid),
+            data="join_accept:bad-token",
+            message=SimpleNamespace(
+                edit_text=AsyncMock(),
+                answer=AsyncMock(),
+                delete=AsyncMock(),
+            ),
+            answer=AsyncMock(),
+        )
+
+        async with rollback_session() as session:
+            await create_user_with_budget(session, telegram_id=solo_tid, role="owner")
+
+            with patch(
+                "bot.membership.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await join_accept(callback)
+
+        callback.message.edit_text.assert_awaited_once_with(invite_link_invalid())
+
+    @pytest.mark.anyio
+    async def test_own_xfer_accept_callback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from types import SimpleNamespace
+
+        from bot.membership import own_xfer_accept
+
+        _mock_bot(monkeypatch)
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        recipient_tid = owner_tid + 1
+        callback = SimpleNamespace(
+            from_user=SimpleNamespace(id=recipient_tid),
+            data="",
+            message=SimpleNamespace(edit_reply_markup=AsyncMock()),
+            answer=AsyncMock(),
+        )
+
+        async with rollback_session() as session:
+            owner, budget = await create_user_with_budget(
+                session, telegram_id=owner_tid, role="owner", first_name="Alice"
+            )
+            budget.name = "Семья Каримовых"
+            recipient, _ = await create_user_with_budget(
+                session,
+                telegram_id=recipient_tid,
+                role="member",
+                first_name="Рустам",
+                family_budget_id=budget.id,
+            )
+            transfer = await request_ownership_transfer(
+                session, owner=owner, recipient=recipient, budget=budget, bot=None
+            )
+            callback.data = f"own_xfer_accept:{transfer.id}"
+
+            with patch(
+                "bot.membership.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await own_xfer_accept(callback)
+
+            await session.refresh(owner)
+            await session.refresh(recipient)
+            await session.refresh(transfer)
+            assert owner.role == "member"
+            assert recipient.role == "owner"
+            assert transfer.status == "accepted"
+
+        callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
+
+    @pytest.mark.anyio
+    async def test_own_xfer_refuse_callback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from types import SimpleNamespace
+
+        from bot.membership import own_xfer_refuse
+
+        bot = _mock_bot(monkeypatch)
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        recipient_tid = owner_tid + 1
+        callback = SimpleNamespace(
+            from_user=SimpleNamespace(id=recipient_tid),
+            data="",
+            message=SimpleNamespace(edit_reply_markup=AsyncMock()),
+            answer=AsyncMock(),
+        )
+
+        async with rollback_session() as session:
+            owner, budget = await create_user_with_budget(
+                session, telegram_id=owner_tid, role="owner", first_name="Alice"
+            )
+            recipient, _ = await create_user_with_budget(
+                session,
+                telegram_id=recipient_tid,
+                role="member",
+                first_name="Рустам",
+                family_budget_id=budget.id,
+            )
+            transfer = await request_ownership_transfer(
+                session, owner=owner, recipient=recipient, budget=budget, bot=None
+            )
+            bot.send_message.reset_mock()
+            callback.data = f"own_xfer_refuse:{transfer.id}"
+
+            with patch(
+                "bot.membership.async_session_factory",
+                return_value=_session_factory_context(session),
+            ):
+                await own_xfer_refuse(callback)
+
+            await session.refresh(owner)
+            await session.refresh(recipient)
+            await session.refresh(transfer)
+            assert owner.role == "owner"
+            assert recipient.role == "member"
+            assert transfer.status == "refused"
+            assert bot.send_message.await_args.args[0] == owner.telegram_id
+            assert bot.send_message.await_args.args[1] == transfer_refused_to_former("Рустам")
+
+        callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
 
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")

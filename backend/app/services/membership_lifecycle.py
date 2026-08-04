@@ -106,12 +106,7 @@ async def convert_join_with_own_budget(
     wallet_ids = [wallet.id for wallet in wallets]
 
     if wallet_ids:
-        await session.execute(
-            delete(Goal).where(
-                Goal.wallet_id.in_(wallet_ids),
-                Goal.status == "active",
-            )
-        )
+        await session.execute(delete(Goal).where(Goal.wallet_id.in_(wallet_ids)))
 
     for wallet in wallets:
         wallet.family_budget_id = target.id
