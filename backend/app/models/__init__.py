@@ -7,6 +7,7 @@ from app.models.ownership_transfer import OwnershipTransfer
 from app.models.quick_entry_pending import QuickEntryPending
 from app.models.revoked_app_pass import RevokedAppPass
 from app.models.transaction import Transaction
+from app.models.transaction_change_log import TransactionChangeLog
 from app.models.user import User
 from app.models.wallet import Wallet
 
@@ -20,6 +21,7 @@ __all__ = [
     "QuickEntryPending",
     "RevokedAppPass",
     "Transaction",
+    "TransactionChangeLog",
     "User",
     "Wallet",
 ]
