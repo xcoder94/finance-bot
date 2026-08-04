@@ -467,7 +467,7 @@ async def test_wallet_list_includes_is_personal(
 ) -> None:
     client, session = api_client
     telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
-    _, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+    user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
     headers = auth_headers(telegram_id)
 
     shared = Wallet(
@@ -481,6 +481,7 @@ async def test_wallet_list_includes_is_personal(
         name="Personal",
         currency="USD",
         is_personal=True,
+        owner_user_id=user.id,
     )
     session.add_all([shared, personal])
     await session.flush()

@@ -10,6 +10,7 @@ from app.db import async_session_factory, get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
 from app.schemas.auth import MeResponse, MeUpdate
+from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import get_active_wallet
 
 router = APIRouter(prefix="/api/v1")
@@ -69,8 +70,7 @@ async def patch_me(
             wallet = await get_active_wallet(
                 session, body.default_wallet_id, user.family_budget_id
             )
-            if wallet is None:
-                raise HTTPException(status_code=404)
+            require_wallet_visible(wallet, user)
             user.default_wallet_id = body.default_wallet_id
         else:
             user.default_wallet_id = None

@@ -19,6 +19,7 @@ from app.services.entity_limits import (
     LIMIT_SHARED_WALLETS,
     SHARED_WALLET_LIMIT,
 )
+from app.services.wallet_visibility import visible_wallets_clause
 from app.services.wallets_categories import (
     count_wallet_transactions,
     get_active_wallet,
@@ -63,6 +64,7 @@ async def list_wallets(
         .where(
             Wallet.family_budget_id == user.family_budget_id,
             Wallet.is_deleted.is_(False),
+            visible_wallets_clause(user),
         )
         .order_by(Wallet.created_at)
     )
