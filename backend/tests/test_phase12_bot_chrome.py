@@ -293,7 +293,9 @@ def test_release_announcement_text_exact_18_4() -> None:
 @pytest.mark.anyio
 async def test_announcement_sent_once_then_skipped(
     api_client: tuple[object, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", "https://example.test/app")
     _, session = api_client
     await _mark_prior_users_delivered(session)
     tid = _tid()
@@ -311,6 +313,12 @@ async def test_announcement_sent_once_then_skipped(
     assert call.args[0] == tid
     assert call.args[1] == ANNOUNCEMENT_TEXT
     assert call.kwargs.get("parse_mode") == "Markdown"
+    markup = call.kwargs.get("reply_markup")
+    assert markup is not None
+    assert isinstance(markup, ReplyKeyboardMarkup)
+    assert len(markup.keyboard) == 1
+    assert len(markup.keyboard[0]) == 1
+    assert markup.keyboard[0][0].text == OPEN_APP_BUTTON_LABEL
     await session.refresh(user)
     assert user.release_announcement_delivered_at is not None
 
@@ -333,6 +341,29 @@ async def test_user_created_after_cutoff_never_eligible(
     await session.refresh(user)
 
     cutoff = user.created_at - timedelta(seconds=1)
+    bot = AsyncMock()
+    sent = await send_release_announcements(session, bot, cutoff, dry_run=False)
+    assert sent == 0
+    bot.send_message.assert_not_awaited()
+    await session.refresh(user)
+    assert user.release_announcement_delivered_at is None
+
+
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
+@pytest.mark.anyio
+async def test_soft_deleted_user_skips_announcement(
+    api_client: tuple[object, AsyncSession],
+) -> None:
+    _, session = api_client
+    await _mark_prior_users_delivered(session)
+    tid = _tid()
+    user, _budget = await create_user_with_budget(session, telegram_id=tid, role="owner")
+    user.is_deleted = True
+    user.deleted_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(user)
+
+    cutoff = datetime.now(timezone.utc) + timedelta(hours=1)
     bot = AsyncMock()
     sent = await send_release_announcements(session, bot, cutoff, dry_run=False)
     assert sent == 0

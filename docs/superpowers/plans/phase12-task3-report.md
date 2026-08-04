@@ -47,7 +47,7 @@ cd frontend && npx vitest run --reporter=dot
 
 Added `_mark_prior_users_delivered()` in announcement DB tests: marks committed fixture users inside the `api_client` transaction before creating the test user, so eligibility counts only the in-test user when the dev DB holds persistent fixture rows (e.g. Owner `111111`). Rolls back with the fixture; not required on an empty DB.
 
-Brief tests do not assert `reply_markup`; implementation attaches `open_app_keyboard()` when `MINI_APP_URL` is set (PRD §18.3).
+Review fix: `test_announcement_sent_once_then_skipped` patches `bot.onboarding.MINI_APP_URL` and asserts `reply_markup` is a `ReplyKeyboardMarkup` with one `Открыть приложение` button. Added `test_soft_deleted_user_skips_announcement` for `is_deleted=True` users.
 
 ## Disabled / stubbed / mocked
 
