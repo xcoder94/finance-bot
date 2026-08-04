@@ -356,9 +356,12 @@ class TestHistoryEndpoint:
             for statement in statements
             if "from transactions" in statement and "join wallets" in statement
         ]
-        assert len(history_statements) == 1
-        assert "join users" not in history_statements[0]
-        assert "users.first_name" not in history_statements[0]
+        assert len(history_statements) == 2
+        items_statement = next(
+            statement for statement in history_statements if "order by" in statement
+        )
+        assert "join users" not in items_statement
+        assert "users.first_name" not in items_statement
 
     async def test_created_by_included_for_multi_user_family(
         self, api_client: tuple[AsyncClient, AsyncSession]
@@ -662,8 +665,11 @@ class TestTranslationKeysOnResponses:
             for statement in statements
             if "from transactions" in statement and "join wallets" in statement
         ]
-        assert len(history_statements) == 1
-        assert "translation_key" in history_statements[0]
+        assert len(history_statements) == 2
+        items_statement = next(
+            statement for statement in history_statements if "order by" in statement
+        )
+        assert "translation_key" in items_statement
 
     async def test_analytics_includes_translation_keys_for_soft_deleted_categories(
         self, api_client: tuple[AsyncClient, AsyncSession]

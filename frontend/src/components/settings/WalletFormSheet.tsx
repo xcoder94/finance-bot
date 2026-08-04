@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { WalletResponse } from '../../api/wallets'
-import {
-  ENTITY_NAME_MAX,
-  LIMIT_SHARED_WALLETS,
-  SHARED_WALLET_LIMIT,
-} from '../../constants/entityLimits'
+import { ENTITY_NAME_MAX } from '../../constants/entityLimits'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
 import { FormSheetField } from '../forms/FormSheetField'
+import {
+  type WalletFormType,
+  walletCreateAtLimit,
+  walletCreateIsPersonal,
+  walletCreateLimitHint,
+} from './walletFormLimits'
 
 export type WalletFormMode = 'create' | 'edit'
 
@@ -19,11 +21,19 @@ type WalletFormSheetProps = {
   wallet: WalletResponse | null
   displayName?: string
   sharedWalletCount: number
+  personalWalletCount: number
+  canPickWalletType: boolean
   editable: boolean
   onClose: () => void
-  onSave: (payload: { name: string; currency: 'UZS' | 'USD' }) => Promise<void>
+  onSave: (payload: {
+    name: string
+    currency: 'UZS' | 'USD'
+    is_personal: boolean
+  }) => Promise<void>
   currencyPickerOpen: boolean
   onCurrencyPickerOpenChange: (open: boolean) => void
+  walletTypePickerOpen: boolean
+  onWalletTypePickerOpenChange: (open: boolean) => void
 }
 
 function validateWalletName(name: string): 'required' | 'tooLong' | null {
@@ -47,21 +57,33 @@ export function WalletFormSheet({
   wallet,
   displayName,
   sharedWalletCount,
+  personalWalletCount,
+  canPickWalletType,
   editable,
   onClose,
   onSave,
   currencyPickerOpen,
   onCurrencyPickerOpenChange,
+  walletTypePickerOpen,
+  onWalletTypePickerOpenChange,
 }: WalletFormSheetProps) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState<'UZS' | 'USD'>('UZS')
+  const [walletType, setWalletType] = useState<WalletFormType>('shared')
   const [nameTouched, setNameTouched] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
 
-  const atSharedLimit = mode === 'create' && sharedWalletCount >= SHARED_WALLET_LIMIT
   const currencyLocked = mode === 'edit' && wallet !== null && wallet.transaction_count > 0
+  const createWalletType: WalletFormType = canPickWalletType ? walletType : 'personal'
+  const atLimit =
+    mode === 'create' &&
+    walletCreateAtLimit(createWalletType, sharedWalletCount, personalWalletCount)
+  const limitHint =
+    mode === 'create'
+      ? walletCreateLimitHint(createWalletType, sharedWalletCount, personalWalletCount)
+      : undefined
 
   useEffect(() => {
     if (!open) {
@@ -69,12 +91,16 @@ export function WalletFormSheet({
     }
     setName(wallet?.name ?? '')
     setCurrency((wallet?.currency as 'UZS' | 'USD') ?? 'UZS')
+    setWalletType(wallet?.is_personal ? 'personal' : 'shared')
     setNameTouched(false)
     setSaving(false)
     setSaveError(false)
   }, [open, wallet])
 
-  useNativeBackButtonOverlay(open && !currencyPickerOpen, onClose)
+  useNativeBackButtonOverlay(
+    open && !currencyPickerOpen && !walletTypePickerOpen,
+    onClose,
+  )
 
   const nameValidation = validateWalletName(name)
   const nameErrorKey =
@@ -85,16 +111,14 @@ export function WalletFormSheet({
         : null
 
   const trimmedLength = name.trim().length
-  const fieldHint = atSharedLimit
-    ? LIMIT_SHARED_WALLETS
-    : nameTouched && nameErrorKey
-      ? t(nameErrorKey)
-      : undefined
-  const fieldHintError = atSharedLimit || (nameTouched && nameErrorKey !== null)
+  const fieldHint =
+    limitHint ??
+    (nameTouched && nameErrorKey ? t(nameErrorKey) : undefined)
+  const fieldHintError = atLimit || (nameTouched && nameErrorKey !== null)
 
   const canSave =
     editable &&
-    !atSharedLimit &&
+    !atLimit &&
     nameValidation === null &&
     !saving &&
     (mode === 'create' || wallet !== null)
@@ -103,7 +127,16 @@ export function WalletFormSheet({
     mode === 'create' ? t('settings.walletForm.newTitle') : (displayName ?? wallet?.name ?? '')
 
   const intro =
-    mode === 'create' && editable ? t('settings.walletForm.createIntroOwner') : undefined
+    mode === 'create'
+      ? canPickWalletType
+        ? t('settings.walletForm.createIntroOwner')
+        : t('settings.walletForm.createIntroMember')
+      : undefined
+
+  const walletTypeLabel =
+    createWalletType === 'personal'
+      ? t('settings.walletType.personal')
+      : t('settings.walletType.shared')
 
   const handleSave = async () => {
     setNameTouched(true)
@@ -114,13 +147,62 @@ export function WalletFormSheet({
     setSaving(true)
     setSaveError(false)
     try {
-      await onSave({ name: name.trim(), currency })
+      await onSave({
+        name: name.trim(),
+        currency,
+        is_personal: walletCreateIsPersonal(createWalletType),
+      })
       onClose()
     } catch {
       setSaveError(true)
     } finally {
       setSaving(false)
     }
+  }
+
+  if (walletTypePickerOpen) {
+    return (
+      <FormSheet
+        open={open}
+        title="Тип"
+        onClose={() => onWalletTypePickerOpenChange(false)}
+        showPrimary={false}
+      >
+        <div className="category-picker">
+          {(['shared', 'personal'] as const).map((option) => {
+            const selected = walletType === option
+            const label =
+              option === 'shared'
+                ? t('settings.walletType.shared')
+                : t('settings.walletType.personal')
+            return (
+              <button
+                key={option}
+                type="button"
+                className="category-picker__row"
+                onClick={() => {
+                  setWalletType(option)
+                  onWalletTypePickerOpenChange(false)
+                }}
+              >
+                <span
+                  className={[
+                    'category-picker__radio',
+                    selected ? 'category-picker__radio--selected' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-hidden="true"
+                >
+                  <span className="category-picker__radio-dot" />
+                </span>
+                <span className="category-picker__name">{label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </FormSheet>
+    )
   }
 
   if (currencyPickerOpen) {
@@ -209,6 +291,20 @@ export function WalletFormSheet({
       >
         <span className="form-sheet-field__value">{currency}</span>
       </FormSheetField>
+
+      {mode === 'create' ? (
+        <FormSheetField
+          label="Тип"
+          right={canPickWalletType ? '›' : undefined}
+          onClick={
+            editable && canPickWalletType
+              ? () => onWalletTypePickerOpenChange(true)
+              : undefined
+          }
+        >
+          <span className="form-sheet-field__value">{walletTypeLabel}</span>
+        </FormSheetField>
+      ) : null}
 
       {saveError ? (
         <div className="form-sheet-load-error" role="alert">

@@ -36,6 +36,7 @@ async def create_quick_entry_expense(
         user.family_budget_id,
         wallet_id,
         expense_category_id,
+        user,
     )
     transaction = Transaction(
         family_budget_id=user.family_budget_id,
@@ -68,6 +69,7 @@ async def create_quick_entry_income(
         user.family_budget_id,
         wallet_id,
         income_category_id,
+        user,
     )
     transaction = Transaction(
         family_budget_id=user.family_budget_id,

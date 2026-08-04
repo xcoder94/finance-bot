@@ -20,6 +20,7 @@ export type WalletDeleteResponse = {
 export type WalletCreatePayload = {
   name: string
   currency: 'UZS' | 'USD'
+  is_personal?: boolean
 }
 
 export type WalletUpdatePayload = {

@@ -7,6 +7,8 @@ import {
   fetchRecentHistory,
   fetchSummary,
   fetchWalletBalances,
+  fetchPersonalSummary,
+  fetchPersonalWalletBalances,
   type HistoryItem,
 } from '../api/home'
 import { useAuthStore } from '../store/authStore'
@@ -14,10 +16,14 @@ import {
   getCachedHomeSummary,
   getCachedRecentHistory,
   getCachedWalletBalances,
+  getCachedPersonalSummary,
+  getCachedPersonalWalletBalances,
   invalidateHomeData,
   peekHomeSummary,
   peekRecentHistory,
   peekWalletBalances,
+  peekPersonalSummary,
+  peekPersonalWalletBalances,
 } from '../store/dataCacheStore'
 import { editRouteForItem } from '../utils/editRouteForItem'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
@@ -26,6 +32,11 @@ import {
   getHomeBudgetHeading,
   getSummaryForCurrency,
 } from '../utils/homeFigures'
+import {
+  getPersonalBalanceForCurrency,
+  getPersonalSummaryForCurrency,
+  shouldShowPersonalBlock,
+} from '../utils/homePersonal'
 import {
   composeBalancesFetchTrigger,
   composeHomeFetchTrigger,
@@ -242,6 +253,25 @@ export function HomePage() {
     balancesFetchTrigger,
     peekWalletBalances(familyId),
   )
+  const personalSummaryFetch = useFetchBlock(
+    useCallback(
+      () =>
+        getCachedPersonalSummary(familyId, year, month, () =>
+          fetchPersonalSummary(year, month),
+        ),
+      [familyId, year, month],
+    ),
+    homeFetchTrigger,
+    peekPersonalSummary(familyId, year, month),
+  )
+  const personalBalancesFetch = useFetchBlock(
+    useCallback(
+      () => getCachedPersonalWalletBalances(familyId, fetchPersonalWalletBalances),
+      [familyId],
+    ),
+    balancesFetchTrigger,
+    peekPersonalWalletBalances(familyId),
+  )
   const historyFetch = useFetchBlock(
     useCallback(
       () =>
@@ -256,6 +286,10 @@ export function HomePage() {
     summaryFetch.state.status === 'success' ? summaryFetch.state.data : null
   const balancesData =
     balancesFetch.state.status === 'success' ? balancesFetch.state.data : null
+  const personalSummaryData =
+    personalSummaryFetch.state.status === 'success' ? personalSummaryFetch.state.data : null
+  const personalBalancesData =
+    personalBalancesFetch.state.status === 'success' ? personalBalancesFetch.state.data : null
   const historyData =
     historyFetch.state.status === 'success' ? historyFetch.state.data : null
 
@@ -263,6 +297,23 @@ export function HomePage() {
     ? getSummaryForCurrency(summaryData, primaryCurrency)
     : { income: 0, expense: 0 }
   const balance = balancesData ? getBalanceForCurrency(balancesData, primaryCurrency) : 0
+  const currenciesWithPersonalWallets =
+    personalSummaryData?.currencies_with_wallets ??
+    personalBalancesData?.currencies_with_wallets ??
+    []
+  const showPersonalBlock = shouldShowPersonalBlock(
+    currenciesWithPersonalWallets,
+    primaryCurrency,
+  )
+  const personalIncome = personalSummaryData
+    ? getPersonalSummaryForCurrency(personalSummaryData, primaryCurrency).income
+    : 0
+  const personalExpense = personalSummaryData
+    ? getPersonalSummaryForCurrency(personalSummaryData, primaryCurrency).expense
+    : 0
+  const personalBalance = personalBalancesData
+    ? getPersonalBalanceForCurrency(personalBalancesData, primaryCurrency)
+    : 0
   const totalCount = historyData?.total_count ?? 0
   const historyItems = historyData?.items ?? []
 
@@ -270,12 +321,18 @@ export function HomePage() {
   const summaryUnavailable = summaryFetch.state.status === 'error'
   const balancesLoading = balancesFetch.state.status === 'loading'
   const balancesUnavailable = balancesFetch.state.status === 'error'
+  const personalSummaryLoading = personalSummaryFetch.state.status === 'loading'
+  const personalSummaryUnavailable = personalSummaryFetch.state.status === 'error'
+  const personalBalancesLoading = personalBalancesFetch.state.status === 'loading'
+  const personalBalancesUnavailable = personalBalancesFetch.state.status === 'error'
   const historyLoading = historyFetch.state.status === 'loading'
   const historySuccess = historyFetch.state.status === 'success'
 
   const hasCachedContent =
     peekHomeSummary(familyId, year, month) !== null ||
     peekWalletBalances(familyId) !== null ||
+    peekPersonalSummary(familyId, year, month) !== null ||
+    peekPersonalWalletBalances(familyId) !== null ||
     peekRecentHistory(familyId, year, month) !== null
 
   const showSkeleton =
@@ -286,6 +343,7 @@ export function HomePage() {
     historyFetch.state.status !== 'error'
 
   const participantLabel = t('home.participant', { count: user?.memberCount ?? 0 })
+  const personalDisplayName = user?.firstName ?? '—'
   const roleLine =
     user?.role === 'owner'
       ? t('home.roleLineOwner', { count: participantLabel })
@@ -367,6 +425,12 @@ export function HomePage() {
           ) : null}
           {balancesFetch.state.status === 'error' ? (
             <BlockError onRetry={balancesFetch.retry} />
+          ) : null}
+          {personalSummaryFetch.state.status === 'error' ? (
+            <BlockError onRetry={personalSummaryFetch.retry} />
+          ) : null}
+          {personalBalancesFetch.state.status === 'error' ? (
+            <BlockError onRetry={personalBalancesFetch.retry} />
           ) : null}
           {historyFetch.state.status === 'error' ? (
             <BlockError onRetry={historyFetch.retry} />
@@ -473,6 +537,43 @@ export function HomePage() {
               <div className="home-skeleton__ops-row">
                 <div className="home-skeleton__line home-skeleton__line--ops-left" />
                 <div className="home-skeleton__line home-skeleton__line--ops-right" />
+              </div>
+            </div>
+          ) : null}
+
+          {showPersonalBlock ? (
+            <div className="home-personal-card">
+              <div className="home-personal-card__header">
+                <div className="home-personal-card__title">{t('home.personalTitle')}</div>
+                <div className="home-personal-card__subtitle">
+                  {t('home.personalSubtitle', { name: personalDisplayName })}
+                </div>
+              </div>
+              <div className="home-personal-card__stats">
+                <div className="home-personal-card__stat">
+                  <div className="home-personal-card__stat-label">{t('home.income')}</div>
+                  <div className="home-personal-card__stat-value home-personal-card__stat-value--income">
+                    {personalSummaryUnavailable || personalSummaryLoading
+                      ? '—'
+                      : formatCurrency(personalIncome, primaryCurrency)}
+                  </div>
+                </div>
+                <div className="home-personal-card__stat">
+                  <div className="home-personal-card__stat-label">{t('home.expense')}</div>
+                  <div className="home-personal-card__stat-value home-personal-card__stat-value--expense">
+                    {personalSummaryUnavailable || personalSummaryLoading
+                      ? '—'
+                      : formatCurrency(personalExpense, primaryCurrency)}
+                  </div>
+                </div>
+                <div className="home-personal-card__stat">
+                  <div className="home-personal-card__stat-label">{t('home.balance')}</div>
+                  <div className="home-personal-card__stat-value">
+                    {personalBalancesUnavailable || personalBalancesLoading
+                      ? '—'
+                      : formatCurrency(personalBalance, primaryCurrency)}
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}

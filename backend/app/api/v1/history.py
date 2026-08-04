@@ -29,6 +29,7 @@ async def list_transaction_history(
     items, total_count = await get_history(
         session,
         user.family_budget_id,
+        user,
         date_from,
         date_to,
         limit,

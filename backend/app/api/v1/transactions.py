@@ -20,7 +20,9 @@ from app.services.transactions import (
     create_income_transaction,
     create_transfer_transaction,
     get_active_transaction,
-    require_modify_permission,
+    get_transaction_wallets,
+    require_transaction_modify_permission,
+    require_transaction_visible,
     soft_delete_transaction,
     transaction_to_response,
     update_expense_transaction,
@@ -70,6 +72,10 @@ async def get_transaction(
     transaction = await get_active_transaction(session, transaction_id, user.family_budget_id)
     if transaction is None:
         raise HTTPException(status_code=404)
+    from_wallet, to_wallet = await get_transaction_wallets(
+        session, transaction, user.family_budget_id
+    )
+    require_transaction_visible(from_wallet, to_wallet, user)
     return transaction_to_response(transaction)
 
 
@@ -83,18 +89,23 @@ async def update_transaction(
     transaction = await get_active_transaction(session, transaction_id, user.family_budget_id)
     if transaction is None:
         raise HTTPException(status_code=404)
-    require_modify_permission(user, transaction)
+    from_wallet, to_wallet = await get_transaction_wallets(
+        session, transaction, user.family_budget_id
+    )
+    if from_wallet is None:
+        raise HTTPException(status_code=404)
+    require_transaction_modify_permission(user, transaction, from_wallet, to_wallet)
 
     body = await request.json()
     if transaction.type == "income":
         parsed = IncomeUpdate.model_validate(body)
-        updated = await update_income_transaction(session, transaction, parsed)
+        updated = await update_income_transaction(session, transaction, parsed, user)
     elif transaction.type == "expense":
         parsed = ExpenseUpdate.model_validate(body)
-        updated = await update_expense_transaction(session, transaction, parsed)
+        updated = await update_expense_transaction(session, transaction, parsed, user)
     elif transaction.type == "transfer":
         parsed = TransferUpdate.model_validate(body)
-        updated = await update_transfer_transaction(session, transaction, parsed)
+        updated = await update_transfer_transaction(session, transaction, parsed, user)
     else:
         raise HTTPException(status_code=422, detail="Unknown transaction type")
 
@@ -110,7 +121,12 @@ async def delete_transaction(
     transaction = await get_active_transaction(session, transaction_id, user.family_budget_id)
     if transaction is None:
         raise HTTPException(status_code=404)
-    require_modify_permission(user, transaction)
+    from_wallet, to_wallet = await get_transaction_wallets(
+        session, transaction, user.family_budget_id
+    )
+    if from_wallet is None:
+        raise HTTPException(status_code=404)
+    require_transaction_modify_permission(user, transaction, from_wallet, to_wallet)
     soft_delete_transaction(transaction)
     await session.commit()
     return transaction_to_response(transaction)

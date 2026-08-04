@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.user_deps import CurrentUserDep, OwnerUserDep
+from app.auth.user_deps import CurrentUserDep
 from app.db import get_session
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
@@ -16,9 +16,12 @@ from app.schemas.wallets_categories import (
     WalletUpdate,
 )
 from app.services.entity_limits import (
+    LIMIT_PERSONAL_WALLETS,
     LIMIT_SHARED_WALLETS,
+    PERSONAL_WALLET_LIMIT,
     SHARED_WALLET_LIMIT,
 )
+from app.services.wallet_visibility import require_wallet_visible, visible_wallets_clause
 from app.services.wallets_categories import (
     count_wallet_transactions,
     get_active_wallet,
@@ -63,6 +66,7 @@ async def list_wallets(
         .where(
             Wallet.family_budget_id == user.family_budget_id,
             Wallet.is_deleted.is_(False),
+            visible_wallets_clause(user),
         )
         .order_by(Wallet.created_at)
     )
@@ -83,26 +87,53 @@ async def list_wallets(
 @router.post("/wallets", status_code=201)
 async def create_wallet(
     body: WalletCreate,
-    user: OwnerUserDep,
+    user: CurrentUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletResponse:
-    shared_count = await session.scalar(
-        select(func.count())
-        .select_from(Wallet)
-        .where(
-            Wallet.family_budget_id == user.family_budget_id,
-            Wallet.is_deleted.is_(False),
-            Wallet.is_personal.is_(False),
+    if body.is_personal:
+        personal_count = await session.scalar(
+            select(func.count())
+            .select_from(Wallet)
+            .where(
+                Wallet.family_budget_id == user.family_budget_id,
+                Wallet.is_deleted.is_(False),
+                Wallet.is_personal.is_(True),
+                Wallet.owner_user_id == user.id,
+            )
         )
-    )
-    if shared_count is not None and shared_count >= SHARED_WALLET_LIMIT:
-        raise HTTPException(status_code=409, detail=LIMIT_SHARED_WALLETS)
+        if personal_count is not None and personal_count >= PERSONAL_WALLET_LIMIT:
+            raise HTTPException(status_code=409, detail=LIMIT_PERSONAL_WALLETS)
 
-    wallet = Wallet(
-        family_budget_id=user.family_budget_id,
-        name=body.name,
-        currency=body.currency,
-    )
+        wallet = Wallet(
+            family_budget_id=user.family_budget_id,
+            name=body.name,
+            currency=body.currency,
+            is_personal=True,
+            owner_user_id=user.id,
+        )
+    else:
+        if user.role != "owner":
+            raise HTTPException(status_code=403)
+
+        shared_count = await session.scalar(
+            select(func.count())
+            .select_from(Wallet)
+            .where(
+                Wallet.family_budget_id == user.family_budget_id,
+                Wallet.is_deleted.is_(False),
+                Wallet.is_personal.is_(False),
+            )
+        )
+        if shared_count is not None and shared_count >= SHARED_WALLET_LIMIT:
+            raise HTTPException(status_code=409, detail=LIMIT_SHARED_WALLETS)
+
+        wallet = Wallet(
+            family_budget_id=user.family_budget_id,
+            name=body.name,
+            currency=body.currency,
+            is_personal=False,
+            owner_user_id=None,
+        )
     session.add(wallet)
     await session.commit()
     await session.refresh(wallet)
@@ -120,12 +151,17 @@ async def create_wallet(
 async def update_wallet(
     wallet_id: uuid.UUID,
     body: WalletUpdate,
-    user: OwnerUserDep,
+    user: CurrentUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletResponse:
     wallet = await get_active_wallet(session, wallet_id, user.family_budget_id)
     if wallet is None:
         raise HTTPException(status_code=404)
+
+    if wallet.is_personal:
+        require_wallet_visible(wallet, user)
+    elif user.role != "owner":
+        raise HTTPException(status_code=403)
 
     wallet.name = body.name
     await session.commit()
@@ -143,12 +179,17 @@ async def update_wallet(
 @router.delete("/wallets/{wallet_id}")
 async def delete_wallet(
     wallet_id: uuid.UUID,
-    user: OwnerUserDep,
+    user: CurrentUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletDeleteResponse:
     wallet = await get_active_wallet(session, wallet_id, user.family_budget_id)
     if wallet is None:
         raise HTTPException(status_code=404)
+
+    if wallet.is_personal:
+        require_wallet_visible(wallet, user)
+    elif user.role != "owner":
+        raise HTTPException(status_code=403)
 
     affected_transactions_count = await count_wallet_transactions(session, wallet.id)
     soft_delete(wallet)
