@@ -81,8 +81,19 @@ export function membersSubtitle(memberCount: number): string {
   return `${memberCount} из 4`
 }
 
-export function notificationsSubtitle(): string {
-  return 'Выключены'
+export function notificationsSubtitle(eveningEnabled: boolean, weeklyEnabled: boolean): string {
+  if (!eveningEnabled && !weeklyEnabled) {
+    return 'Выключены'
+  }
+
+  const parts: string[] = []
+  if (eveningEnabled) {
+    parts.push('Напоминание вечером')
+  }
+  if (weeklyEnabled) {
+    parts.push('Итоги недели')
+  }
+  return parts.join(' · ')
 }
 
 export function languageSubtitle(language: string): string {

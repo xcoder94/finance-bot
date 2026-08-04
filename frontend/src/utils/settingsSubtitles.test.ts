@@ -50,8 +50,11 @@ describe('settingsSubtitles', () => {
     expect(membersSubtitle(3)).toBe('3 из 4')
   })
 
-  it('formats notifications subtitle', () => {
-    expect(notificationsSubtitle()).toBe('Выключены')
+  it('formats notifications subtitle from enabled prefs', () => {
+    expect(notificationsSubtitle(true, true)).toBe('Напоминание вечером · Итоги недели')
+    expect(notificationsSubtitle(false, false)).toBe('Выключены')
+    expect(notificationsSubtitle(true, false)).toBe('Напоминание вечером')
+    expect(notificationsSubtitle(false, true)).toBe('Итоги недели')
   })
 
   it('formats language subtitle', () => {

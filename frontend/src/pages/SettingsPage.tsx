@@ -133,7 +133,10 @@ export function SettingsPage() {
         countExpenseSubcategories(loadState.expenseCategories),
       ),
       members: membersSubtitle(user.memberCount),
-      notifications: notificationsSubtitle(),
+      notifications: notificationsSubtitle(
+        user.eveningReminderEnabled,
+        user.weeklyDigestEnabled,
+      ),
       language: languageSubtitle(i18n.language),
     }
   }, [loadState, t, user])

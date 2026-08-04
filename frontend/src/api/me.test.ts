@@ -54,9 +54,31 @@ describe('mapMeResponse', () => {
       budget_name: 'Семейный бюджет',
       member_count: 1,
       default_wallet_id: null,
+      evening_reminder_enabled: true,
+      weekly_digest_enabled: true,
     })
 
     expect(user.defaultWalletId).toBeNull()
+  })
+
+  it('maps notification prefs to camelCase fields', () => {
+    const user = mapMeResponse({
+      id: 'user-1',
+      telegram_id: 42,
+      family_budget_id: 'family-1',
+      role: 'owner',
+      first_name: null,
+      username: null,
+      language: 'ru',
+      budget_name: 'Семейный бюджет',
+      member_count: 1,
+      default_wallet_id: null,
+      evening_reminder_enabled: false,
+      weekly_digest_enabled: true,
+    })
+
+    expect(user.eveningReminderEnabled).toBe(false)
+    expect(user.weeklyDigestEnabled).toBe(true)
   })
 })
 
@@ -91,6 +113,35 @@ describe('patchMe', () => {
     expect(init.method).toBe('PATCH')
     expect(JSON.parse(init.body as string)).toEqual({ default_wallet_id: 'wallet-abc' })
     expect(user.defaultWalletId).toBe('wallet-abc')
+  })
+
+  it('PATCHes evening_reminder_enabled and maps response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 'user-1',
+        telegram_id: 42,
+        family_budget_id: 'family-1',
+        role: 'owner',
+        first_name: null,
+        username: null,
+        language: 'ru',
+        budget_name: 'Семейный бюджет',
+        member_count: 1,
+        default_wallet_id: null,
+        evening_reminder_enabled: false,
+        weekly_digest_enabled: true,
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = await patchMe({ evening_reminder_enabled: false })
+
+    expect(JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string)).toEqual({
+      evening_reminder_enabled: false,
+    })
+    expect(user.eveningReminderEnabled).toBe(false)
+    expect(user.weeklyDigestEnabled).toBe(true)
   })
 
   it('PATCHes language and maps response', async () => {

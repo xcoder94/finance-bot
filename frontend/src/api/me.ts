@@ -12,6 +12,8 @@ type MeResponseJson = {
   budget_name: string
   member_count: number
   default_wallet_id: string | null
+  evening_reminder_enabled?: boolean
+  weekly_digest_enabled?: boolean
 }
 
 export type MeErrorType = 'unauthorized' | 'not_onboarded' | 'removed_from_family' | 'network'
@@ -37,6 +39,8 @@ export function mapMeResponse(data: MeResponseJson): AuthUser {
     budgetName: data.budget_name,
     memberCount: data.member_count,
     defaultWalletId: data.default_wallet_id,
+    eveningReminderEnabled: data.evening_reminder_enabled ?? true,
+    weeklyDigestEnabled: data.weekly_digest_enabled ?? true,
   }
 }
 
@@ -76,6 +80,8 @@ export async function fetchMe(): Promise<AuthUser> {
 export type MeUpdatePayload = {
   default_wallet_id?: string | null
   language?: 'ru' | 'uz'
+  evening_reminder_enabled?: boolean
+  weekly_digest_enabled?: boolean
 }
 
 export async function patchMe(payload: MeUpdatePayload): Promise<AuthUser> {

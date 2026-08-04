@@ -384,4 +384,6 @@ class TestMeEndpointUserLookup:
             "budget_name": "Семейный бюджет",
             "member_count": 1,
             "default_wallet_id": None,
+            "evening_reminder_enabled": True,
+            "weekly_digest_enabled": True,
         }

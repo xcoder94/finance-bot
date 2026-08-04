@@ -17,6 +17,8 @@ class MeResponse(BaseModel):
     budget_name: str
     member_count: int
     default_wallet_id: uuid.UUID | None
+    evening_reminder_enabled: bool
+    weekly_digest_enabled: bool
 
 
 class MeUpdate(BaseModel):
@@ -24,3 +26,5 @@ class MeUpdate(BaseModel):
 
     default_wallet_id: uuid.UUID | None = None
     language: Literal["ru", "uz"] | None = None
+    evening_reminder_enabled: bool | None = None
+    weekly_digest_enabled: bool | None = None

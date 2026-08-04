@@ -6,12 +6,17 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.config import BOT_TOKEN
 from app.services.invite import cache_bot_username
+from app.services.notification_scheduler import notification_loop
 from bot.onboarding import router as onboarding_router
 from bot.membership import router as membership_router
 from bot.goals import router as goals_router
 from bot.quick_entry.handlers import router as quick_entry_router
 
 logging.basicConfig(level=logging.INFO)
+
+
+async def _run_notification_loop(bot: Bot) -> None:
+    await notification_loop(bot)
 
 
 async def main() -> None:
@@ -22,7 +27,11 @@ async def main() -> None:
     dp.include_router(membership_router)
     dp.include_router(goals_router)
     dp.include_router(quick_entry_router)
-    await dp.start_polling(bot)
+    loop_task = asyncio.create_task(_run_notification_loop(bot))
+    try:
+        await dp.start_polling(bot)
+    finally:
+        loop_task.cancel()
 
 
 if __name__ == "__main__":
