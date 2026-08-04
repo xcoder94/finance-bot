@@ -1151,6 +1151,17 @@ body {
   cursor: pointer;
 }
 
+.member-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.invite-link-sheet__reissue {
+  width: 100%;
+}
+
 .settings-entity-group {
   display: flex;
   flex-direction: column;

@@ -19,15 +19,24 @@ export function membersGroupTitle(memberCount: number, isOwner: boolean): string
   return isOwner ? `${countPart} · вы владелец` : `${countPart} · вы участник`
 }
 
+export function formatMemberJoinDate(iso: string): string {
+  const date = new Date(iso)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}.${month}.${year}`
+}
+
 export function buildMemberRowSubtitle(
   member: MemberResponse,
   currentUserId: string,
   roleOwnerLabel: string,
   roleMemberLabel: string,
+  sincePrefix: string,
 ): string {
   const roleLabel = member.role === 'owner' ? roleOwnerLabel : roleMemberLabel
   if (member.id === currentUserId) {
     return `${roleLabel} · вы`
   }
-  return roleLabel
+  return `${roleLabel} · ${sincePrefix} ${formatMemberJoinDate(member.created_at)}`
 }

@@ -5,6 +5,7 @@ export const PERSONAL_WALLET_LIMIT = 5
 export const PARENT_CATEGORY_LIMIT = 8
 export const INCOME_CATEGORY_LIMIT = 8
 export const SUBCATEGORY_LIMIT = 8
+export const MEMBER_LIMIT = 4
 export const ENTITY_NAME_MAX = 30
 
 export const LIMIT_SHARED_WALLETS =
@@ -18,6 +19,9 @@ export const LIMIT_EXPENSE_PARENTS =
 
 export const LIMIT_INCOME_CATEGORIES =
   'Больше 8 категорий доходов создать нельзя. Удалите ненужную — место освободится.'
+
+export const LIMIT_MEMBERS =
+  'В семейном бюджете уже 4 участника — это предел.'
 
 export function limitSubcategories(parentName: string): string {
   return `В категории «${parentName}» уже 8 подкатегорий — это предел. Удалите ненужную, чтобы добавить новую.`

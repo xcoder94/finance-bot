@@ -15,102 +15,46 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     WebAppInfo,
 )
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import MINI_APP_URL
 from app.db import async_session_factory
-from app.models.expense_category import ExpenseCategory
 from app.models.family_budget import FamilyBudget
-from app.models.income_category import IncomeCategory
 from app.models.user import User
-from app.models.wallet import Wallet
-from app.services.category_colors import assign_category_color
+from app.services.budget_seed import (
+    SEED_EXPENSE_CATEGORIES,
+    SEED_INCOME_CATEGORIES,
+    SEED_WALLETS,
+    assign_default_card_uzs,
+    copy_seed_data,
+    count_seed_rows,
+)
 from app.services.invite import (
     build_invite_link,
     cache_bot_username,
     get_cached_bot_username,
 )
+from app.services.member_texts import (
+    invite_already_member,
+    invite_family_full_chat,
+    invite_link_invalid,
+    join_confirm_prompt,
+    join_has_other_members,
+    join_personal_wallet_cap,
+    welcome_invited,
+)
+from app.services.membership_lifecycle import (
+    JoinBlockReason,
+    count_active_members,
+    count_all_wallets_for_user_budget,
+    evaluate_join_from_own_budget,
+)
+from app.services.entity_limits import MEMBER_LIMIT
 
 router = Router()
 
 FlowType = Literal["owner", "member"]
-
-SEED_INCOME_CATEGORIES: list[tuple[str, str]] = [
-    ("Зарплата", "salary"),
-    ("Подработка", "side_job"),
-    ("Подарки", "gifts"),
-    ("Переводы от родных", "family_transfers"),
-    ("Прочее", "income_other"),
-]
-
-SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
-    "Еда": (
-        "food",
-        [
-            ("Продукты", "groceries"),
-            ("Кафе и рестораны", "cafes_restaurants"),
-            ("Доставка", "delivery"),
-        ],
-    ),
-    "Транспорт": (
-        "transport",
-        [
-            ("Такси", "taxi"),
-            ("Топливо", "fuel"),
-            ("Общественный транспорт", "public_transport"),
-            ("Обслуживание авто", "car_maintenance"),
-        ],
-    ),
-    "Дом": (
-        "home",
-        [
-            ("Аренда", "rent"),
-            ("Коммунальные услуги", "utilities"),
-            ("Связь и интернет", "telecom_internet"),
-            ("Ремонт и обустройство", "repairs_furnishing"),
-        ],
-    ),
-    "Дети": (
-        "children",
-        [
-            ("Садик и школа", "kindergarten_school"),
-            ("Кружки и репетиторы", "clubs_tutoring"),
-            ("Детские товары", "kids_goods"),
-        ],
-    ),
-    "Здоровье": (
-        "health",
-        [
-            ("Лекарства и аптека", "pharmacy"),
-            ("Врачи и клиники", "doctors_clinics"),
-            ("Стоматология", "dentistry"),
-        ],
-    ),
-    "События и тои": (
-        "events_celebrations",
-        [
-            ("Тои и маърака", "toi_celebrations"),
-            ("Подарки", "event_gifts"),
-        ],
-    ),
-    "Покупки и досуг": (
-        "shopping_leisure",
-        [
-            ("Одежда", "clothing"),
-            ("Развлечения", "entertainment"),
-            ("Подписки", "subscriptions"),
-            ("Красота и уход", "beauty_care"),
-        ],
-    ),
-}
-
-SEED_WALLETS: list[tuple[str, str, str]] = [
-    ("Наличный сум", "UZS", "cash_uzs"),
-    ("Карта сум", "UZS", "card_uzs"),
-    ("Наличный USD", "USD", "cash_usd"),
-    ("Карта USD", "USD", "card_usd"),
-]
 
 MESSAGES: dict[str, dict[str, str]] = {
     "already_member": {
@@ -196,6 +140,20 @@ def open_app_keyboard(language: str) -> ReplyKeyboardMarkup:
     )
 
 
+def join_confirm_keyboard(token: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Присоединиться",
+                    callback_data=f"join_accept:{token}",
+                )
+            ],
+            [InlineKeyboardButton(text="Отмена", callback_data="join_cancel")],
+        ]
+    )
+
+
 async def resolve_bot_username(bot: Bot) -> str:
     bot_username = get_cached_bot_username()
     if bot_username is None:
@@ -223,108 +181,6 @@ async def get_family_budget_by_invite_token(
     return await session.scalar(stmt)
 
 
-async def assign_default_card_uzs(session: AsyncSession, user: User) -> None:
-    stmt = select(Wallet).where(
-        Wallet.family_budget_id == user.family_budget_id,
-        Wallet.name == "Карта сум",
-        Wallet.is_deleted.is_(False),
-        Wallet.is_personal.is_(False),
-    )
-    wallet = await session.scalar(stmt)
-    if wallet is not None:
-        user.default_wallet_id = wallet.id
-
-
-async def copy_seed_data(session: AsyncSession, family_budget_id: uuid.UUID) -> None:
-    for name, translation_key in SEED_INCOME_CATEGORIES:
-        session.add(
-            IncomeCategory(
-                family_budget_id=family_budget_id,
-                name=name,
-                translation_key=translation_key,
-                color_index=await assign_category_color(
-                    session, family_budget_id, kind="income"
-                ),
-            )
-        )
-
-    for name, currency, translation_key in SEED_WALLETS:
-        session.add(
-            Wallet(
-                family_budget_id=family_budget_id,
-                name=name,
-                currency=currency,
-                translation_key=translation_key,
-                is_personal=False,
-            )
-        )
-
-    for parent_name, (parent_key, sub_entries) in SEED_EXPENSE_CATEGORIES.items():
-        parent = ExpenseCategory(
-            family_budget_id=family_budget_id,
-            name=parent_name,
-            parent_id=None,
-            translation_key=parent_key,
-            color_index=await assign_category_color(
-                session, family_budget_id, kind="expense"
-            ),
-        )
-        session.add(parent)
-        await session.flush()
-        for sub_name, sub_key in sub_entries:
-            session.add(
-                ExpenseCategory(
-                    family_budget_id=family_budget_id,
-                    name=sub_name,
-                    parent_id=parent.id,
-                    translation_key=sub_key,
-                    color_index=await assign_category_color(
-                        session, family_budget_id, kind="expense"
-                    ),
-                )
-            )
-
-
-async def count_seed_rows(session: AsyncSession, family_budget_id: uuid.UUID) -> dict[str, int]:
-    wallet_count = await session.scalar(
-        select(func.count())
-        .select_from(Wallet)
-        .where(Wallet.family_budget_id == family_budget_id, Wallet.is_deleted.is_(False))
-    )
-    income_count = await session.scalar(
-        select(func.count())
-        .select_from(IncomeCategory)
-        .where(
-            IncomeCategory.family_budget_id == family_budget_id,
-            IncomeCategory.is_deleted.is_(False),
-        )
-    )
-    expense_top_count = await session.scalar(
-        select(func.count())
-        .select_from(ExpenseCategory)
-        .where(
-            ExpenseCategory.family_budget_id == family_budget_id,
-            ExpenseCategory.parent_id.is_(None),
-            ExpenseCategory.is_deleted.is_(False),
-        )
-    )
-    expense_sub_count = await session.scalar(
-        select(func.count())
-        .select_from(ExpenseCategory)
-        .where(
-            ExpenseCategory.family_budget_id == family_budget_id,
-            ExpenseCategory.parent_id.is_not(None),
-            ExpenseCategory.is_deleted.is_(False),
-        )
-    )
-    return {
-        "wallets": wallet_count or 0,
-        "income_categories": income_count or 0,
-        "expense_top_level": expense_top_count or 0,
-        "expense_subcategories": expense_sub_count or 0,
-    }
-
-
 @router.message(CommandStart())
 async def start_handler(
     message: Message, command: CommandObject, state: FSMContext
@@ -333,20 +189,60 @@ async def start_handler(
         return
 
     telegram_id = message.from_user.id
+    flow, invite_token = parse_start_payload(command.args)
+
     async with async_session_factory() as session:
         existing_user = await get_active_user_by_telegram_id(session, telegram_id)
+
         if existing_user is not None:
+            if flow == "member" and invite_token:
+                budget = await get_family_budget_by_invite_token(
+                    session, invite_token
+                )
+                if budget is None:
+                    await message.answer(invite_link_invalid())
+                    return
+
+                if existing_user.family_budget_id == budget.id:
+                    await message.answer(invite_already_member(budget.name))
+                    return
+
+                if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
+                    await message.answer(invite_family_full_chat())
+                    return
+
+                block = await evaluate_join_from_own_budget(
+                    session, existing_user, budget
+                )
+                if block == JoinBlockReason.HAS_OTHER_MEMBERS:
+                    await message.answer(join_has_other_members())
+                    return
+                if block == JoinBlockReason.PERSONAL_WALLET_CAP:
+                    wallet_count = await count_all_wallets_for_user_budget(
+                        session, existing_user
+                    )
+                    await message.answer(join_personal_wallet_cap(wallet_count))
+                    return
+
+                await message.answer(
+                    join_confirm_prompt(budget.name),
+                    reply_markup=join_confirm_keyboard(invite_token),
+                )
+                return
+
             await message.answer(t("already_member", existing_user.language))
             return
 
-        flow, invite_token = parse_start_payload(command.args)
         target_budget_id: uuid.UUID | None = None
 
         if flow == "member":
             assert invite_token is not None
             budget = await get_family_budget_by_invite_token(session, invite_token)
             if budget is None:
-                await message.answer(t("invalid_invite", "ru"))
+                await message.answer(invite_link_invalid())
+                return
+            if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
+                await message.answer(invite_family_full_chat())
                 return
             target_budget_id = budget.id
 
@@ -376,6 +272,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
     telegram_id = data.get("telegram_id", callback.from_user.id)
     existing_language: str | None = None
     invite_token: str | None = None
+    member_budget_name = ""
 
     async with async_session_factory() as session:
         async with session.begin():
@@ -402,6 +299,19 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 await assign_default_card_uzs(session, user)
             else:
                 budget_id = uuid.UUID(data["family_budget_id"])
+                budget = await session.get(FamilyBudget, budget_id)
+                if budget is None or budget.is_deleted:
+                    existing_language = language
+                    await callback.message.edit_text(invite_link_invalid())
+                    await state.clear()
+                    await callback.answer()
+                    return
+                if await count_active_members(session, budget_id) >= MEMBER_LIMIT:
+                    existing_language = language
+                    await callback.message.edit_text(invite_family_full_chat())
+                    await state.clear()
+                    await callback.answer()
+                    return
                 user = User(
                     telegram_id=telegram_id,
                     family_budget_id=budget_id,
@@ -412,6 +322,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 )
                 session.add(user)
                 await assign_default_card_uzs(session, user)
+                member_budget_name = budget.name
 
     if existing_language is not None:
         await callback.message.edit_text(t("already_member", existing_language))
@@ -422,7 +333,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
     if flow == "owner":
         welcome = t("welcome_owner", language)
     else:
-        welcome = t("welcome_member", language)
+        welcome = welcome_invited(member_budget_name)
 
     await callback.message.answer(welcome, reply_markup=open_app_keyboard(language))
     await callback.message.delete()

@@ -1,6 +1,5 @@
 import secrets
 import uuid
-from datetime import UTC, datetime
 from typing import Annotated
 
 from aiogram import Bot
@@ -13,7 +12,20 @@ from app.config import BOT_TOKEN
 from app.db import get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
-from app.schemas.members import InviteLinkResponse, MemberDeleteResponse, MemberResponse
+from app.schemas.members import (
+    InviteLinkResponse,
+    MemberDeleteResponse,
+    MemberResponse,
+    TransferResponse,
+)
+from app.services.membership_lifecycle import (
+    OwnerCannotDetachError,
+    detach_member_to_own_budget,
+)
+from app.services.ownership_transfer import (
+    InvalidTransferTargetError,
+    request_ownership_transfer,
+)
 from app.services.invite import (
     build_invite_link,
     cache_bot_username,
@@ -87,15 +99,7 @@ async def list_members(
         .order_by(User.created_at)
     )
     members = (await session.scalars(stmt)).all()
-    return [
-        MemberResponse(
-            id=member.id,
-            first_name=member.first_name,
-            username=member.username,
-            role=member.role,
-        )
-        for member in members
-    ]
+    return [MemberResponse.model_validate(member) for member in members]
 
 
 @router.get("/members/invite-link")
@@ -139,12 +143,97 @@ async def delete_member(
     if member is None:
         raise HTTPException(status_code=404)
 
-    member.is_deleted = True
-    member.deleted_at = datetime.now(UTC)
+    old_budget = await get_active_family_budget(session, user.family_budget_id)
+    if old_budget is None:
+        raise HTTPException(status_code=404)
+
+    member_role = member.role
+    member_first_name = member.first_name
+
+    await detach_member_to_own_budget(
+        session,
+        departing_user=member,
+        old_budget=old_budget,
+        reason="removed",
+        bot=None,
+    )
     await session.commit()
 
     return MemberDeleteResponse(
         id=member.id,
-        first_name=member.first_name,
-        role=member.role,
+        first_name=member_first_name,
+        role=member_role,
+    )
+
+
+@router.post("/members/leave")
+async def leave_family(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> MemberDeleteResponse:
+    if user.role == "owner":
+        raise HTTPException(status_code=400, detail="owner_cannot_leave")
+
+    old_budget = await get_active_family_budget(session, user.family_budget_id)
+    if old_budget is None:
+        raise HTTPException(status_code=404)
+
+    member_role = user.role
+    member_first_name = user.first_name
+
+    try:
+        await detach_member_to_own_budget(
+            session,
+            departing_user=user,
+            old_budget=old_budget,
+            reason="left",
+            bot=None,
+        )
+    except OwnerCannotDetachError:
+        raise HTTPException(status_code=400, detail="owner_cannot_leave") from None
+
+    await session.commit()
+
+    return MemberDeleteResponse(
+        id=user.id,
+        first_name=member_first_name,
+        role=member_role,
+    )
+
+
+@router.post("/members/{member_id}/transfer")
+async def transfer_ownership(
+    member_id: uuid.UUID,
+    user: OwnerUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TransferResponse:
+    if member_id == user.id:
+        raise HTTPException(status_code=400, detail="cannot_transfer_to_self")
+
+    member = await get_active_member(session, member_id, user.family_budget_id)
+    if member is None:
+        raise HTTPException(status_code=404)
+
+    budget = await get_active_family_budget(session, user.family_budget_id)
+    if budget is None:
+        raise HTTPException(status_code=404)
+
+    try:
+        transfer = await request_ownership_transfer(
+            session,
+            owner=user,
+            recipient=member,
+            budget=budget,
+            bot=None,
+        )
+    except InvalidTransferTargetError as exc:
+        raise HTTPException(status_code=400, detail="invalid_transfer_target") from exc
+
+    await session.commit()
+    await session.refresh(transfer)
+
+    return TransferResponse(
+        id=transfer.id,
+        to_user_id=transfer.to_user_id,
+        status=transfer.status,
     )

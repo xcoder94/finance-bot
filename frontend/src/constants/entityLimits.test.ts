@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   LIMIT_EXPENSE_PARENTS,
   LIMIT_INCOME_CATEGORIES,
+  LIMIT_MEMBERS,
   LIMIT_PERSONAL_WALLETS,
   LIMIT_SHARED_WALLETS,
   limitSubcategories,
@@ -36,6 +37,12 @@ describe('entity limit strings §19.1', () => {
   it('builds subcategory limit with parent name', () => {
     expect(limitSubcategories('Еда')).toBe(
       'В категории «Еда» уже 8 подкатегорий — это предел. Удалите ненужную, чтобы добавить новую.',
+    )
+  })
+
+  it('exports members limit verbatim', () => {
+    expect(LIMIT_MEMBERS).toBe(
+      'В семейном бюджете уже 4 участника — это предел.',
     )
   })
 })

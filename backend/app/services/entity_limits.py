@@ -2,6 +2,7 @@ SHARED_WALLET_LIMIT = 10
 PERSONAL_WALLET_LIMIT = 5
 PARENT_CATEGORY_LIMIT = 8
 SUBCATEGORY_LIMIT = 8
+MEMBER_LIMIT = 4
 ENTITY_NAME_MAX = 30
 
 LIMIT_SHARED_WALLETS = (
@@ -16,6 +17,7 @@ LIMIT_EXPENSE_PARENTS = (
 LIMIT_INCOME_CATEGORIES = (
     "Больше 8 категорий доходов создать нельзя. Удалите ненужную — место освободится."
 )
+LIMIT_MEMBERS = "В семейном бюджете уже 4 участника — это предел."
 
 
 def limit_subcategories(parent_name: str) -> str:
