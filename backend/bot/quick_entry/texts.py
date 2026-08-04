@@ -24,6 +24,9 @@ MSG_EXCHANGE_RATE_REQUIRED = (
     "Перевод между кошельками в разных валютах — это обмен, для него нужен курс.\n"
     "Сделайте его в приложении."
 )
+MSG_VOICE_NOT_RECOGNIZED = (
+    "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом."
+)
 
 
 def currency_missing_text(currency: Literal["UZS", "USD"]) -> str:

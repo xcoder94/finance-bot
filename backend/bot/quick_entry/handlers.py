@@ -22,6 +22,8 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
+from app.speech.base import SpeechClient, SpeechUnavailable
+from app.speech.factory import get_speech_client
 from app.parsing.types import (
     ParseRequest,
     ParsedOperation,
@@ -77,6 +79,7 @@ from bot.quick_entry.texts import (
     MSG_TOO_LONG,
     MSG_TOO_MANY_OPS,
     MSG_TYPE_QUESTION,
+    MSG_VOICE_NOT_RECOGNIZED,
     currency_missing_text,
     model_limit_text,
     unparsed_limit_text,
@@ -88,6 +91,7 @@ MAX_MESSAGE_LEN = 500
 MAX_OPERATIONS = 5
 
 _parser_override: MessageParser | None = None
+_speech_override: SpeechClient | None = None
 
 
 def set_parser_override(parser: MessageParser | None) -> None:
@@ -95,10 +99,21 @@ def set_parser_override(parser: MessageParser | None) -> None:
     _parser_override = parser
 
 
+def set_speech_client_override(client: SpeechClient | None) -> None:
+    global _speech_override
+    _speech_override = client
+
+
 def _get_parser() -> MessageParser:
     if _parser_override is not None:
         return _parser_override
     return get_parser()
+
+
+def _get_speech_client() -> SpeechClient:
+    if _speech_override is not None:
+        return _speech_override
+    return get_speech_client()
 
 
 def _is_clear(op: ParsedOperation) -> bool:
@@ -232,12 +247,8 @@ async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | Non
     return wallets[0] if wallets else None
 
 
-async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
-    if message.from_user is None or message.text is None:
-        return
-
-    text = message.text.strip()
-    if not text:
+async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> None:
+    if message.from_user is None:
         return
 
     telegram_id = message.from_user.id
@@ -534,9 +545,70 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
             )
 
 
+async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
+    if message.from_user is None or message.text is None:
+        return
+
+    text = message.text.strip()
+    if not text:
+        return
+
+    await process_quick_entry_text(message, bot, text)
+
+
 @router.message(F.text, ~F.text.startswith("/"))
 async def quick_entry_text_handler(message: Message, bot: Bot) -> None:
     await handle_quick_entry_text(message, bot)
+
+
+async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
+    if message.from_user is None or message.voice is None:
+        return
+
+    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+    file = await bot.get_file(message.voice.file_id)
+    if file.file_path is None:
+        await message.answer(MSG_MODEL_FAIL)
+        return
+    buffer = await bot.download_file(file.file_path)
+    audio = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
+
+    try:
+        transcript = await _get_speech_client().transcribe(audio)
+    except SpeechUnavailable:
+        await message.answer(MSG_MODEL_FAIL)
+        return
+
+    text = transcript.strip()
+    if not text:
+        telegram_id = message.from_user.id
+        async with async_session_factory() as session:
+            user = await get_active_user_by_telegram_id(session, telegram_id)
+            if user is None:
+                await message.answer(MESSAGES["not_registered"]["ru"])
+                return
+            budget = await session.get(FamilyBudget, user.family_budget_id)
+            if budget is None or budget.is_deleted:
+                await message.answer(MESSAGES["not_registered"]["ru"])
+                return
+            today = tashkent_today_for_counters()
+            ensure_counters_day(budget, today)
+            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await session.commit()
+                return
+            spend_unparsed(budget)
+            await session.commit()
+            await message.answer(MSG_VOICE_NOT_RECOGNIZED)
+        return
+
+    await process_quick_entry_text(message, bot, text)
+
+
+@router.message(F.voice)
+async def quick_entry_voice_handler(message: Message, bot: Bot) -> None:
+    await handle_quick_entry_voice(message, bot)
 
 
 async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
