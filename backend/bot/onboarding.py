@@ -43,6 +43,7 @@ from app.services.member_texts import (
     join_has_other_members,
     join_personal_wallet_cap,
     welcome_invited,
+    welcome_solo,
 )
 from app.services.membership_lifecycle import (
     JoinBlockReason,
@@ -69,14 +70,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ru": "Выберите язык:",
         "uz": "Tilni tanlang:",
     },
-    "welcome_owner": {
-        "ru": "Добро пожаловать! Вы создали Family Budget.",
-        "uz": "Xush kelibsiz! Siz Family Budget yaratdingiz.",
-    },
-    "welcome_member": {
-        "ru": "Добро пожаловать! Вы присоединились к Family Budget.",
-        "uz": "Xush kelibsiz! Siz Family Budgetga qo'shildingiz.",
-    },
     "invite_only_owner": {
         "ru": "Только Owner может приглашать участников.",
         "uz": "Faqat Owner a'zolarni taklif qila oladi.",
@@ -89,10 +82,7 @@ MESSAGES: dict[str, dict[str, str]] = {
 
 SUPPORTED_LANGUAGES = frozenset({"ru", "uz"})
 
-OPEN_APP_BUTTON: dict[str, str] = {
-    "ru": "💰 Запустить приложение",
-    "uz": "💰 Ilovani ochish",
-}
+OPEN_APP_BUTTON_LABEL = "Открыть приложение"
 
 
 class OnboardingStates(StatesGroup):
@@ -124,13 +114,14 @@ def language_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def open_app_keyboard(language: str) -> ReplyKeyboardMarkup:
-    lang = language if language in SUPPORTED_LANGUAGES else "ru"
+def open_app_keyboard() -> ReplyKeyboardMarkup | None:
+    if not MINI_APP_URL:
+        return None
     return ReplyKeyboardMarkup(
         keyboard=[
             [
                 KeyboardButton(
-                    text=OPEN_APP_BUTTON[lang],
+                    text=OPEN_APP_BUTTON_LABEL,
                     web_app=WebAppInfo(url=MINI_APP_URL),
                 )
             ]
@@ -331,11 +322,15 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
         return
 
     if flow == "owner":
-        welcome = t("welcome_owner", language)
+        welcome = welcome_solo()
     else:
         welcome = welcome_invited(member_budget_name)
 
-    await callback.message.answer(welcome, reply_markup=open_app_keyboard(language))
+    await callback.message.answer(
+        welcome,
+        reply_markup=open_app_keyboard(),
+        parse_mode="Markdown",
+    )
     await callback.message.delete()
     await state.clear()
     await callback.answer()
