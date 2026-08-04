@@ -18,17 +18,16 @@ describe('memberConfirmCopy', () => {
   })
 
   it('remove confirm body substitutes member name verbatim', () => {
-    expect(removeConfirmBody('Рустама')).toBe(
-      'Удалить Рустама из бюджета? Его личные кошельки и операции по ним перейдут в его собственный бюджет. Операции по общим кошелькам останутся здесь.',
+    expect(removeConfirmBody('Рустам')).toBe(
+      'Рустам больше не будет участником бюджета. Личные кошельки и операции по ним перейдут в собственный бюджет участника. Операции по общим кошелькам останутся здесь.',
     )
   })
 
   it('transfer confirm body substitutes member name verbatim', () => {
-    expect(transferConfirmBody('Рустаму')).toBe(
-      'Передать владение бюджетом Рустаму? Он должен подтвердить. После этого вы останетесь обычным участником. Отменить в одиночку нельзя.',
+    expect(transferConfirmBody('Рустам')).toBe(
+      'Новый владелец бюджета: Рустам. Нужно его подтверждение. После этого вы останетесь обычным участником. Отменить в одиночку нельзя.',
     )
   })
-
   it('confirm action labels are exact', () => {
     expect(LEAVE_CONFIRM_ACTION).toBe('Выйти')
     expect(REMOVE_CONFIRM_ACTION).toBe('Удалить')

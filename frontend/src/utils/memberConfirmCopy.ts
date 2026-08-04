@@ -5,11 +5,11 @@ export function leaveConfirmBody(budgetName: string): string {
 }
 
 export function removeConfirmBody(memberName: string): string {
-  return `Удалить ${memberName} из бюджета? Его личные кошельки и операции по ним перейдут в его собственный бюджет. Операции по общим кошелькам останутся здесь.`
+  return `${memberName} больше не будет участником бюджета. Личные кошельки и операции по ним перейдут в собственный бюджет участника. Операции по общим кошелькам останутся здесь.`
 }
 
 export function transferConfirmBody(memberName: string): string {
-  return `Передать владение бюджетом ${memberName}? Он должен подтвердить. После этого вы останетесь обычным участником. Отменить в одиночку нельзя.`
+  return `Новый владелец бюджета: ${memberName}. Нужно его подтверждение. После этого вы останетесь обычным участником. Отменить в одиночку нельзя.`
 }
 
 export const LEAVE_CONFIRM_ACTION = 'Выйти'
