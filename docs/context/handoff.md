@@ -1,97 +1,97 @@
-# Handoff — Phase 12 (bot chrome outside quick entry)
+# Handoff — Phase 13 (prompt caching), kickoff
 
-Last updated: 2026-08-04, end of this session.
+Last updated: 2026-08-04.
+
+## Role change this session
+
+From now on this Claude Code session is the architect and context manager
+(previously played by a browser Claude chat). It writes phase prompts for
+Cursor, reviews Cursor's reports, and maintains this file. It does not
+implement MVP2 features itself. Cursor (orchestrator: Grok 4.5 High; workers:
+`composer-2.5` only, `composer-2.5-fast` banned everywhere) is the
+implementer, one phase per Cursor chat.
 
 ## Branch
 
-`mvp2/phase-12-bot-chrome`. Do NOT merge to `main`, do not push, do not create
-or switch branches. Working tree has one uncommitted fix (see below) about to
-be committed by this handoff commit.
+Phase 12 (`mvp2/phase-12-bot-chrome`) is finished, green, and — per the git
+command at the top of `docs/context/cursor-prompt-phase-13.md` — merged into
+`main` (fast-forward, no divergent commits on `main`). Phase 13 work happens
+on a new branch `mvp2/phase-13-prompt-caching`, created by that same command.
+Never pushed to GitHub — deliberate.
 
-## Status: Phase 12 complete, verified by hand, ready to stop here
+## Baseline test counts (measured this session, before any phase 13 work)
 
-An earlier agent session (tasks 1–4, see `docs/superpowers/plans/phase12-task*-report.md`)
-implemented the phase. This session independently re-audited every claim
-against actual code and actual test runs (did not trust the reports). Audit
-found the implementation correct against `docs/tasks/phase-12-bot-chrome.md`
-section 2 and PRD §18.1–§18.4 + Acceptance, with **one small gap**, which this
-session then fixed.
+- Backend: `382 passed, 1 warning` (warning is a pre-existing
+  `httpx`/starlette deprecation notice, unrelated to this project).
+- Frontend: `37 files, 205 tests`, all passed.
+- Measured on `mvp2/phase-12-bot-chrome` at commit `1a23dbc`, which is what
+  fast-forwards into `main`. Same numbers hold on `main` and on the new
+  phase-13 branch until phase 13 changes anything.
 
-### The one fix made this session
+## Phase 13 scope
 
-`backend/bot/membership.py`, `join_accept` handler: was sending
-`welcome_invited()` with `reply_markup=open_app_keyboard()` but **without**
-`parse_mode="Markdown"`. The §18.2 text contains a backtick code span
-(`` `такси 25 тысяч` ``) that needs Markdown parsing to render as code — it
-was showing as literal backticks. Fixed by adding `parse_mode="Markdown"` to
-that one `.answer()` call, matching how `language_callback` in
-`backend/bot/onboarding.py` already does it. Nothing else touched.
+PRD §20 + `docs/tasks/phase-13-prompt-caching.md`. Explicit prompt caching
+for the parser call only — cost change, zero user-facing behavior change.
 
-This path (`join_accept`) is a narrow scenario: an **already-registered** user
-(with their own solo budget) taps "Присоединиться" to switch into someone
-else's family budget via invite link — not the main `/start`-with-invite path
-tested by phase-spec acceptance item 2 (that path is `start_handler` →
-`language_callback`, which already had `parse_mode` set correctly before this
-session started).
+## Decision made this session (confirmed by the PM, scope-expanding)
 
-## Test counts as of right now (after the fix above, this session, verified live)
+Read `backend/app/parsing/http_adapter.py`, `factory.py`, `prompt.py`,
+`config.py`: `HttpParser` currently supports only `provider="openai"` and
+`provider="anthropic"`, with per-provider hardcoded endpoint URLs and
+response-body extraction. No Google/Gemini provider exists anywhere in
+`backend/` (grep-confirmed, zero hits for "google"/"gemini").
 
-- Backend: `cd backend && source venv/bin/activate && pytest -q` → **382 passed, 1 warning**
-  (warning is a pre-existing `httpx`/starlette deprecation notice, unrelated).
-- Frontend: `cd frontend && npx vitest run --reporter=dot` → **37 files, 205 tests, all passed**
-  (frontend was not touched this phase at all).
-- Postgres was up and reachable during the backend run — the DB-dependent
-  tests in `tests/test_phase12_bot_chrome.py` actually executed, not skipped
-  (confirmed via `alembic current` → head `r8a9b0c1d2e3`).
+The phase-13 spec's Preconditions table names "Google" three times
+(customer-provided credentials, cache-capable API). Asked the PM: this is new
+provider work, not just an explicit-cache flag on an existing provider — in
+scope or not? Answer: **in scope.** PM's brainstorm already settled on
+`gemini 3.1 flash lite` as the model (cost reasons — other models too
+expensive for them). So Phase 13 must add a Google/Gemini provider to
+`HttpParser`, not only wire caching onto openai/anthropic.
 
-## What was decided and must NOT be reopened
+Also confirmed with the PM: Cursor prompts and any documents Cursor produces
+are English, always. Conversation with the PM is Russian, always. (This
+matches AGENTS.md's "Documents in docs/ are in English" — the PM's one
+ambiguous line this session was resolved in favor of the existing rule.)
 
-- `/start` texts (§18.1 solo, §18.2 invited) are final, verified byte-for-byte
-  against PRD. Do not reword.
-- Persistent reply keyboard: **exactly one button**, label `Открыть приложение`,
-  opens `MINI_APP_URL` as a Telegram WebApp button. Do not add more buttons,
-  do not restore `/menu` (PRD §18.3 explicitly says `/menu` is not built).
-- Release announcement (§18.4): exact text is final. Sent **once** per
-  pre-cutoff user via a manually-run CLI script
-  (`backend/scripts/send_release_announcement.py --cutoff ISO8601 [--dry-run]`),
-  never automatically. It is confirmed NOT wired into `bot/main.py`,
-  `app/main.py`, the notification scheduler, or any migration
-  (grep-verified this session).
-- `MINI_APP_URL` is optional in `app/config.py` (`str | None`) — app must not
-  crash at startup if it's unset; when unset, `open_app_keyboard()` returns
-  `None` and no keyboard is attached.
-- `.env` currently has `MINI_APP_URL` set to a live trycloudflare tunnel URL —
-  that's an external/ops concern, out of this agent's scope per AGENTS.md.
+## Closed decisions — do not reopen
 
-## Deferred / out of scope for this phase (do not pick up without asking)
+- Worker model: `composer-2.5` only, exact name. `composer-2.5-fast` is
+  forbidden — as worker, fallback, retry, or editor default.
+- Provider/model driven only by `PARSER_PROVIDER` / `PARSER_API_KEY` /
+  `PARSER_MODEL` env vars — never hard-code a model name or version string.
+- Exactly one cache for the whole installation — never per-family.
+- Cache is a cost optimization, never a hard dependency — a missing/expired
+  cache must not break parsing; full-prompt fallback always works.
+- Deploying a changed static prompt must delete the old cache, not just stop
+  using it.
+- No user-facing copy or behavior changes in this phase.
+- Phase 12 (`/start` texts, single "Открыть приложение" keyboard, no `/menu`,
+  one-shot manually-triggered release announcement script) is closed and
+  merged. Do not reopen it. Firing the release announcement against real
+  users is still the customer's call — nobody has been sent anything.
 
-- Actually firing the release announcement against production users — the
-  customer decides when (PRD §22). Nobody has been sent anything.
-- Uzbek translations — explicitly out of scope everywhere in this project.
-- Quick-entry card texts, voice/photo, prompt caching, app-side feature tour
-  (§21) — all explicitly excluded from Phase 12 spec.
-- `backend/bot/quick_entry/cards.py` still imports `MINI_APP_URL` directly
-  (pre-existing, untouched, not part of this phase).
+## Deferred / not this phase
 
-## Unverified by hand (only test-verified, not manually clicked in real Telegram)
+- Per-family caches.
+- Any user-facing copy change.
+- Voice (§9) / receipt-photo (§10) caching — images don't benefit from this
+  cache per §10.2; do not invent a second cache design for them.
+- Uzbek translations.
+- Making cache a hard dependency of parsing.
 
-Nobody has manually run the 5 acceptance steps in
-`docs/tasks/phase-12-bot-chrome.md` section 2 against a live bot/Telegram
-client this session — verification here was via reading code + running
-`pytest`/`vitest`. If the user wants to sign off acceptance in the literal
-"I will do this by hand" sense described in the phase spec, that manual pass
-against a real test bot is still pending.
+## Unverified by hand
 
-## Open questions awaiting the user's answer
+Nothing yet — phase 13 implementation has not started.
 
-None outstanding. The one open question from the audit (the `join_accept`
-`parse_mode` gap) was resolved this session by fixing it — no answer from
-the user was received or required; the fix was mechanical and matched an
-existing pattern in the same file.
+## Open questions awaiting the PM's answer
+
+None outstanding. Both kickoff questions (Cursor-prompt language;
+Google/Gemini in scope) were asked and answered this session.
 
 ## Immediate next step
 
-Nothing is queued. Phase 12 is done pending the user's own manual
-acceptance-step walkthrough (see "Unverified by hand" above) and their
-decision on when to fire the release announcement script (§22, customer's
-call). Do not start Phase 13 without the user's explicit go-ahead.
+`docs/context/cursor-prompt-phase-13.md` is written and ready to paste into a
+new Cursor chat. Its first line is the one-line git command the PM runs to
+merge phase 12 into `main` and create the phase 13 branch. Nothing else is
+queued.
