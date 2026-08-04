@@ -1,9 +1,12 @@
+import asyncio
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 
+from app.parsing.google_cache import GooglePromptCache
 from app.parsing.prompt import (
     IMMUTABLE_PARSER_INSTRUCTIONS,
     build_mutable_parser_payload,
@@ -143,6 +146,15 @@ def _should_retry(status_code: int) -> bool:
     return status_code == 429 or status_code >= 500
 
 
+def _is_cache_missing_response(response: httpx.Response) -> bool:
+    if response.status_code == 404:
+        return True
+    if response.status_code == 400:
+        text = response.text.lower()
+        return "cached" in text or "cache" in text
+    return False
+
+
 class HttpParser:
     def __init__(
         self,
@@ -150,11 +162,21 @@ class HttpParser:
         api_key: str,
         model: str,
         client: httpx.AsyncClient | None = None,
+        prompt_cache: GooglePromptCache | None = None,
+        on_rebuild: Callable[[], None] | None = None,
     ) -> None:
         self._provider = provider
         self._api_key = api_key
         self._model = model
         self._client = client
+        self._on_rebuild = on_rebuild
+        self._bg_tasks: set[asyncio.Task[None]] = set()
+        if provider == "google":
+            self._prompt_cache = prompt_cache or GooglePromptCache(
+                api_key, model, client=client
+            )
+        else:
+            self._prompt_cache = None
 
     async def parse(self, request: ParseRequest) -> ParseResponse:
         if self._provider not in ("openai", "anthropic", "google"):
@@ -164,10 +186,16 @@ class HttpParser:
 
         owns_client = self._client is None
         client = self._client or httpx.AsyncClient(timeout=_TIMEOUT_SECONDS)
+        google_cache_used = False
         try:
             for attempt in range(1, _MAX_ATTEMPTS + 1):
                 try:
-                    response = await self._post(client, request)
+                    if self._provider == "google":
+                        response, google_cache_used = await self._post_google_flow(
+                            client, request
+                        )
+                    else:
+                        response = await self._post(client, request)
                 except (httpx.TimeoutException, httpx.NetworkError) as exc:
                     logger.warning(
                         "parser network error attempt %s/%s: %s",
@@ -210,10 +238,89 @@ class HttpParser:
                 except json.JSONDecodeError as exc:
                     raise ParserMalformed("model content is not JSON") from exc
 
+                if self._provider == "google" and self._prompt_cache is not None:
+                    if google_cache_used:
+                        cache_name = self._prompt_cache.get_cached_name()
+                        if cache_name:
+                            self._schedule_background(
+                                self._extend_cache_ttl(cache_name)
+                            )
+                    else:
+                        self._schedule_background(self._rebuild_cache())
+
                 return ParseResponse(operations=operations)
         finally:
             if owns_client:
                 await client.aclose()
+
+    def _schedule_background(self, coro: Any) -> None:
+        task = asyncio.get_running_loop().create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+
+    async def _rebuild_cache(self) -> None:
+        if self._prompt_cache is None:
+            return
+        if self._on_rebuild is not None:
+            self._on_rebuild()
+        await self._prompt_cache.ensure_cache()
+
+    async def _extend_cache_ttl(self, name: str) -> None:
+        if self._prompt_cache is None:
+            return
+        try:
+            await self._prompt_cache.extend_ttl(name)
+        except Exception:
+            logger.exception("prompt cache TTL extend failed")
+
+    async def _post_google_flow(
+        self, client: httpx.AsyncClient, request: ParseRequest
+    ) -> tuple[httpx.Response, bool]:
+        cache_name = (
+            self._prompt_cache.get_cached_name() if self._prompt_cache else None
+        )
+        if cache_name:
+            response = await self._post_google(
+                client, request, cache_name=cache_name
+            )
+            if _is_cache_missing_response(response):
+                self._prompt_cache.clear_local()
+                return await self._post_google(client, request, cache_name=None), False
+            return response, True
+        return await self._post_google(client, request, cache_name=None), False
+
+    async def _post_google(
+        self,
+        client: httpx.AsyncClient,
+        request: ParseRequest,
+        *,
+        cache_name: str | None,
+    ) -> httpx.Response:
+        user_content = build_mutable_parser_payload(request)
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self._model}:generateContent"
+        )
+        body: dict[str, Any] = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": user_content}],
+                }
+            ],
+        }
+        if cache_name:
+            body["cachedContent"] = cache_name
+        else:
+            body["systemInstruction"] = {
+                "parts": [{"text": static_cache_text()}]
+            }
+        return await client.post(
+            url,
+            params={"key": self._api_key},
+            headers={"Content-Type": "application/json"},
+            json=body,
+        )
 
     async def _post(
         self, client: httpx.AsyncClient, request: ParseRequest
@@ -233,27 +340,7 @@ class HttpParser:
             )
 
         if self._provider == "google":
-            model = self._model
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model}:generateContent"
-            )
-            return await client.post(
-                url,
-                params={"key": self._api_key},
-                headers={"Content-Type": "application/json"},
-                json={
-                    "systemInstruction": {
-                        "parts": [{"text": static_cache_text()}]
-                    },
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [{"text": user_content}],
-                        }
-                    ],
-                },
-            )
+            return await self._post_google(client, request, cache_name=None)
 
         return await client.post(
             "https://api.anthropic.com/v1/messages",

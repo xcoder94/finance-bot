@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+import socket
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -21,7 +24,18 @@ from app.parsing.prompt import (
     prompt_version,
     static_cache_text,
 )
+from app.parsing.stub import StubParser
 from app.parsing.types import ParseRequest, ParserMalformed
+from app.services.quick_entry_create import create_quick_entry_expense, resolve_category_id
+from tests.test_quick_entry_create import create_user, rollback_session, seed_expense_tree
+
+
+def _db_available() -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+            return True
+    except OSError:
+        return False
 
 
 FAMILY_MARKERS = (
@@ -261,3 +275,104 @@ async def test_google_unsupported_without_model():
     with pytest.raises(ParserMalformed):
         await parser.parse(_sample_request())
     await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_missing_cache_still_parses_and_schedules_rebuild():
+    """Cache miss must not fail parse; rebuild scheduled in background."""
+    rebuild_calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "GET" and path.endswith("/cachedContents"):
+            return httpx.Response(200, json={"cachedContents": []})
+        if request.method == "POST" and path.endswith("/cachedContents"):
+            rebuild_calls.append("create")
+            return httpx.Response(
+                200,
+                json={
+                    "name": "cachedContents/rebuilt",
+                    "displayName": cache_display_name(prompt_version()),
+                },
+            )
+        if "generateContent" in path:
+            body = json.loads(request.content.decode())
+            assert "cachedContent" not in body
+            assert body["systemInstruction"]["parts"][0]["text"] == static_cache_text()
+            ops = (
+                '{"operations":[{"type":"expense","amount":25000,"currency":"UZS",'
+                '"wallet_hint":null,"category":"Такси","comment":null,'
+                '"from_wallet_hint":null,"to_wallet_hint":null,"rate":null}]}'
+            )
+            return httpx.Response(200, json=_google_ok_body(ops))
+        return httpx.Response(500, json={"error": "unexpected"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = GooglePromptCache("test-key", "test-model-from-env", client=client)
+    cache.clear_local()
+    parser = HttpParser(
+        "google",
+        "test-key",
+        "test-model-from-env",
+        client=client,
+        prompt_cache=cache,
+    )
+    response = await parser.parse(_sample_request())
+    assert response.operations[0].amount == 25000
+    await asyncio.sleep(0.05)
+    assert "create" in rebuild_calls
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_cached_parse_references_cache_not_static():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "generateContent" in request.url.path:
+            body = json.loads(request.content.decode())
+            assert body.get("cachedContent") == "cachedContents/abc"
+            assert "systemInstruction" not in body
+            ops = (
+                '{"operations":[{"type":"expense","amount":1000,"currency":"UZS",'
+                '"wallet_hint":null,"category":null,"comment":null,'
+                '"from_wallet_hint":null,"to_wallet_hint":null,"rate":null}]}'
+            )
+            return httpx.Response(200, json=_google_ok_body(ops))
+        if request.method == "PATCH":
+            return httpx.Response(200, json={"name": "cachedContents/abc"})
+        return httpx.Response(500, json={"error": "unexpected"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = GooglePromptCache("test-key", "test-model-from-env", client=client)
+    cache._local_name = "cachedContents/abc"
+    cache._local_version = prompt_version()
+    parser = HttpParser(
+        "google", "test-key", "test-model-from-env", client=client, prompt_cache=cache
+    )
+    response = await parser.parse(_sample_request())
+    assert response.operations[0].amount == 1000
+    await asyncio.sleep(0.05)
+    await client.aclose()
+
+
+@pytest.mark.anyio
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
+async def test_stub_parser_path_still_creates_transaction():
+    async with rollback_session() as session:
+        user, budget = await create_user(session, telegram_id=1_013_001)
+        wallet, _, _, _, _ = await seed_expense_tree(session, budget)
+        parser = StubParser()
+        parse_response = await parser.parse(_sample_request())
+        op = parse_response.operations[0]
+        category_id = await resolve_category_id(
+            session, budget.id, op_type="expense", category_name=op.category
+        )
+        txn = await create_quick_entry_expense(
+            session,
+            user,
+            amount=op.amount,
+            wallet_id=wallet.id,
+            expense_category_id=category_id,
+            comment=op.comment,
+            transaction_date=datetime(2026, 8, 4, 12, 0, tzinfo=UTC),
+        )
+        assert txn.amount == 25000
