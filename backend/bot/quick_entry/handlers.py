@@ -232,12 +232,8 @@ async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | Non
     return wallets[0] if wallets else None
 
 
-async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
-    if message.from_user is None or message.text is None:
-        return
-
-    text = message.text.strip()
-    if not text:
+async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> None:
+    if message.from_user is None:
         return
 
     telegram_id = message.from_user.id
@@ -532,6 +528,17 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
                 reply_markup=type_question_keyboard(str(pending.id)),
                 parse_mode="Markdown",
             )
+
+
+async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
+    if message.from_user is None or message.text is None:
+        return
+
+    text = message.text.strip()
+    if not text:
+        return
+
+    await process_quick_entry_text(message, bot, text)
 
 
 @router.message(F.text, ~F.text.startswith("/"))

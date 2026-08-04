@@ -108,3 +108,9 @@ def test_config_exposes_speech_env_vars() -> None:
     assert hasattr(config, "SPEECH_PROVIDER")
     assert hasattr(config, "SPEECH_API_KEY")
     assert hasattr(config, "SPEECH_MODEL")
+
+
+def test_process_quick_entry_text_is_importable() -> None:
+    from bot.quick_entry.handlers import process_quick_entry_text
+
+    assert callable(process_quick_entry_text)
