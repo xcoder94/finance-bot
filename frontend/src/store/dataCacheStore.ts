@@ -8,6 +8,8 @@ import type {
 } from '../api/transactions'
 import type {
   HistoryResponse,
+  PersonalSummaryResponse,
+  PersonalWalletBalancesResponse,
   SummaryResponse,
   WalletBalancesResponse,
 } from '../api/home'
@@ -97,6 +99,9 @@ async function fetchCached<T>(
 const summaryKey = (familyId: string, year: number, month: number) =>
   `home:${familyId}:summary:${year}-${month}`
 const balancesKey = (familyId: string) => `home:${familyId}:balances`
+const personalSummaryKey = (familyId: string, year: number, month: number) =>
+  `home:${familyId}:personal-summary:${year}-${month}`
+const personalBalancesKey = (familyId: string) => `home:${familyId}:personal-balances`
 const recentHistoryKey = (familyId: string, year: number, month: number) =>
   `home:${familyId}:recent:${year}-${month}`
 const walletsKey = (familyId: string) => `reference:${familyId}:wallets`
@@ -133,6 +138,43 @@ export function getCachedWalletBalances(
   force = false,
 ): Promise<WalletBalancesResponse> {
   return fetchCached(balancesKey(familyId), HOME_TTL_MS, fetcher, force)
+}
+
+export function peekPersonalSummary(
+  familyId: string,
+  year: number,
+  month: number,
+): PersonalSummaryResponse | null {
+  return readFresh(personalSummaryKey(familyId, year, month), HOME_TTL_MS)
+}
+
+export function getCachedPersonalSummary(
+  familyId: string,
+  year: number,
+  month: number,
+  fetcher: () => Promise<PersonalSummaryResponse>,
+  force = false,
+): Promise<PersonalSummaryResponse> {
+  return fetchCached(
+    personalSummaryKey(familyId, year, month),
+    HOME_TTL_MS,
+    fetcher,
+    force,
+  )
+}
+
+export function peekPersonalWalletBalances(
+  familyId: string,
+): PersonalWalletBalancesResponse | null {
+  return readFresh(personalBalancesKey(familyId), HOME_TTL_MS)
+}
+
+export function getCachedPersonalWalletBalances(
+  familyId: string,
+  fetcher: () => Promise<PersonalWalletBalancesResponse>,
+  force = false,
+): Promise<PersonalWalletBalancesResponse> {
+  return fetchCached(personalBalancesKey(familyId), HOME_TTL_MS, fetcher, force)
 }
 
 export function peekRecentHistory(

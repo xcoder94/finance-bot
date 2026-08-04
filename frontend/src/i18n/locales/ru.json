@@ -57,7 +57,8 @@
     "linkCopied": "Скопировано",
     "walletForm": {
       "newTitle": "Новый кошелёк",
-      "createIntroOwner": "Общий кошелёк создаёт только владелец. Личный — каждый себе."
+      "createIntroOwner": "Общий кошелёк создаёт только владелец. Личный — каждый себе.",
+      "createIntroMember": "Вы можете создать только личный кошелёк."
     },
     "walletGroups": {
       "sharedOwner": "Общие · меняете вы",
@@ -120,7 +121,9 @@
     "participant_many": "{{count}} участников",
     "emptyMonthHint": "Напишите боту «такси 32000» — операция появится здесь.",
     "opsNone": "нет операций",
-    "opsCount": "{{count}} за {{monthShort}}"
+    "opsCount": "{{count}} за {{monthShort}}",
+    "personalTitle": "Мои личные",
+    "personalSubtitle": "{{name}} · вне общего бюджета"
   },
   "addIncome": {
     "title": "Новый доход"

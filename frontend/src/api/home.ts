@@ -26,6 +26,22 @@ export type WalletBalancesResponse = {
   balances: CurrencyBalance[]
 }
 
+export type PersonalPerCurrencySummary = {
+  currency: string
+  income: number
+  expense: number
+}
+
+export type PersonalSummaryResponse = {
+  currencies_with_wallets: string[]
+  by_currency: PersonalPerCurrencySummary[]
+}
+
+export type PersonalWalletBalancesResponse = {
+  currencies_with_wallets: string[]
+  balances: CurrencyBalance[]
+}
+
 export type HistoryItem = {
   id: string
   type: string
@@ -104,6 +120,22 @@ export async function fetchSummary(year: number, month: number): Promise<Summary
 
 export async function fetchWalletBalances(): Promise<WalletBalancesResponse> {
   return apiGet<WalletBalancesResponse>('/api/v1/analytics/wallet-balances')
+}
+
+export async function fetchPersonalSummary(
+  year: number,
+  month: number,
+): Promise<PersonalSummaryResponse> {
+  const { dateFrom, dateTo } = monthDateRange(year, month)
+  const params = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+  })
+  return apiGet<PersonalSummaryResponse>(`/api/v1/analytics/personal-summary?${params}`)
+}
+
+export async function fetchPersonalWalletBalances(): Promise<PersonalWalletBalancesResponse> {
+  return apiGet<PersonalWalletBalancesResponse>('/api/v1/analytics/personal-wallet-balances')
 }
 
 export async function fetchRecentHistory(year: number, month: number): Promise<HistoryResponse> {
