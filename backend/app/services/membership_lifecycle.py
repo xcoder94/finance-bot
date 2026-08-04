@@ -17,6 +17,7 @@ from app.services.budget_seed import (
 )
 from app.services.goal_notify import resolve_bot
 from app.services.member_texts import left_notice, removed_notice
+from app.services.transaction_category_remap import remap_transaction_categories_to_budget
 
 
 class OwnerCannotDetachError(Exception):
@@ -68,6 +69,8 @@ async def detach_member_to_own_budget(
     session.add(new_budget)
     await session.flush()
 
+    await copy_seed_categories_only(session, new_budget.id)
+
     personal_wallets_stmt = (
         select(Wallet)
         .where(
@@ -83,23 +86,25 @@ async def detach_member_to_own_budget(
     for wallet in personal_wallets:
         wallet.family_budget_id = new_budget.id
 
+    personal_txns: list[Transaction] = []
     if personal_wallets:
         personal_wallet_ids = [wallet.id for wallet in personal_wallets]
-        personal_txns = (
+        personal_txns = list(
             await session.scalars(
                 select(Transaction).where(
                     Transaction.wallet_id.in_(personal_wallet_ids),
                     Transaction.is_deleted.is_(False),
                 )
             )
-        ).all()
+        )
         for txn in personal_txns:
             txn.family_budget_id = new_budget.id
+        await remap_transaction_categories_to_budget(
+            session, personal_txns, new_budget.id
+        )
 
     departing_user.family_budget_id = new_budget.id
     departing_user.role = "owner"
-
-    await copy_seed_categories_only(session, new_budget.id)
 
     if len(personal_wallets) == 0:
         await copy_seed_wallets_only(session, new_budget.id)

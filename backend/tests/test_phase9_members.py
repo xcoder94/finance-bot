@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import engine, get_session
 from app.main import app
 from app.models.family_budget import FamilyBudget
+from app.models.expense_category import ExpenseCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
@@ -376,6 +377,113 @@ async def test_leave_uses_left_notice_first_line(
     await session.refresh(member)
     assert member.role == "owner"
     assert member.is_deleted is False
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_remove_member_remaps_personal_txn_categories_by_translation_key(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    member_tid = owner_tid + 1
+    owner, budget = await create_user_with_budget(
+        session,
+        telegram_id=owner_tid,
+        role="owner",
+        first_name="Owner",
+    )
+    member, _ = await create_user_with_budget(
+        session,
+        telegram_id=member_tid,
+        role="member",
+        first_name="Bob",
+        family_budget_id=budget.id,
+    )
+
+    food_parent = ExpenseCategory(
+        family_budget_id=budget.id,
+        name="Еда",
+        translation_key="food",
+    )
+    session.add(food_parent)
+    await session.flush()
+    groceries = ExpenseCategory(
+        family_budget_id=budget.id,
+        name="Продукты",
+        parent_id=food_parent.id,
+        translation_key="groceries",
+    )
+    invented = ExpenseCategory(
+        family_budget_id=budget.id,
+        name="Моя категория",
+        parent_id=food_parent.id,
+        translation_key=None,
+    )
+    session.add_all([groceries, invented])
+    await session.flush()
+
+    personal_wallet = Wallet(
+        family_budget_id=budget.id,
+        name="Member Personal",
+        currency="UZS",
+        is_personal=True,
+        owner_user_id=member.id,
+    )
+    session.add(personal_wallet)
+    await session.flush()
+
+    seeded_txn = Transaction(
+        family_budget_id=budget.id,
+        type="expense",
+        wallet_id=personal_wallet.id,
+        amount=300,
+        expense_category_id=groceries.id,
+        created_by_user_id=member.id,
+        transaction_date=datetime.now(UTC),
+    )
+    invented_txn = Transaction(
+        family_budget_id=budget.id,
+        type="expense",
+        wallet_id=personal_wallet.id,
+        amount=150,
+        expense_category_id=invented.id,
+        created_by_user_id=member.id,
+        transaction_date=datetime.now(UTC),
+    )
+    session.add_all([seeded_txn, invented_txn])
+    await session.flush()
+
+    old_groceries_id = groceries.id
+    old_invented_id = invented.id
+
+    _mock_bot(monkeypatch)
+
+    delete_resp = await client.delete(
+        f"/api/v1/members/{member.id}",
+        headers=auth_headers(owner_tid),
+    )
+    assert delete_resp.status_code == 200
+
+    await session.refresh(member)
+    new_budget_id = member.family_budget_id
+
+    new_groceries = await session.scalar(
+        select(ExpenseCategory).where(
+            ExpenseCategory.family_budget_id == new_budget_id,
+            ExpenseCategory.translation_key == "groceries",
+            ExpenseCategory.is_deleted.is_(False),
+        )
+    )
+    assert new_groceries is not None
+    assert new_groceries.id != old_groceries_id
+
+    await session.refresh(seeded_txn)
+    await session.refresh(invented_txn)
+    assert seeded_txn.expense_category_id == new_groceries.id
+    assert invented_txn.expense_category_id is None
+    assert invented_txn.expense_category_id != old_invented_id
 
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")
