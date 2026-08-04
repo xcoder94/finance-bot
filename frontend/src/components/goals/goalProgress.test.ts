@@ -67,17 +67,43 @@ describe('goalShowCloseButton', () => {
         isOwner: true,
         canClose: true,
         excessAmount: 200_000,
+        isExactlyComplete: false,
         status: 'active',
       }),
     ).toBe(true)
   })
 
-  it('hides when not over target even if can_close', () => {
+  it('shows for owner at exactly 100%', () => {
     expect(
       goalShowCloseButton({
         isOwner: true,
         canClose: true,
         excessAmount: null,
+        isExactlyComplete: true,
+        status: 'active',
+      }),
+    ).toBe(true)
+  })
+
+  it('hides for member at exactly 100%', () => {
+    expect(
+      goalShowCloseButton({
+        isOwner: false,
+        canClose: false,
+        excessAmount: null,
+        isExactlyComplete: true,
+        status: 'active',
+      }),
+    ).toBe(false)
+  })
+
+  it('hides when under target even if can_close', () => {
+    expect(
+      goalShowCloseButton({
+        isOwner: true,
+        canClose: true,
+        excessAmount: null,
+        isExactlyComplete: false,
         status: 'active',
       }),
     ).toBe(false)
@@ -89,6 +115,7 @@ describe('goalShowCloseButton', () => {
         isOwner: false,
         canClose: false,
         excessAmount: 200_000,
+        isExactlyComplete: false,
         status: 'active',
       }),
     ).toBe(false)
@@ -100,6 +127,7 @@ describe('goalShowCloseButton', () => {
         isOwner: true,
         canClose: false,
         excessAmount: 200_000,
+        isExactlyComplete: false,
         status: 'closed',
       }),
     ).toBe(false)

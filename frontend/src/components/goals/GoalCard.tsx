@@ -33,6 +33,7 @@ export function GoalCard({ goal, isOwner, onClose, onEdit, closing = false }: Go
     isOwner,
     canClose: goal.can_close,
     excessAmount: goal.excess_amount,
+    isExactlyComplete: goal.is_exactly_complete,
     status: goal.status,
   })
   const showOwnerNote = goalShowOwnerNote({

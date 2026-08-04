@@ -63,9 +63,15 @@ export function goalShowCloseButton(opts: {
   isOwner: boolean
   canClose: boolean
   excessAmount: number | null
+  isExactlyComplete: boolean
   status: string
 }): boolean {
-  if (opts.status !== 'active' || opts.excessAmount == null) {
+  if (!opts.isOwner || opts.status !== 'active') {
+    return false
+  }
+
+  // balance >= target: excess when over, isExactlyComplete at 100%
+  if (opts.excessAmount == null && !opts.isExactlyComplete) {
     return false
   }
 
