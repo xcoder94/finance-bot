@@ -39,6 +39,17 @@ def join_confirm_prompt(budget_name: str) -> str:
     )
 
 
+def welcome_solo() -> str:
+    return (
+        "Chontak — семейный бюджет.\n"
+        "\n"
+        "Записывайте траты прямо здесь, сообщением:\n"
+        "`такси 25 тысяч`\n"
+        "\n"
+        "Кошельки, категории и аналитика — в приложении."
+    )
+
+
 def welcome_invited(budget_name: str) -> str:
     return (
         f"Вы присоединились к бюджету «{budget_name}».\n"

@@ -15,6 +15,7 @@ from app.models.expense_category import ExpenseCategory
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.member_texts import welcome_solo
 from bot.onboarding import (
     MESSAGES,
     SEED_EXPENSE_CATEGORIES,
@@ -189,7 +190,8 @@ class TestLanguageCallbackSessionOrdering:
             bot.get_me.assert_not_awaited()
             message.answer.assert_awaited_once()
             answer_args, answer_kwargs = message.answer.await_args
-            assert answer_args[0] == MESSAGES["welcome_owner"]["ru"]
+            assert answer_args[0] == welcome_solo()
+            assert answer_kwargs.get("parse_mode") == "Markdown"
             assert "reply_markup" in answer_kwargs
             message.delete.assert_awaited_once()
 

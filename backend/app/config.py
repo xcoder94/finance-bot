@@ -11,9 +11,8 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 APP_PASS_SECRET = os.environ["APP_PASS_SECRET"]
 if not APP_PASS_SECRET:
     raise RuntimeError("APP_PASS_SECRET environment variable is empty")
-MINI_APP_URL = os.environ["MINI_APP_URL"]
-if not MINI_APP_URL:
-    raise RuntimeError("MINI_APP_URL environment variable is empty")
+_raw_mini_app_url = (os.environ.get("MINI_APP_URL") or "").strip()
+MINI_APP_URL: str | None = _raw_mini_app_url or None
 
 PARSER_PROVIDER = os.environ.get("PARSER_PROVIDER") or None
 PARSER_API_KEY = os.environ.get("PARSER_API_KEY") or None

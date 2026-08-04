@@ -58,7 +58,6 @@ async def join_accept(callback: CallbackQuery) -> None:
         return
 
     budget_name = ""
-    user_language = "ru"
 
     async with async_session_factory() as session:
         async with session.begin():
@@ -69,7 +68,6 @@ async def join_accept(callback: CallbackQuery) -> None:
                 await callback.answer()
                 return
 
-            user_language = user.language
             budget = await get_family_budget_by_invite_token(session, token)
             if budget is None:
                 await callback.message.edit_text(invite_link_invalid())
@@ -107,7 +105,8 @@ async def join_accept(callback: CallbackQuery) -> None:
 
     await callback.message.answer(
         welcome_invited(budget_name),
-        reply_markup=open_app_keyboard(user_language),
+        reply_markup=open_app_keyboard(),
+        parse_mode="Markdown",
     )
     await callback.message.delete()
     await callback.answer()
