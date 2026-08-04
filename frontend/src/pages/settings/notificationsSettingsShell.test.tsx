@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -6,6 +6,29 @@ import { I18nextProvider } from 'react-i18next'
 
 import ru from '../../i18n/locales/ru.json'
 import { NotificationsSettingsBody } from './NotificationsSettingsShellPage'
+
+vi.mock('../../api/me', () => ({
+  patchMe: vi.fn(),
+}))
+
+vi.mock('../../store/authStore', () => ({
+  useAuthStore: (selector: (state: {
+    user: {
+      eveningReminderEnabled: boolean
+      weeklyDigestEnabled: boolean
+    }
+    setLocalEveningReminder: () => void
+    setLocalWeeklyDigest: () => void
+  }) => unknown) =>
+    selector({
+      user: {
+        eveningReminderEnabled: true,
+        weeklyDigestEnabled: false,
+      },
+      setLocalEveningReminder: vi.fn(),
+      setLocalWeeklyDigest: vi.fn(),
+    }),
+}))
 
 const testI18n = i18n.createInstance()
 void testI18n.use(initReactI18next).init({
@@ -33,12 +56,13 @@ describe('NotificationsSettingsBody', () => {
     expect(html).toContain('Два независимых переключателя')
   })
 
-  it('has no checkbox or switch controls', () => {
+  it('renders exactly two toggle switches with correct checked state', () => {
     const html = renderNotificationsBody()
-    expect(html).not.toContain('type="checkbox"')
-    expect(html).not.toContain('role="switch"')
-    expect(html).not.toContain('settings-notifications-toggle')
-    expect(html).not.toMatch(/<input\b/)
-    expect(html).not.toMatch(/<button\b/)
+    const switches = html.match(/role="switch"/g) ?? []
+    expect(switches).toHaveLength(2)
+    expect(html).toContain('aria-checked="true"')
+    expect(html).toContain('aria-checked="false"')
+    expect(html).toContain('settings-toggle-row__track--on')
+    expect(html).toContain('settings-toggle-row__track--off')
   })
 })

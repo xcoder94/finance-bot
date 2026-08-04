@@ -21,6 +21,8 @@ export type AuthUser = {
   budgetName: string
   memberCount: number
   defaultWalletId: string | null
+  eveningReminderEnabled: boolean
+  weeklyDigestEnabled: boolean
 }
 
 type AuthState = {
@@ -32,6 +34,8 @@ type AuthState = {
   setError: (errorType: Exclude<AuthErrorType, null>) => void
   setLocalLanguage: (language: string) => void
   setLocalDefaultWallet: (defaultWalletId: string | null) => void
+  setLocalEveningReminder: (enabled: boolean) => void
+  setLocalWeeklyDigest: (enabled: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -51,6 +55,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) =>
       state.user
         ? { user: { ...state.user, defaultWalletId } }
+        : state,
+    ),
+  setLocalEveningReminder: (eveningReminderEnabled) =>
+    set((state) =>
+      state.user
+        ? { user: { ...state.user, eveningReminderEnabled } }
+        : state,
+    ),
+  setLocalWeeklyDigest: (weeklyDigestEnabled) =>
+    set((state) =>
+      state.user
+        ? { user: { ...state.user, weeklyDigestEnabled } }
         : state,
     ),
 }))
