@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,4 +29,7 @@ class User(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
         UUID(as_uuid=True),
         ForeignKey("wallets.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    release_announcement_delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )

@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 from aiogram.filters import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
+from app.models.user import User
 from app.services.member_texts import welcome_invited, welcome_solo
 from bot.goals import router as goals_router
 from bot.membership import router as membership_router
@@ -30,6 +31,13 @@ START_SOLO_TEXT = (
     "\n"
     "Кошельки, категории и аналитика — в приложении."
 )
+
+
+def test_user_has_release_announcement_delivered_at_column() -> None:
+    col = User.__table__.c.release_announcement_delivered_at
+    assert col.nullable is True
+    # column accepts datetime | None at ORM level
+    assert "release_announcement_delivered_at" in User.__mapper__.columns
 
 
 def test_welcome_solo_exact_18_1() -> None:
