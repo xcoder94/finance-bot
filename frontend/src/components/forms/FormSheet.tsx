@@ -6,6 +6,7 @@ type FormSheetProps = {
   intro?: string
   onClose: () => void
   children?: ReactNode
+  changes?: ReactNode
   showPrimary?: boolean
   cancelLabel?: string
   primaryLabel?: string
@@ -21,6 +22,7 @@ export function FormSheet({
   intro,
   onClose,
   children,
+  changes,
   showPrimary = true,
   cancelLabel = 'Отмена',
   primaryLabel = 'Сохранить',
@@ -59,6 +61,8 @@ export function FormSheet({
         {intro ? <p className="form-sheet-intro">{intro}</p> : null}
 
         {children ? <div className="form-sheet-fields">{children}</div> : null}
+
+        {changes}
 
         {showPrimary ? (
           <div className="form-sheet-actions">

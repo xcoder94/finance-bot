@@ -215,7 +215,8 @@
     "incomeCategoryHint": "У доходов подкатегорий нет",
     "transferSameIntro": "Валюты совпадают — поля курса нет.",
     "transferDiffIntro": "Валюты разные — появляется курс и строка результата.",
-    "deleteRecord": "Удалить запись"
+    "deleteRecord": "Удалить запись",
+    "changes": "Изменения"
   },
   "analytics": {
     "title": "Аналитика",

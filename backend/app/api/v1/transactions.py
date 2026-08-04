@@ -15,6 +15,7 @@ from app.schemas.transactions import (
     TransferCreate,
     TransferUpdate,
 )
+from app.services.change_log import list_change_lines
 from app.services.transactions import (
     create_expense_transaction,
     create_income_transaction,
@@ -76,7 +77,8 @@ async def get_transaction(
         session, transaction, user.family_budget_id
     )
     require_transaction_visible(from_wallet, to_wallet, user)
-    return transaction_to_response(transaction)
+    changes = await list_change_lines(session, transaction.id)
+    return transaction_to_response(transaction, changes=changes)
 
 
 @router.patch("/transactions/{transaction_id}")
@@ -109,7 +111,8 @@ async def update_transaction(
     else:
         raise HTTPException(status_code=422, detail="Unknown transaction type")
 
-    return transaction_to_response(updated)
+    changes = await list_change_lines(session, updated.id)
+    return transaction_to_response(updated, changes=changes)
 
 
 @router.delete("/transactions/{transaction_id}")

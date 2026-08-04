@@ -56,3 +56,4 @@ class TransactionResponse(BaseModel):
     expense_category_id: uuid.UUID | None = None
     comment: str | None = None
     created_by_user_id: uuid.UUID
+    changes: list[str] = []

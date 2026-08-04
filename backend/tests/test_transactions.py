@@ -622,7 +622,7 @@ class TestTransferValidation:
 
 
 class TestEditDeletePermissions:
-    async def test_member_forbidden_on_others_transactions_allowed_on_own(
+    async def test_member_can_edit_and_delete_others_shared_transactions(
         self, api_client: tuple[AsyncClient, AsyncSession]
     ) -> None:
         client, session = api_client
@@ -667,19 +667,21 @@ class TestEditDeletePermissions:
             amount=250,
         )
 
-        assert (
-            await client.patch(
-                f"/api/v1/transactions/{owner_txn.id}",
-                headers=member_headers,
-                json=patch_body,
-            )
-        ).status_code == 403
-        assert (
-            await client.delete(
-                f"/api/v1/transactions/{owner_txn.id}",
-                headers=member_headers,
-            )
-        ).status_code == 403
+        owner_patch = await client.patch(
+            f"/api/v1/transactions/{owner_txn.id}",
+            headers=member_headers,
+            json=patch_body,
+        )
+        assert owner_patch.status_code == 200
+        assert owner_patch.json()["amount"] == 250
+        assert owner_patch.json()["created_by_user_id"] == str(owner.id)
+
+        owner_delete = await client.delete(
+            f"/api/v1/transactions/{owner_txn.id}",
+            headers=member_headers,
+        )
+        assert owner_delete.status_code == 200
+        assert owner_delete.json()["id"] == str(owner_txn.id)
 
         own_patch = await client.patch(
             f"/api/v1/transactions/{member_txn.id}",
