@@ -27,7 +27,7 @@ _TIMEOUT_SECONDS = 10.0
 _MAX_ATTEMPTS = 3
 
 
-def _parse_operations_payload(data: Any) -> list[ParsedOperation]:
+def _parse_response_payload(data: Any) -> ParseResponse:
     if not isinstance(data, dict):
         raise ParserMalformed("response is not a JSON object")
     raw_ops = data.get("operations")
@@ -93,7 +93,23 @@ def _parse_operations_payload(data: Any) -> list[ParsedOperation]:
                 rate=rate,
             )
         )
-    return operations
+
+    speech_status = data.get("speech_status")
+    if speech_status is not None:
+        if not isinstance(speech_status, str):
+            raise ParserMalformed("speech_status must be string or null")
+        if speech_status not in ("recognized", "not_recognized"):
+            raise ParserMalformed(f"invalid speech_status: {speech_status!r}")
+
+    date_hint = data.get("date_hint")
+    if date_hint is not None and not isinstance(date_hint, str):
+        raise ParserMalformed("date_hint must be string or null")
+
+    return ParseResponse(
+        operations=operations,
+        speech_status=speech_status,
+        date_hint=date_hint,
+    )
 
 
 def _extract_text_from_provider_body(provider: str, body: dict[str, Any]) -> str:
@@ -183,6 +199,8 @@ class HttpParser:
             raise ParserMalformed(f"unsupported parser provider: {self._provider!r}")
         if not self._model:
             raise ParserMalformed("parser model is not configured")
+        if request.audio_base64 and self._provider != "google":
+            raise ParserUnavailable("audio requires google parser")
 
         owns_client = self._client is None
         client = self._client or httpx.AsyncClient(timeout=_TIMEOUT_SECONDS)
@@ -234,7 +252,7 @@ class HttpParser:
                         self._provider, body
                     )
                     payload = json.loads(text_payload)
-                    operations = _parse_operations_payload(payload)
+                    parsed = _parse_response_payload(payload)
                 except json.JSONDecodeError as exc:
                     raise ParserMalformed("model content is not JSON") from exc
 
@@ -248,7 +266,7 @@ class HttpParser:
                     else:
                         self._schedule_background(self._rebuild_cache())
 
-                return ParseResponse(operations=operations)
+                return parsed
         finally:
             if owns_client:
                 await client.aclose()
@@ -301,11 +319,21 @@ class HttpParser:
             f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self._model}:generateContent"
         )
+        parts: list[dict[str, Any]] = [{"text": user_content}]
+        if request.audio_base64 and request.audio_mime_type:
+            parts.append(
+                {
+                    "inlineData": {
+                        "mimeType": request.audio_mime_type,
+                        "data": request.audio_base64,
+                    }
+                }
+            )
         body: dict[str, Any] = {
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"text": user_content}],
+                    "parts": parts,
                 }
             ],
         }

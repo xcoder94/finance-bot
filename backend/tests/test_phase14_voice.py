@@ -94,6 +94,88 @@ def test_apply_date_hint_none_is_today():
     assert apply_date_hint(None, today) == today
 
 
+# --- Task 2 (phase 14b): HttpParser audio + speech_status ---
+
+
+from app.parsing.http_adapter import HttpParser
+from app.parsing.types import ParserMalformed, ParserUnavailable
+
+
+@pytest.mark.anyio
+async def test_http_parser_google_posts_inline_audio_part():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content.decode())
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "operations": [
+                                                {
+                                                    "type": "expense",
+                                                    "amount": 25000,
+                                                    "currency": "UZS",
+                                                    "wallet_hint": None,
+                                                    "category": "Такси",
+                                                    "comment": None,
+                                                    "from_wallet_hint": None,
+                                                    "to_wallet_hint": None,
+                                                    "rate": None,
+                                                }
+                                            ],
+                                            "speech_status": "recognized",
+                                            "date_hint": None,
+                                        }
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        parser = HttpParser("google", "key", "env-model", client=client)
+        resp = await parser.parse(
+            ParseRequest(
+                text="",
+                wallet_names=["Карта"],
+                expense_category_names=["Такси"],
+                income_category_names=[],
+                audio_base64="QQ==",
+                audio_mime_type="audio/ogg",
+            )
+        )
+    assert resp.speech_status == "recognized"
+    parts = captured["body"]["contents"][0]["parts"]
+    assert any("inlineData" in p or "inline_data" in p for p in parts)
+
+
+@pytest.mark.anyio
+async def test_http_parser_rejects_audio_when_not_google():
+    parser = HttpParser("openai", "key", "m")
+    with pytest.raises(ParserUnavailable):
+        await parser.parse(
+            ParseRequest(
+                text="",
+                wallet_names=[],
+                expense_category_names=[],
+                income_category_names=[],
+                audio_base64="QQ==",
+                audio_mime_type="audio/ogg",
+            )
+        )
+
+
 def _db_available() -> bool:
     try:
         with socket.create_connection(("127.0.0.1", 5432), timeout=1):
