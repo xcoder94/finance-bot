@@ -662,3 +662,31 @@ class TestReceiptPhotoAcceptance:
                 )
             )
             assert len(txns) == 3
+
+
+# --- Task 4: flag-off isolation ---
+
+
+def test_handlers_import_with_receipt_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.config.RECEIPT_PHOTO_ENABLED", None)
+    from bot.quick_entry import handlers  # noqa: F401
+
+    assert handlers.router is not None
+
+
+def test_voice_handler_import_with_receipt_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.config.RECEIPT_PHOTO_ENABLED", None)
+    from bot.quick_entry.handlers import handle_quick_entry_voice
+
+    assert callable(handle_quick_entry_voice)
+
+
+def test_receipt_photo_enabled_false_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.config.RECEIPT_PHOTO_ENABLED", None)
+    assert receipt_photo_enabled() is False
