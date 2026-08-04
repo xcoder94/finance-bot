@@ -1,6 +1,8 @@
 import socket
 import uuid
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -11,7 +13,10 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.goal_notify import format_achievement_message
+from app.services.goals import check_goal_achievement
 from app.services.quick_entry_balance import wallet_balance
+from bot.goals import handle_goal_close
 from tests.test_wallets_categories import api_client, auth_headers, create_user_with_budget
 
 
@@ -377,3 +382,237 @@ async def test_patch_deadline_in_past_allowed(
     )
     assert patch_resp.status_code == 200
     assert patch_resp.json()["deadline"] == past.isoformat()
+
+
+def _mock_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    bot = AsyncMock()
+    bot.send_message = AsyncMock()
+
+    async def fake_resolve_bot(b: AsyncMock | None) -> tuple[AsyncMock, bool]:
+        return (bot if b is None else b), False
+
+    monkeypatch.setattr("app.services.goals.resolve_bot", fake_resolve_bot)
+    monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
+    return bot
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_format_achievement_message_uzs() -> None:
+    text = format_achievement_message("Накопления", 8_200_000, 8_000_000, "UZS")
+    assert text == (
+        "🎯 Цель «Накопления» достигнута\n"
+        "Накоплено 8 200 000 сум из 8 000 000"
+    )
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_crossing_sends_to_every_member_owner_button(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet = await _create_shared_wallet(session, owner.family_budget_id)
+    await _seed_income(session, owner.family_budget_id, wallet.id, owner.id, 8_200_000)
+    await session.flush()
+
+    bot = _mock_bot(monkeypatch)
+
+    resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 8_000_000},
+    )
+    assert resp.status_code == 201, resp.text
+    goal_id = uuid.UUID(resp.json()["id"])
+
+    assert bot.send_message.await_count == 2
+    calls_by_tid: dict[int, tuple] = {
+        c.args[0]: (c.args[1], c.kwargs) for c in bot.send_message.await_args_list
+    }
+    assert owner_tid in calls_by_tid
+    assert member_tid in calls_by_tid
+    owner_text, owner_kwargs = calls_by_tid[owner_tid]
+    member_text, member_kwargs = calls_by_tid[member_tid]
+    assert owner_text == member_text
+    assert "🎯 Цель «Накопления» достигнута" in owner_text
+    owner_markup = owner_kwargs["reply_markup"]
+    member_markup = member_kwargs["reply_markup"]
+    assert owner_markup is not None
+    assert owner_markup.inline_keyboard[0][0].text == "Закрыть цель"
+    assert owner_markup.inline_keyboard[0][0].callback_data == f"goal:close:{goal_id}"
+    assert member_markup is None
+
+    goal = await session.get(Goal, goal_id)
+    assert goal is not None
+    assert goal.crossed is True
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_staying_above_does_not_resend(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet = await _create_shared_wallet(session, owner.family_budget_id)
+    await _seed_income(session, owner.family_budget_id, wallet.id, owner.id, 8_200_000)
+    await session.flush()
+
+    bot = _mock_bot(monkeypatch)
+
+    create_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 8_000_000},
+    )
+    assert create_resp.status_code == 201
+    assert bot.send_message.await_count == 2
+
+    bot.send_message.reset_mock()
+    await check_goal_achievement(session, wallet.id, bot=bot)
+    bot.send_message.assert_not_awaited()
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_drop_below_then_cross_sends_again(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet = await _create_shared_wallet(session, owner.family_budget_id)
+    await _seed_income(session, owner.family_budget_id, wallet.id, owner.id, 8_200_000)
+    await session.flush()
+
+    bot = _mock_bot(monkeypatch)
+
+    create_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 8_000_000},
+    )
+    assert create_resp.status_code == 201
+    goal_id = uuid.UUID(create_resp.json()["id"])
+    bot.send_message.reset_mock()
+
+    patch_resp = await client.patch(
+        f"/api/v1/goals/{goal_id}",
+        headers=auth_headers(owner_tid),
+        json={"target_amount": 9_000_000},
+    )
+    assert patch_resp.status_code == 200
+    bot.send_message.assert_not_awaited()
+
+    goal = await session.get(Goal, goal_id)
+    assert goal is not None
+    assert goal.crossed is False
+
+    patch_back = await client.patch(
+        f"/api/v1/goals/{goal_id}",
+        headers=auth_headers(owner_tid),
+        json={"target_amount": 8_000_000},
+    )
+    assert patch_back.status_code == 200
+    assert bot.send_message.await_count == 2
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_close_via_callback_owner(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet = await _create_shared_wallet(session, owner.family_budget_id)
+    await _seed_income(session, owner.family_budget_id, wallet.id, owner.id, 1_000_000)
+    await session.flush()
+
+    _mock_bot(monkeypatch)
+
+    create_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 500_000},
+    )
+    assert create_resp.status_code == 201
+    goal_id = create_resp.json()["id"]
+
+    callback = SimpleNamespace(
+        from_user=SimpleNamespace(id=owner_tid),
+        message=SimpleNamespace(edit_reply_markup=AsyncMock()),
+        data=f"goal:close:{goal_id}",
+        answer=AsyncMock(),
+    )
+
+    class _SessionCtx:
+        async def __aenter__(self) -> AsyncSession:
+            return session
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "bot.goals.async_session_factory",
+        lambda: _SessionCtx(),
+    )
+
+    await handle_goal_close(callback)
+    callback.answer.assert_awaited()
+    callback.message.edit_reply_markup.assert_awaited_with(reply_markup=None)
+
+    goal = await session.get(Goal, uuid.UUID(goal_id))
+    assert goal is not None
+    assert goal.status == "closed"
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_close_via_callback_member_ignored(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, member_tid, owner, _ = await _create_owner_and_member(session)
+    wallet = await _create_shared_wallet(session, owner.family_budget_id)
+    await session.flush()
+
+    create_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 1_000_000},
+    )
+    assert create_resp.status_code == 201
+    goal_id = create_resp.json()["id"]
+
+    callback = SimpleNamespace(
+        from_user=SimpleNamespace(id=member_tid),
+        message=SimpleNamespace(edit_reply_markup=AsyncMock()),
+        data=f"goal:close:{goal_id}",
+        answer=AsyncMock(),
+    )
+
+    class _SessionCtx:
+        async def __aenter__(self) -> AsyncSession:
+            return session
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "bot.goals.async_session_factory",
+        lambda: _SessionCtx(),
+    )
+
+    await handle_goal_close(callback)
+    callback.answer.assert_awaited()
+    callback.message.edit_reply_markup.assert_not_awaited()
+
+    goal = await session.get(Goal, uuid.UUID(goal_id))
+    assert goal is not None
+    assert goal.status == "active"

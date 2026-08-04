@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, date, datetime
 
+from aiogram import Bot
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,7 @@ from app.models.goal import Goal
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.goals import GoalCreate, GoalResponse, GoalUpdate
+from app.services.goal_notify import fan_out_achievement, resolve_bot
 from app.services.quick_entry_balance import wallet_balance
 from app.services.wallets_categories import get_active_wallet
 
@@ -78,6 +80,40 @@ async def get_goal_in_family(
     return await session.scalar(stmt)
 
 
+async def get_active_goal_for_wallet(
+    session: AsyncSession,
+    wallet_id: uuid.UUID,
+) -> Goal | None:
+    stmt = select(Goal).where(
+        Goal.wallet_id == wallet_id,
+        Goal.status == "active",
+    )
+    return await session.scalar(stmt)
+
+
+async def check_goal_achievement(
+    session: AsyncSession,
+    wallet_id: uuid.UUID,
+    *,
+    bot: Bot | None = None,
+) -> None:
+    goal = await get_active_goal_for_wallet(session, wallet_id)
+    if goal is None:
+        return
+
+    balance = await wallet_balance(session, wallet_id)
+    now_crossed = balance >= goal.target_amount
+
+    if now_crossed and not goal.crossed:
+        resolved_bot, _owned = await resolve_bot(bot)
+        await fan_out_achievement(session, goal, balance, resolved_bot)
+        goal.crossed = True
+        await session.commit()
+    elif not now_crossed and goal.crossed:
+        goal.crossed = False
+        await session.commit()
+
+
 async def list_goals(
     session: AsyncSession,
     user: User,
@@ -123,7 +159,6 @@ async def create_goal(
 
     balance = await wallet_balance(session, wallet.id)
     name = body.name if body.name is not None and body.name.strip() else wallet.name
-    crossed = balance >= body.target_amount
 
     goal = Goal(
         family_budget_id=user.family_budget_id,
@@ -133,11 +168,14 @@ async def create_goal(
         currency=wallet.currency,
         deadline=body.deadline,
         status="active",
-        crossed=crossed,
+        crossed=False,
     )
     session.add(goal)
     await session.commit()
     await session.refresh(goal)
+    await check_goal_achievement(session, wallet.id)
+    await session.refresh(goal)
+    balance = await wallet_balance(session, wallet.id)
     return goal_to_response(goal, balance, user)
 
 
@@ -165,6 +203,9 @@ async def update_goal(
 
     await session.commit()
     await session.refresh(goal)
+    if "target_amount" in update_data:
+        await check_goal_achievement(session, goal.wallet_id)
+        await session.refresh(goal)
     balance = await wallet_balance(session, goal.wallet_id)
     return goal_to_response(goal, balance, user)
 

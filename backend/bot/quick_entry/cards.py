@@ -24,7 +24,7 @@ _MONTH_GENITIVE = (
 )
 
 
-def _format_number(amount: int) -> str:
+def format_number(amount: int) -> str:
     negative = amount < 0
     digits = str(abs(amount))
     groups: list[str] = []
@@ -35,8 +35,11 @@ def _format_number(amount: int) -> str:
     return f"-{formatted}" if negative else formatted
 
 
+_format_number = format_number
+
+
 def format_amount(amount: int, currency: str) -> str:
-    number = _format_number(amount)
+    number = format_number(amount)
     if currency == "USD":
         return f"{number} $"
     return f"{number} сум"
