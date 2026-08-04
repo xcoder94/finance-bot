@@ -15,6 +15,7 @@ from app.main import app
 from app.models.family_budget import FamilyBudget
 from app.models.expense_category import ExpenseCategory
 from app.models.goal import Goal
+from app.models.ownership_transfer import OwnershipTransfer
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
@@ -30,6 +31,10 @@ from app.services.member_texts import (
     join_personal_wallet_cap,
     left_notice,
     removed_notice,
+    transfer_accepted_to_former,
+    transfer_accepted_to_others,
+    transfer_offer,
+    transfer_refused_to_former,
     welcome_invited,
 )
 from app.services.membership_lifecycle import (
@@ -37,6 +42,11 @@ from app.services.membership_lifecycle import (
     JoinBlockReason,
     convert_join_with_own_budget,
     evaluate_join_from_own_budget,
+)
+from app.services.ownership_transfer import (
+    accept_ownership_transfer,
+    refuse_ownership_transfer,
+    request_ownership_transfer,
 )
 from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
 from tests.test_members import auth_headers, create_user_with_budget
@@ -117,6 +127,9 @@ def _mock_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
         "app.services.membership_lifecycle.resolve_bot", fake_resolve_bot
     )
     monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
+    monkeypatch.setattr(
+        "app.services.ownership_transfer.resolve_bot", fake_resolve_bot
+    )
     return bot
 
 
@@ -957,3 +970,199 @@ class TestInviteStartRefusals:
         text = message.answer.await_args.args[0]
         assert text == join_confirm_prompt("Семья Юсуповых")
         assert message.answer.await_args.kwargs["reply_markup"] is not None
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_transfer_accept_swaps_roles_and_notifies_former_and_remaining(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = _mock_bot(monkeypatch)
+
+    async with rollback_session() as session:
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        recipient_tid = owner_tid + 1
+        other_tid = owner_tid + 2
+        owner, budget = await create_user_with_budget(
+            session,
+            telegram_id=owner_tid,
+            role="owner",
+            first_name="Alice",
+        )
+        budget.name = "Семья Каримовых"
+        recipient, _ = await create_user_with_budget(
+            session,
+            telegram_id=recipient_tid,
+            role="member",
+            first_name="Рустам",
+            family_budget_id=budget.id,
+        )
+        other, _ = await create_user_with_budget(
+            session,
+            telegram_id=other_tid,
+            role="member",
+            first_name="Bob",
+            family_budget_id=budget.id,
+        )
+        await session.flush()
+
+        transfer = await request_ownership_transfer(
+            session,
+            owner=owner,
+            recipient=recipient,
+            budget=budget,
+            bot=None,
+        )
+        assert transfer.status == "pending"
+        assert bot.send_message.await_count == 1
+        assert transfer_offer("Семья Каримовых") in bot.send_message.await_args.args[1]
+
+        bot.send_message.reset_mock()
+
+        await accept_ownership_transfer(
+            session,
+            transfer_id=transfer.id,
+            actor=recipient,
+            bot=None,
+        )
+        await session.flush()
+
+        await session.refresh(owner)
+        await session.refresh(recipient)
+        await session.refresh(other)
+        await session.refresh(transfer)
+
+        assert owner.role == "member"
+        assert recipient.role == "owner"
+        assert transfer.status == "accepted"
+
+        messages = {
+            call.args[0]: call.args[1]
+            for call in bot.send_message.await_args_list
+        }
+        assert messages[owner.telegram_id] == transfer_accepted_to_former(
+            "Рустам", "Семья Каримовых"
+        )
+        assert messages[other.telegram_id] == transfer_accepted_to_others(
+            "Рустам", "Семья Каримовых"
+        )
+        assert recipient.telegram_id not in messages
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_transfer_refuse_keeps_owner_and_notifies_former(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = _mock_bot(monkeypatch)
+
+    async with rollback_session() as session:
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        recipient_tid = owner_tid + 1
+        owner, budget = await create_user_with_budget(
+            session,
+            telegram_id=owner_tid,
+            role="owner",
+            first_name="Alice",
+        )
+        recipient, _ = await create_user_with_budget(
+            session,
+            telegram_id=recipient_tid,
+            role="member",
+            first_name="Рустам",
+            family_budget_id=budget.id,
+        )
+        await session.flush()
+
+        transfer = await request_ownership_transfer(
+            session,
+            owner=owner,
+            recipient=recipient,
+            budget=budget,
+            bot=None,
+        )
+        bot.send_message.reset_mock()
+
+        await refuse_ownership_transfer(
+            session,
+            transfer_id=transfer.id,
+            actor=recipient,
+            bot=None,
+        )
+        await session.flush()
+
+        await session.refresh(owner)
+        await session.refresh(recipient)
+        await session.refresh(transfer)
+
+        assert owner.role == "owner"
+        assert recipient.role == "member"
+        assert transfer.status == "refused"
+
+        bot.send_message.assert_awaited_once_with(
+            owner.telegram_id,
+            transfer_refused_to_former("Рустам"),
+        )
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_post_transfer_creates_pending_and_cancels_previous(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    bot = _mock_bot(monkeypatch)
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    member_a_tid = owner_tid + 1
+    member_b_tid = owner_tid + 2
+    owner, budget = await create_user_with_budget(
+        session,
+        telegram_id=owner_tid,
+        role="owner",
+    )
+    budget.name = "Семья Каримовых"
+    member_a, _ = await create_user_with_budget(
+        session,
+        telegram_id=member_a_tid,
+        role="member",
+        first_name="A",
+        family_budget_id=budget.id,
+    )
+    member_b, _ = await create_user_with_budget(
+        session,
+        telegram_id=member_b_tid,
+        role="member",
+        first_name="B",
+        family_budget_id=budget.id,
+    )
+    await session.flush()
+
+    first = await client.post(
+        f"/api/v1/members/{member_a.id}/transfer",
+        headers=auth_headers(owner_tid),
+    )
+    assert first.status_code == 200
+    first_id = uuid.UUID(first.json()["id"])
+
+    second = await client.post(
+        f"/api/v1/members/{member_b.id}/transfer",
+        headers=auth_headers(owner_tid),
+    )
+    assert second.status_code == 200
+
+    first_row = await session.get(OwnershipTransfer, first_id)
+    assert first_row is not None
+    assert first_row.status == "cancelled"
+
+    pending = (
+        await session.scalars(
+            select(OwnershipTransfer).where(
+                OwnershipTransfer.family_budget_id == budget.id,
+                OwnershipTransfer.status == "pending",
+            )
+        )
+    ).all()
+    assert len(pending) == 1
+    assert pending[0].to_user_id == member_b.id
+    assert bot.send_message.await_count == 2

@@ -22,3 +22,11 @@ class MemberDeleteResponse(BaseModel):
     id: uuid.UUID
     first_name: str | None
     role: str
+
+
+class TransferResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    to_user_id: uuid.UUID
+    status: str

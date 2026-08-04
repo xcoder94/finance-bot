@@ -12,10 +12,19 @@ from app.config import BOT_TOKEN
 from app.db import get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
-from app.schemas.members import InviteLinkResponse, MemberDeleteResponse, MemberResponse
+from app.schemas.members import (
+    InviteLinkResponse,
+    MemberDeleteResponse,
+    MemberResponse,
+    TransferResponse,
+)
 from app.services.membership_lifecycle import (
     OwnerCannotDetachError,
     detach_member_to_own_budget,
+)
+from app.services.ownership_transfer import (
+    InvalidTransferTargetError,
+    request_ownership_transfer,
 )
 from app.services.invite import (
     build_invite_link,
@@ -197,4 +206,42 @@ async def leave_family(
         id=user.id,
         first_name=member_first_name,
         role=member_role,
+    )
+
+
+@router.post("/members/{member_id}/transfer")
+async def transfer_ownership(
+    member_id: uuid.UUID,
+    user: OwnerUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TransferResponse:
+    if member_id == user.id:
+        raise HTTPException(status_code=400, detail="cannot_transfer_to_self")
+
+    member = await get_active_member(session, member_id, user.family_budget_id)
+    if member is None:
+        raise HTTPException(status_code=404)
+
+    budget = await get_active_family_budget(session, user.family_budget_id)
+    if budget is None:
+        raise HTTPException(status_code=404)
+
+    try:
+        transfer = await request_ownership_transfer(
+            session,
+            owner=user,
+            recipient=member,
+            budget=budget,
+            bot=None,
+        )
+    except InvalidTransferTargetError as exc:
+        raise HTTPException(status_code=400, detail="invalid_transfer_target") from exc
+
+    await session.commit()
+    await session.refresh(transfer)
+
+    return TransferResponse(
+        id=transfer.id,
+        to_user_id=transfer.to_user_id,
+        status=transfer.status,
     )

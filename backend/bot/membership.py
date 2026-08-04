@@ -1,3 +1,5 @@
+import uuid
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
@@ -19,6 +21,13 @@ from app.services.membership_lifecycle import (
     evaluate_join_from_own_budget,
 )
 from app.services.entity_limits import MEMBER_LIMIT
+from app.services.ownership_transfer import (
+    TransferActorError,
+    TransferNotFoundError,
+    TransferNotPendingError,
+    accept_ownership_transfer,
+    refuse_ownership_transfer,
+)
 from bot.onboarding import (
     get_active_user_by_telegram_id,
     get_family_budget_by_invite_token,
@@ -108,6 +117,78 @@ async def join_cancel(callback: CallbackQuery) -> None:
     if callback.message is None:
         await callback.answer()
         return
+
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("own_xfer_accept:"))
+async def own_xfer_accept(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.message is None:
+        return
+
+    raw_id = callback.data.split(":", 1)[1] if callback.data else ""
+    try:
+        transfer_id = uuid.UUID(raw_id)
+    except ValueError:
+        await callback.answer()
+        return
+
+    async with async_session_factory() as session:
+        async with session.begin():
+            user = await get_active_user_by_telegram_id(
+                session, callback.from_user.id
+            )
+            if user is None:
+                await callback.answer()
+                return
+
+            try:
+                await accept_ownership_transfer(
+                    session,
+                    transfer_id=transfer_id,
+                    actor=user,
+                    bot=None,
+                )
+            except (TransferNotFoundError, TransferNotPendingError, TransferActorError):
+                await callback.answer()
+                return
+
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("own_xfer_refuse:"))
+async def own_xfer_refuse(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.message is None:
+        return
+
+    raw_id = callback.data.split(":", 1)[1] if callback.data else ""
+    try:
+        transfer_id = uuid.UUID(raw_id)
+    except ValueError:
+        await callback.answer()
+        return
+
+    async with async_session_factory() as session:
+        async with session.begin():
+            user = await get_active_user_by_telegram_id(
+                session, callback.from_user.id
+            )
+            if user is None:
+                await callback.answer()
+                return
+
+            try:
+                await refuse_ownership_transfer(
+                    session,
+                    transfer_id=transfer_id,
+                    actor=user,
+                    bot=None,
+                )
+            except (TransferNotFoundError, TransferNotPendingError, TransferActorError):
+                await callback.answer()
+                return
 
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer()
