@@ -37,7 +37,7 @@ from bot.quick_entry.receipt_photo import (
     handle_receipt_photo,
     set_receipt_parser_override,
 )
-from bot.quick_entry.texts import MSG_RECEIPT_UNREADABLE
+from bot.quick_entry.texts import MSG_MODEL_FAIL, MSG_RECEIPT_UNREADABLE
 
 MSG_RECEIPT_UNREADABLE_EXPECTED = (
     "Не разобрал чек. Сфотографируйте его целиком при хорошем свете или запишите\n"
@@ -535,6 +535,35 @@ class TestReceiptPhotoAcceptance:
             await session.refresh(budget)
             assert budget.daily_unparsed == 1
             assert budget.daily_model_calls == 1
+
+    async def test_receipt_missing_receipt_status_returns_model_fail_without_counters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_015_006)
+            await seed_receipt_setup(session, user, budget)
+
+            set_receipt_parser_override(
+                FixedParser(
+                    ParseResponse(
+                        operations=[],
+                        receipt_status=None,
+                    )
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.receipt_photo.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_photo_message(telegram_id=user.telegram_id)
+            bot = make_photo_bot()
+            await handle_receipt_photo(message, bot)
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
+            assert budget.daily_model_calls == 0
 
     async def test_receipt_old_date_hint_becomes_today(
         self, monkeypatch: pytest.MonkeyPatch
