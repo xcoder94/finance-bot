@@ -19,6 +19,11 @@ from app.schemas.transactions import (
     TransferCreate,
     TransferUpdate,
 )
+from app.services.change_log import (
+    record_expense_changes,
+    record_income_changes,
+    record_transfer_changes,
+)
 from app.services.goals import check_goal_achievement
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import (
@@ -38,8 +43,15 @@ async def _check_affected_wallets(
         await check_goal_achievement(session, wallet_id, bot=bot)
 
 
-def transaction_to_response(transaction: Transaction) -> TransactionResponse:
-    return TransactionResponse.model_validate(transaction)
+def transaction_to_response(
+    transaction: Transaction,
+    *,
+    changes: list[str] | None = None,
+) -> TransactionResponse:
+    response = TransactionResponse.model_validate(transaction)
+    if changes is not None:
+        return response.model_copy(update={"changes": changes})
+    return response
 
 
 async def get_active_transaction(
@@ -332,6 +344,7 @@ async def update_income_transaction(
         body.income_category_id,
         user,
     )
+    await record_income_changes(session, transaction, body, user)
     affected = {transaction.wallet_id, body.wallet_id}
     transaction.transaction_date = body.transaction_date
     transaction.amount = body.amount
@@ -363,6 +376,7 @@ async def update_expense_transaction(
         body.expense_category_id,
         user,
     )
+    await record_expense_changes(session, transaction, body, user)
     affected = {transaction.wallet_id, body.wallet_id}
     transaction.transaction_date = body.transaction_date
     transaction.amount = body.amount
@@ -395,6 +409,9 @@ async def update_transfer_transaction(
         body.amount,
         body.rate,
         user,
+    )
+    await record_transfer_changes(
+        session, transaction, body, user, stored_rate=stored_rate
     )
     affected = {transaction.wallet_id, body.wallet_id}
     if transaction.to_wallet_id is not None:
