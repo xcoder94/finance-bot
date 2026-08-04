@@ -671,3 +671,37 @@ async def test_transfer_into_wallet_triggers_achievement(
     calls_by_tid = {c.args[0] for c in bot.send_message.await_args_list}
     assert owner_tid in calls_by_tid
     assert member_tid in calls_by_tid
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_wallet_list_includes_has_active_goal(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    telegram_id = _random_tid()
+    _, budget = await create_user_with_budget(
+        session, telegram_id=telegram_id, role="owner"
+    )
+    wallet_with_goal = await _create_shared_wallet(session, budget.id, name="С целью")
+    wallet_without_goal = await _create_shared_wallet(
+        session, budget.id, name="Без цели"
+    )
+    session.add(
+        Goal(
+            family_budget_id=budget.id,
+            wallet_id=wallet_with_goal.id,
+            name="Накопления",
+            target_amount=1_000_000,
+            currency="UZS",
+            deadline=None,
+            status="active",
+        )
+    )
+    await session.flush()
+
+    response = await client.get("/api/v1/wallets", headers=auth_headers(telegram_id))
+    assert response.status_code == 200
+    wallets = {w["id"]: w for w in response.json()}
+    assert wallets[str(wallet_with_goal.id)]["has_active_goal"] is True
+    assert wallets[str(wallet_without_goal.id)]["has_active_goal"] is False

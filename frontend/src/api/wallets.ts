@@ -8,6 +8,7 @@ export type WalletResponse = {
   translation_key: string | null
   transaction_count: number
   is_personal: boolean
+  has_active_goal: boolean
 }
 
 export type WalletDeleteResponse = {
