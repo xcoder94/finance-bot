@@ -21,6 +21,7 @@ from app.services.budget_seed import (
 from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT
 from app.services.goal_notify import resolve_bot
 from app.services.member_texts import left_notice, removed_notice
+from app.services.ownership_transfer import cancel_pending_transfers_for_user
 from app.services.transaction_category_remap import remap_transaction_categories_to_budget
 
 
@@ -147,6 +148,8 @@ async def detach_member_to_own_budget(
 ) -> FamilyBudget:
     if departing_user.role == "owner":
         raise OwnerCannotDetachError()
+
+    await cancel_pending_transfers_for_user(session, departing_user.id)
 
     old_budget_name = old_budget.name
 

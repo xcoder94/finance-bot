@@ -25,6 +25,7 @@ from app.services.ownership_transfer import (
     TransferActorError,
     TransferNotFoundError,
     TransferNotPendingError,
+    TransferStaleError,
     accept_ownership_transfer,
     refuse_ownership_transfer,
 )
@@ -150,6 +151,10 @@ async def own_xfer_accept(callback: CallbackQuery) -> None:
                     actor=user,
                     bot=None,
                 )
+            except TransferStaleError as exc:
+                await callback.message.edit_reply_markup(reply_markup=None)
+                await callback.answer(exc.message)
+                return
             except (TransferNotFoundError, TransferNotPendingError, TransferActorError):
                 await callback.answer()
                 return

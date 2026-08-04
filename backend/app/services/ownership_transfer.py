@@ -33,6 +33,12 @@ class TransferActorError(Exception):
     pass
 
 
+class TransferStaleError(Exception):
+    def __init__(self, message: str = "Предложение больше не действует.") -> None:
+        self.message = message
+        super().__init__(message)
+
+
 def display_name(user: User) -> str:
     return user.first_name or user.username or "Участник"
 
@@ -69,12 +75,63 @@ async def _cancel_pending_for_family(
         row.status = "cancelled"
 
 
+async def cancel_pending_transfers_for_user(
+    session: AsyncSession, user_id: uuid.UUID
+) -> None:
+    pending = (
+        await session.scalars(
+            select(OwnershipTransfer).where(
+                OwnershipTransfer.status == "pending",
+                (
+                    (OwnershipTransfer.to_user_id == user_id)
+                    | (OwnershipTransfer.from_user_id == user_id)
+                ),
+            )
+        )
+    ).all()
+    for row in pending:
+        row.status = "cancelled"
+
+
+async def _get_transfer(
+    session: AsyncSession, transfer_id: uuid.UUID
+) -> OwnershipTransfer | None:
+    return await session.get(OwnershipTransfer, transfer_id)
+
+
 async def _get_pending_transfer(
     session: AsyncSession, transfer_id: uuid.UUID
 ) -> OwnershipTransfer | None:
-    return await session.scalar(
-        select(OwnershipTransfer).where(OwnershipTransfer.id == transfer_id)
-    )
+    transfer = await _get_transfer(session, transfer_id)
+    if transfer is None or transfer.status != "pending":
+        return None
+    return transfer
+
+
+def _transfer_participants_stale(
+    transfer: OwnershipTransfer,
+    former_owner: User | None,
+    new_owner: User | None,
+    budget: FamilyBudget | None,
+) -> bool:
+    if (
+        former_owner is None
+        or new_owner is None
+        or budget is None
+        or budget.is_deleted
+        or former_owner.is_deleted
+        or new_owner.is_deleted
+    ):
+        return True
+    if former_owner.family_budget_id != transfer.family_budget_id:
+        return True
+    if new_owner.family_budget_id != transfer.family_budget_id:
+        return True
+    if former_owner.role != "owner":
+        return True
+    if new_owner.role != "member":
+        return True
+    return False
 
 
 async def request_ownership_transfer(
@@ -128,7 +185,7 @@ async def accept_ownership_transfer(
     actor: User,
     bot: Bot | None = None,
 ) -> None:
-    transfer = await _get_pending_transfer(session, transfer_id)
+    transfer = await _get_transfer(session, transfer_id)
     if transfer is None:
         raise TransferNotFoundError()
     if transfer.status != "pending":
@@ -139,15 +196,14 @@ async def accept_ownership_transfer(
     former_owner = await session.get(User, transfer.from_user_id)
     new_owner = await session.get(User, transfer.to_user_id)
     budget = await session.get(FamilyBudget, transfer.family_budget_id)
-    if (
-        former_owner is None
-        or new_owner is None
-        or budget is None
-        or former_owner.is_deleted
-        or new_owner.is_deleted
-        or budget.is_deleted
-    ):
-        raise TransferNotFoundError()
+
+    if _transfer_participants_stale(transfer, former_owner, new_owner, budget):
+        transfer.status = "cancelled"
+        raise TransferStaleError()
+
+    assert former_owner is not None
+    assert new_owner is not None
+    assert budget is not None
 
     former_owner.role = "member"
     new_owner.role = "owner"

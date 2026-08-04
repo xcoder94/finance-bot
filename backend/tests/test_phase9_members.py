@@ -41,9 +41,12 @@ from app.services.membership_lifecycle import (
     FamilyFullError,
     JoinBlockReason,
     convert_join_with_own_budget,
+    detach_member_to_own_budget,
     evaluate_join_from_own_budget,
 )
 from app.services.ownership_transfer import (
+    TransferNotPendingError,
+    TransferStaleError,
     accept_ownership_transfer,
     refuse_ownership_transfer,
     request_ownership_transfer,
@@ -1166,3 +1169,134 @@ async def test_post_transfer_creates_pending_and_cancels_previous(
     assert len(pending) == 1
     assert pending[0].to_user_id == member_b.id
     assert bot.send_message.await_count == 2
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_accept_after_recipient_left_cancels_and_keeps_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = _mock_bot(monkeypatch)
+
+    async with rollback_session() as session:
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        recipient_tid = owner_tid + 1
+        owner, budget = await create_user_with_budget(
+            session,
+            telegram_id=owner_tid,
+            role="owner",
+            first_name="Alice",
+        )
+        budget.name = "Семья Каримовых"
+        recipient, _ = await create_user_with_budget(
+            session,
+            telegram_id=recipient_tid,
+            role="member",
+            first_name="Рустам",
+            family_budget_id=budget.id,
+        )
+        await session.flush()
+
+        transfer = await request_ownership_transfer(
+            session,
+            owner=owner,
+            recipient=recipient,
+            budget=budget,
+            bot=None,
+        )
+        assert transfer.status == "pending"
+
+        await detach_member_to_own_budget(
+            session,
+            departing_user=recipient,
+            old_budget=budget,
+            reason="left",
+            bot=None,
+        )
+        await session.flush()
+
+        await session.refresh(transfer)
+        assert transfer.status == "cancelled"
+
+        await session.refresh(owner)
+        await session.refresh(recipient)
+        assert owner.role == "owner"
+        assert recipient.role == "owner"
+        assert recipient.family_budget_id != budget.id
+
+        bot.send_message.reset_mock()
+
+        with pytest.raises(TransferNotPendingError):
+            await accept_ownership_transfer(
+                session,
+                transfer_id=transfer.id,
+                actor=recipient,
+                bot=None,
+            )
+        await session.flush()
+
+        await session.refresh(owner)
+        await session.refresh(transfer)
+        assert owner.role == "owner"
+        assert transfer.status == "cancelled"
+        bot.send_message.assert_not_awaited()
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_accept_stale_when_recipient_no_longer_in_family(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = _mock_bot(monkeypatch)
+
+    async with rollback_session() as session:
+        owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        recipient_tid = owner_tid + 1
+        owner, budget = await create_user_with_budget(
+            session,
+            telegram_id=owner_tid,
+            role="owner",
+            first_name="Alice",
+        )
+        budget.name = "Семья Каримовых"
+        recipient, _ = await create_user_with_budget(
+            session,
+            telegram_id=recipient_tid,
+            role="member",
+            first_name="Рустам",
+            family_budget_id=budget.id,
+        )
+        other_budget = FamilyBudget(invite_token=f"solo-{uuid.uuid4()}")
+        session.add(other_budget)
+        await session.flush()
+
+        transfer = await request_ownership_transfer(
+            session,
+            owner=owner,
+            recipient=recipient,
+            budget=budget,
+            bot=None,
+        )
+
+        recipient.family_budget_id = other_budget.id
+        recipient.role = "owner"
+        await session.flush()
+
+        bot.send_message.reset_mock()
+
+        with pytest.raises(TransferStaleError):
+            await accept_ownership_transfer(
+                session,
+                transfer_id=transfer.id,
+                actor=recipient,
+                bot=None,
+            )
+        await session.flush()
+
+        await session.refresh(owner)
+        await session.refresh(recipient)
+        await session.refresh(transfer)
+        assert owner.role == "owner"
+        assert recipient.role == "owner"
+        assert transfer.status == "cancelled"
+        bot.send_message.assert_not_awaited()
