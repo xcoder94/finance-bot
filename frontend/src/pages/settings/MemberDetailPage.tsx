@@ -10,6 +10,12 @@ import { SettingsStaticRow } from '../../components/settings/SettingsStaticRow'
 import { SettingsSubPageShell } from '../../components/settings/SettingsSubPageShell'
 import { useAuthStore } from '../../store/authStore'
 import {
+  REMOVE_CONFIRM_ACTION,
+  TRANSFER_CONFIRM_ACTION,
+  removeConfirmBody,
+  transferConfirmBody,
+} from '../../utils/memberConfirmCopy'
+import {
   buildMemberRowSubtitle,
   getMemberDisplayName,
 } from '../../utils/memberDisplay'
@@ -94,14 +100,12 @@ export function MemberDetailPage() {
     sheetState.kind === 'confirm' && member
       ? sheetState.confirmKind === 'remove'
         ? {
-            title: t('settings.membersScreen.removeConfirmTitle', { name: displayName }),
-            intro: t('settings.membersScreen.removeConfirmIntro'),
-            confirmLabel: t('settings.membersScreen.removeMember'),
+            intro: removeConfirmBody(displayName),
+            confirmLabel: REMOVE_CONFIRM_ACTION,
           }
         : {
-            title: t('settings.membersScreen.transferConfirmTitle'),
-            intro: t('settings.membersScreen.transferConfirmIntro', { name: displayName }),
-            confirmLabel: t('settings.membersScreen.transferOwnership'),
+            intro: transferConfirmBody(displayName),
+            confirmLabel: TRANSFER_CONFIRM_ACTION,
           }
       : null
 
@@ -162,7 +166,6 @@ export function MemberDetailPage() {
       {confirmCopy ? (
         <MemberConfirmSheet
           open={sheetState.kind === 'confirm'}
-          title={confirmCopy.title}
           intro={confirmCopy.intro}
           confirmLabel={confirmCopy.confirmLabel}
           onClose={() => {

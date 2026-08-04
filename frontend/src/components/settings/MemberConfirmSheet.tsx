@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
 
+import { MEMBER_CONFIRM_CANCEL } from '../../utils/memberConfirmCopy'
 import { FormSheet } from '../forms/FormSheet'
 
 type MemberConfirmSheetProps = {
   open: boolean
-  title: string
   intro: string
   confirmLabel: string
   onClose: () => void
@@ -15,7 +15,6 @@ type MemberConfirmSheetProps = {
 
 export function MemberConfirmSheet({
   open,
-  title,
   intro,
   confirmLabel,
   onClose,
@@ -28,19 +27,29 @@ export function MemberConfirmSheet({
   return (
     <FormSheet
       open={open}
-      title={title}
+      title=""
       intro={intro}
       onClose={onClose}
       showPrimary={false}
       danger={
-        <button
-          type="button"
-          className="form-sheet-danger-button"
-          onClick={onConfirm}
-          disabled={confirming}
-        >
-          {confirming ? '…' : confirmLabel}
-        </button>
+        <>
+          <button
+            type="button"
+            className="form-sheet-cancel"
+            onClick={onClose}
+            disabled={confirming}
+          >
+            {MEMBER_CONFIRM_CANCEL}
+          </button>
+          <button
+            type="button"
+            className="form-sheet-danger-button"
+            onClick={onConfirm}
+            disabled={confirming}
+          >
+            {confirming ? '…' : confirmLabel}
+          </button>
+        </>
       }
     >
       {error ? (
