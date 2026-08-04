@@ -21,6 +21,10 @@ TASHKENT = ZoneInfo("Asia/Tashkent")
 logger = logging.getLogger(__name__)
 
 
+def _default_clock() -> datetime:
+    return datetime.now(TASHKENT)
+
+
 def is_evening_reminder_slot(now: datetime) -> bool:
     local = now.astimezone(TASHKENT)
     return local.hour == 21 and local.minute == 0
@@ -59,7 +63,7 @@ async def notification_loop(
     bot: Bot,
     *,
     sleep_seconds: float = 60.0,
-    clock: Callable[[], datetime] = datetime.now,
+    clock: Callable[[], datetime] = _default_clock,
 ) -> None:
     while True:
         try:

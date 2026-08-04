@@ -14,6 +14,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.evening_reminder import EVENING_REMINDER_TEXT
 from app.services.notification_scheduler import (
+    _default_clock,
     is_evening_reminder_slot,
     is_weekly_digest_slot,
     tick,
@@ -48,6 +49,12 @@ def test_evening_slot_only_at_2100_tashkent() -> None:
 def test_weekly_slot_monday_1000() -> None:
     assert is_weekly_digest_slot(datetime(2026, 8, 3, 10, 0, tzinfo=TASHKENT))
     assert not is_weekly_digest_slot(datetime(2026, 8, 4, 10, 0, tzinfo=TASHKENT))
+
+
+def test_default_clock_is_tashkent_aware() -> None:
+    now = _default_clock()
+    assert now.tzinfo is not None
+    assert now.utcoffset() == datetime.now(TASHKENT).utcoffset()
 
 
 @pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
