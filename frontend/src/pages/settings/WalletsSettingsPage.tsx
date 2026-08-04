@@ -23,6 +23,7 @@ import {
 import {
   countPersonalWallets,
   countSharedWallets,
+  formatWalletSettingsSubtitle,
 } from '../../utils/settingsSubtitles'
 import { getDisplayName } from '../../utils/getDisplayName'
 
@@ -35,10 +36,6 @@ type SheetState =
   | { kind: 'closed' }
   | { kind: 'form'; mode: WalletFormMode; walletId: string | null }
   | { kind: 'delete'; walletId: string }
-
-function formatWalletSubtitle(currency: string): string {
-  return currency
-}
 
 export function WalletsSettingsPage() {
   const { t } = useTranslation()
@@ -196,7 +193,10 @@ export function WalletsSettingsPage() {
                 <SwipeableSettingsRow
                   key={wallet.id}
                   name={getDisplayName(wallet, t)}
-                  subtitle={formatWalletSubtitle(wallet.currency)}
+                  subtitle={formatWalletSettingsSubtitle(
+                    wallet.currency,
+                    wallet.has_active_goal,
+                  )}
                   onOpen={() => {
                     if (isOwner) {
                       openEditForm(wallet.id)
@@ -216,7 +216,10 @@ export function WalletsSettingsPage() {
                 <SwipeableSettingsRow
                   key={wallet.id}
                   name={getDisplayName(wallet, t)}
-                  subtitle={formatWalletSubtitle(wallet.currency)}
+                  subtitle={formatWalletSettingsSubtitle(
+                    wallet.currency,
+                    wallet.has_active_goal,
+                  )}
                   onOpen={() => openEditForm(wallet.id)}
                   swipeDeleteEnabled
                   onDelete={() => setSheetState({ kind: 'delete', walletId: wallet.id })}

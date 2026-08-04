@@ -7,6 +7,7 @@ import {
   countSharedWallets,
   defaultWalletSubtitle,
   expenseCategoriesSubtitle,
+  formatWalletSettingsSubtitle,
   incomeCategoriesSubtitle,
   languageSubtitle,
   membersSubtitle,
@@ -24,6 +25,11 @@ describe('settingsSubtitles', () => {
     expect(defaultWalletSubtitle('Карта Humo — основная')).toBe('Карта Humo — основная')
     expect(defaultWalletSubtitle(null)).toBe('—')
     expect(defaultWalletSubtitle(undefined)).toBe('—')
+  })
+
+  it('formats wallet settings subtitle with active goal mark', () => {
+    expect(formatWalletSettingsSubtitle('UZS', false)).toBe('UZS')
+    expect(formatWalletSettingsSubtitle('USD', true)).toBe('USD · цель')
   })
 
   it('formats income categories subtitle with Russian plural forms', () => {

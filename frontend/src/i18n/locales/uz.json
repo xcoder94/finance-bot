@@ -181,5 +181,28 @@
     "rent": "Ijara",
     "utilities": "Kommunal to'lovlar",
     "subcategory_other": "Boshqa"
+  },
+  "goals": {
+    "title": "Maqsadlar",
+    "newGoal": "Yangi maqsad",
+    "tabActive": "Jarayonda",
+    "tabClosed": "Erishilgan",
+    "emptyTitle": "Hozircha maqsadlar yo'q",
+    "emptySubtitle": "Maqsad — oila erishmoqchi bo'lgan summa: ta'til, ta'mirlash, xavfsizlik zaxirasi.",
+    "createGoal": "Maqsad yaratish",
+    "form": {
+      "newTitle": "Yangi maqsad",
+      "editTitle": "Maqsad",
+      "create": "Maqsad yaratish",
+      "save": "Saqlash",
+      "walletLabel": "Hamyon · majburiy",
+      "walletHint": "Maqsad valyutasi = hamyon valyutasi",
+      "targetAmountLabel": "Maqsad summasi · majburiy",
+      "nameLabel": "Nomi · ixtiyoriy",
+      "nameHint": "Standart — hamyon nomi",
+      "deadlineLabel": "Muddat · ixtiyoriy",
+      "deadlineNotSelected": "tanlanmagan",
+      "deadlineInvalid": "Sanani KK.OO.YYYY formatida kiriting"
+    }
   }
 }

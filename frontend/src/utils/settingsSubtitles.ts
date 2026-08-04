@@ -24,6 +24,13 @@ export function formatDefaultWalletRowSubtitle(
   return `${typeLabel} · ${currency}`
 }
 
+export function formatWalletSettingsSubtitle(
+  currency: string,
+  hasActiveGoal: boolean,
+): string {
+  return hasActiveGoal ? `${currency} · цель` : currency
+}
+
 function categoryWordRu(count: number): string {
   const abs = Math.abs(count)
   const mod10 = abs % 10

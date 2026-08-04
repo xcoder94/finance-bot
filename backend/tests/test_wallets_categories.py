@@ -250,6 +250,7 @@ class TestWalletsApi:
             "translation_key",
             "is_personal",
             "transaction_count",
+            "has_active_goal",
         }
         assert active_listed["transaction_count"] == 2
 
@@ -590,6 +591,7 @@ class TestListingQueryCounts:
                         "translation_key",
                         "is_personal",
                         "transaction_count",
+                        "has_active_goal",
                     },
                 ),
                 (

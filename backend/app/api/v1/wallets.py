@@ -2,11 +2,12 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select, union_all
+from sqlalchemy import exists, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.user_deps import CurrentUserDep
 from app.db import get_session
+from app.models.goal import Goal
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
 from app.schemas.wallets_categories import (
@@ -21,6 +22,7 @@ from app.services.entity_limits import (
     PERSONAL_WALLET_LIMIT,
     SHARED_WALLET_LIMIT,
 )
+from app.services.goals import get_active_goal_for_wallet
 from app.services.wallet_visibility import require_wallet_visible, visible_wallets_clause
 from app.services.wallets_categories import (
     count_wallet_transactions,
@@ -61,6 +63,12 @@ async def list_wallets(
             func.coalesce(transaction_counts.c.transaction_count, 0).label(
                 "transaction_count"
             ),
+            exists(
+                select(1).where(
+                    Goal.wallet_id == Wallet.id,
+                    Goal.status == "active",
+                )
+            ).label("has_active_goal"),
         )
         .outerjoin(transaction_counts, transaction_counts.c.wallet_id == Wallet.id)
         .where(
@@ -79,8 +87,9 @@ async def list_wallets(
             translation_key=wallet.translation_key,
             is_personal=wallet.is_personal,
             transaction_count=int(transaction_count),
+            has_active_goal=bool(has_active_goal),
         )
-        for wallet, transaction_count in rows
+        for wallet, transaction_count, has_active_goal in rows
     ]
 
 
@@ -144,6 +153,7 @@ async def create_wallet(
         translation_key=wallet.translation_key,
         is_personal=wallet.is_personal,
         transaction_count=0,
+        has_active_goal=False,
     )
 
 
@@ -166,6 +176,7 @@ async def update_wallet(
     wallet.name = body.name
     await session.commit()
     await session.refresh(wallet)
+    active_goal = await get_active_goal_for_wallet(session, wallet.id)
     return WalletResponse(
         id=wallet.id,
         name=wallet.name,
@@ -173,6 +184,7 @@ async def update_wallet(
         translation_key=wallet.translation_key,
         is_personal=wallet.is_personal,
         transaction_count=await count_wallet_transactions(session, wallet.id),
+        has_active_goal=active_goal is not None,
     )
 
 

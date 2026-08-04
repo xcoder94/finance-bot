@@ -39,6 +39,7 @@ class WalletResponse(BaseModel):
     translation_key: str | None
     is_personal: bool
     transaction_count: int = Field(default=0)
+    has_active_goal: bool = Field(default=False)
 
 
 class WalletDeleteResponse(BaseModel):

@@ -12,6 +12,7 @@ from app.api.v1.history import router as history_router
 from app.api.v1.members import init_bot_username, router as members_router
 from app.api.v1.me import router as me_router
 from app.api.v1.transactions import router as transactions_router
+from app.api.v1.goals import router as goals_router
 from app.api.v1.wallets import router as wallets_router
 from app.config import asyncpg_dsn
 from app.db import dispose_engine
@@ -58,6 +59,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(wallets_router)
+app.include_router(goals_router)
 app.include_router(categories_router)
 app.include_router(history_router)
 app.include_router(transactions_router)

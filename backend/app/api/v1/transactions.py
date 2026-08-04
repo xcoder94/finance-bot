@@ -19,11 +19,11 @@ from app.services.transactions import (
     create_expense_transaction,
     create_income_transaction,
     create_transfer_transaction,
+    delete_transaction_record,
     get_active_transaction,
     get_transaction_wallets,
     require_transaction_modify_permission,
     require_transaction_visible,
-    soft_delete_transaction,
     transaction_to_response,
     update_expense_transaction,
     update_income_transaction,
@@ -127,6 +127,6 @@ async def delete_transaction(
     if from_wallet is None:
         raise HTTPException(status_code=404)
     require_transaction_modify_permission(user, transaction, from_wallet, to_wallet)
-    soft_delete_transaction(transaction)
-    await session.commit()
-    return transaction_to_response(transaction)
+    return transaction_to_response(
+        await delete_transaction_record(session, transaction)
+    )
