@@ -600,6 +600,64 @@ class TestVoiceAcceptance:
             assert budget.daily_unparsed == 0
             assert budget.daily_model_calls == 0
 
+    async def test_voice_missing_speech_status_returns_model_fail_without_counters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_014_008)
+            wallet = make_wallet(budget, name="Карта сум")
+            session.add(wallet)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            set_parser_override(
+                FixedParser(
+                    ParseResponse(
+                        operations=[],
+                        speech_status=None,
+                    )
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_voice_message(telegram_id=user.telegram_id)
+            bot = make_voice_bot()
+            await handle_quick_entry_voice(message, bot)
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
+            assert budget.daily_model_calls == 0
+
+    async def test_voice_missing_parser_api_key_returns_model_fail_without_counters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_014_009)
+            wallet = make_wallet(budget, name="Карта сум")
+            session.add(wallet)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            monkeypatch.setattr("bot.quick_entry.handlers.PARSER_PROVIDER", "google")
+            monkeypatch.setattr("bot.quick_entry.handlers.PARSER_API_KEY", None)
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_voice_message(telegram_id=user.telegram_id)
+            bot = make_voice_bot()
+            await handle_quick_entry_voice(message, bot)
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
+            assert budget.daily_model_calls == 0
+
     async def test_voice_no_amount_reuses_msg_no_amount(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
