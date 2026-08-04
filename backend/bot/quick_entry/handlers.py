@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -12,7 +13,12 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import DAILY_MODEL_CALL_LIMIT, DAILY_UNPARSED_LIMIT
+from app.config import (
+    DAILY_MODEL_CALL_LIMIT,
+    DAILY_UNPARSED_LIMIT,
+    PARSER_API_KEY,
+    PARSER_PROVIDER,
+)
 from app.db import async_session_factory
 from app.models.expense_category import ExpenseCategory
 from app.models.family_budget import FamilyBudget
@@ -22,11 +28,10 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
-from app.speech.base import SpeechClient, SpeechUnavailable
-from app.speech.factory import get_speech_client
 from app.parsing.types import (
     ParseRequest,
     ParsedOperation,
+    ParseResponse,
     ParserMalformed,
     ParserUnavailable,
 )
@@ -53,7 +58,11 @@ from app.services.quick_entry_transfer import (
     resolve_transfer_wallets,
 )
 from app.services.transactions import get_active_transaction, soft_delete_transaction
-from app.services.quick_entry_dates import resolve_operation_date, strip_date_words
+from app.services.quick_entry_dates import (
+    apply_date_hint,
+    resolve_operation_date,
+    strip_date_words,
+)
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
     list_wallets_for_parse,
@@ -91,17 +100,11 @@ MAX_MESSAGE_LEN = 500
 MAX_OPERATIONS = 5
 
 _parser_override: MessageParser | None = None
-_speech_override: SpeechClient | None = None
 
 
 def set_parser_override(parser: MessageParser | None) -> None:
     global _parser_override
     _parser_override = parser
-
-
-def set_speech_client_override(client: SpeechClient | None) -> None:
-    global _speech_override
-    _speech_override = client
 
 
 def _get_parser() -> MessageParser:
@@ -110,10 +113,25 @@ def _get_parser() -> MessageParser:
     return get_parser()
 
 
-def _get_speech_client() -> SpeechClient:
-    if _speech_override is not None:
-        return _speech_override
-    return get_speech_client()
+def _resolve_op_date(
+    source_text: str, response: ParseResponse, today: date
+) -> date:
+    if source_text:
+        return resolve_operation_date(source_text)
+    return apply_date_hint(response.date_hint, today)
+
+
+def _resolve_rate(op: ParsedOperation, source_text: str) -> int | None:
+    if source_text:
+        return effective_rate(op, source_text)
+    if op.rate is not None and op.rate > 0:
+        return op.rate
+    return None
+
+
+def _strip_op_comment(op: ParsedOperation, source_text: str) -> str | None:
+    strip_source = source_text if source_text else (op.comment or "")
+    return strip_date_words(op.comment, strip_source)
 
 
 def _is_clear(op: ParsedOperation) -> bool:
@@ -247,6 +265,262 @@ async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | Non
     return wallets[0] if wallets else None
 
 
+async def _process_parsed_response(
+    message: Message,
+    bot: Bot,
+    session: AsyncSession,
+    user: User,
+    budget: FamilyBudget,
+    default_wallet: Wallet,
+    response: ParseResponse,
+    source_text: str,
+    today: date,
+) -> None:
+    countable = _filter_countable(response.operations)
+    clear_ops = [op for op in countable if _is_clear(op)]
+    ambiguous_ops = [op for op in countable if _is_ambiguous(op)]
+    transfer_ops = [op for op in countable if _is_transfer_op(op)]
+
+    ambiguous_only = (
+        not clear_ops
+        and not transfer_ops
+        and bool(ambiguous_ops)
+        and len(countable) <= MAX_OPERATIONS
+    )
+    if not ambiguous_only:
+        spend_model_call(budget)
+        await session.commit()
+
+    if len(countable) > MAX_OPERATIONS:
+        if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+            await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+            return
+        spend_unparsed(budget)
+        await session.commit()
+        await message.answer(MSG_TOO_MANY_OPS)
+        return
+
+    if not clear_ops and not ambiguous_ops and not transfer_ops:
+        if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+            await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+            return
+        spend_unparsed(budget)
+        await session.commit()
+        await message.answer(MSG_NO_AMOUNT)
+        return
+
+    op_date = _resolve_op_date(source_text, response, today)
+    txn_datetime = _operation_date_to_datetime(op_date)
+
+    for op in transfer_ops:
+        assert op.amount is not None
+        amount_currency: Literal["UZS", "USD"] = (
+            op.currency or default_wallet.currency  # type: ignore[assignment]
+        )
+        resolved = await resolve_transfer_wallets(
+            session=session,
+            family_budget_id=user.family_budget_id,
+            writer=user,
+            from_hint=op.from_wallet_hint,
+            to_hint=op.to_wallet_hint,
+            amount_currency=amount_currency,
+            default_wallet=default_wallet,
+        )
+        if isinstance(resolved, CurrencyMissing):
+            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                return
+            spend_unparsed(budget)
+            await session.commit()
+            await message.answer(currency_missing_text(resolved.currency))
+            continue
+
+        rate_val = _resolve_rate(op, source_text)
+        if needs_exchange_refusal(
+            from_currency=resolved.from_wallet.currency,  # type: ignore[arg-type]
+            to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
+            rate=rate_val,
+        ):
+            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                return
+            spend_unparsed(budget)
+            await session.commit()
+            await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
+            continue
+
+        create_rate = Decimal(rate_val) if rate_val is not None else None
+        comment = _strip_op_comment(op, source_text)
+        try:
+            txn = await create_quick_entry_transfer(
+                session,
+                user,
+                from_wallet_id=resolved.from_wallet.id,
+                to_wallet_id=resolved.to_wallet.id,
+                amount=op.amount,
+                rate=create_rate,
+                comment=comment,
+                transaction_date=txn_datetime,
+            )
+        except HTTPException:
+            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                return
+            spend_unparsed(budget)
+            await session.commit()
+            await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
+            continue
+
+        await _check_wallets_after_write(
+            session,
+            {resolved.from_wallet.id, resolved.to_wallet.id},
+            bot,
+        )
+
+        from_balance = await wallet_balance(session, resolved.from_wallet.id)
+        to_balance = await wallet_balance(session, resolved.to_wallet.id)
+        if (
+            resolved.from_wallet.currency != resolved.to_wallet.currency
+            and rate_val is not None
+        ):
+            card_text = format_exchange_card(
+                amount=op.amount,
+                from_currency=resolved.from_wallet.currency,  # type: ignore[arg-type]
+                to_amount=txn.to_amount,
+                to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
+                rate=rate_val,
+                op_date=op_date,
+                from_wallet_name=resolved.from_wallet.name,
+                to_wallet_name=resolved.to_wallet.name,
+                from_balance=from_balance,
+                to_balance=to_balance,
+            )
+        else:
+            card_text = format_transfer_card(
+                amount=op.amount,
+                currency=amount_currency,
+                from_wallet_name=resolved.from_wallet.name,
+                to_wallet_name=resolved.to_wallet.name,
+                op_date=op_date,
+                from_balance=from_balance,
+                to_balance=to_balance,
+            )
+        await message.answer(
+            card_text,
+            reply_markup=transfer_card_keyboard(txn.id),
+            parse_mode="Markdown",
+        )
+
+    for op in clear_ops:
+        assert op.amount is not None
+        currency: Literal["UZS", "USD"] = op.currency or default_wallet.currency  # type: ignore[assignment]
+        resolved = await resolve_wallet(
+            session=session,
+            family_budget_id=user.family_budget_id,
+            writer=user,
+            wallet_hint=op.wallet_hint,
+            currency=op.currency,
+            default_wallet=default_wallet,
+        )
+        if isinstance(resolved, CurrencyMissing):
+            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                return
+            spend_unparsed(budget)
+            await session.commit()
+            await message.answer(currency_missing_text(resolved.currency))
+            continue
+
+        wallet = resolved
+        comment = _strip_op_comment(op, source_text)
+        category_id = await resolve_category_id(
+            session,
+            user.family_budget_id,
+            op_type=op.type,  # type: ignore[arg-type]
+            category_name=op.category,
+        )
+
+        if op.type == "expense":
+            txn = await create_quick_entry_expense(
+                session,
+                user,
+                amount=op.amount,
+                wallet_id=wallet.id,
+                expense_category_id=category_id,
+                comment=comment,
+                transaction_date=txn_datetime,
+            )
+            sign = "➖"
+        else:
+            txn = await create_quick_entry_income(
+                session,
+                user,
+                amount=op.amount,
+                wallet_id=wallet.id,
+                income_category_id=category_id,
+                comment=comment,
+                transaction_date=txn_datetime,
+            )
+            sign = "➕"
+
+        await _check_wallets_after_write(session, {wallet.id}, bot)
+
+        balance = await wallet_balance(session, wallet.id)
+        card_text = format_card(
+            sign=sign,
+            amount=op.amount,
+            currency=currency,
+            category_label=_category_label(op.category),
+            comment=comment,
+            wallet_name=wallet.name,
+            op_date=op_date,
+            balance=balance,
+        )
+        await message.answer(
+            card_text,
+            reply_markup=card_keyboard(txn.id),
+            parse_mode="Markdown",
+        )
+
+    for op in ambiguous_ops:
+        assert op.amount is not None
+        currency = op.currency or default_wallet.currency  # type: ignore[assignment]
+        resolved = await resolve_wallet(
+            session=session,
+            family_budget_id=user.family_budget_id,
+            writer=user,
+            wallet_hint=op.wallet_hint,
+            currency=op.currency,
+            default_wallet=default_wallet,
+        )
+        if isinstance(resolved, CurrencyMissing):
+            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                return
+            spend_unparsed(budget)
+            await session.commit()
+            await message.answer(currency_missing_text(resolved.currency))
+            continue
+
+        pending = await create_pending(
+            session,
+            user_id=user.id,
+            family_budget_id=user.family_budget_id,
+            amount=op.amount,
+            currency=currency,
+            wallet_id=resolved.id,
+            category_raw=op.category,
+            comment=_strip_op_comment(op, source_text),
+            operation_date=op_date,
+            charge_on_confirm=not bool(clear_ops),
+        )
+        await message.answer(
+            _format_type_question(op.amount, currency, op.category),
+            reply_markup=type_question_keyboard(str(pending.id)),
+            parse_mode="Markdown",
+        )
+
+
 async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> None:
     if message.from_user is None:
         return
@@ -300,249 +574,17 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
             await session.commit()
             return
 
-        countable = _filter_countable(response.operations)
-        clear_ops = [op for op in countable if _is_clear(op)]
-        ambiguous_ops = [op for op in countable if _is_ambiguous(op)]
-        transfer_ops = [op for op in countable if _is_transfer_op(op)]
-
-        ambiguous_only = (
-            not clear_ops
-            and not transfer_ops
-            and bool(ambiguous_ops)
-            and len(countable) <= MAX_OPERATIONS
+        await _process_parsed_response(
+            message,
+            bot,
+            session,
+            user,
+            budget,
+            default_wallet,
+            response,
+            text,
+            today,
         )
-        if not ambiguous_only:
-            spend_model_call(budget)
-            await session.commit()
-
-        if len(countable) > MAX_OPERATIONS:
-            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                return
-            spend_unparsed(budget)
-            await session.commit()
-            await message.answer(MSG_TOO_MANY_OPS)
-            return
-
-        if not clear_ops and not ambiguous_ops and not transfer_ops:
-            if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                return
-            spend_unparsed(budget)
-            await session.commit()
-            await message.answer(MSG_NO_AMOUNT)
-            return
-
-        op_date = resolve_operation_date(text)
-        txn_datetime = _operation_date_to_datetime(op_date)
-
-        for op in transfer_ops:
-            assert op.amount is not None
-            amount_currency: Literal["UZS", "USD"] = (
-                op.currency or default_wallet.currency  # type: ignore[assignment]
-            )
-            resolved = await resolve_transfer_wallets(
-                session=session,
-                family_budget_id=user.family_budget_id,
-                writer=user,
-                from_hint=op.from_wallet_hint,
-                to_hint=op.to_wallet_hint,
-                amount_currency=amount_currency,
-                default_wallet=default_wallet,
-            )
-            if isinstance(resolved, CurrencyMissing):
-                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                    return
-                spend_unparsed(budget)
-                await session.commit()
-                await message.answer(currency_missing_text(resolved.currency))
-                continue
-
-            rate_val = effective_rate(op, text)
-            if needs_exchange_refusal(
-                from_currency=resolved.from_wallet.currency,  # type: ignore[arg-type]
-                to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
-                rate=rate_val,
-            ):
-                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                    return
-                spend_unparsed(budget)
-                await session.commit()
-                await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
-                continue
-
-            create_rate = Decimal(rate_val) if rate_val is not None else None
-            comment = strip_date_words(op.comment, text)
-            try:
-                txn = await create_quick_entry_transfer(
-                    session,
-                    user,
-                    from_wallet_id=resolved.from_wallet.id,
-                    to_wallet_id=resolved.to_wallet.id,
-                    amount=op.amount,
-                    rate=create_rate,
-                    comment=comment,
-                    transaction_date=txn_datetime,
-                )
-            except HTTPException:
-                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                    return
-                spend_unparsed(budget)
-                await session.commit()
-                await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
-                continue
-
-            await _check_wallets_after_write(
-                session,
-                {resolved.from_wallet.id, resolved.to_wallet.id},
-                bot,
-            )
-
-            from_balance = await wallet_balance(session, resolved.from_wallet.id)
-            to_balance = await wallet_balance(session, resolved.to_wallet.id)
-            if (
-                resolved.from_wallet.currency != resolved.to_wallet.currency
-                and rate_val is not None
-            ):
-                card_text = format_exchange_card(
-                    amount=op.amount,
-                    from_currency=resolved.from_wallet.currency,  # type: ignore[arg-type]
-                    to_amount=txn.to_amount,
-                    to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
-                    rate=rate_val,
-                    op_date=op_date,
-                    from_wallet_name=resolved.from_wallet.name,
-                    to_wallet_name=resolved.to_wallet.name,
-                    from_balance=from_balance,
-                    to_balance=to_balance,
-                )
-            else:
-                card_text = format_transfer_card(
-                    amount=op.amount,
-                    currency=amount_currency,
-                    from_wallet_name=resolved.from_wallet.name,
-                    to_wallet_name=resolved.to_wallet.name,
-                    op_date=op_date,
-                    from_balance=from_balance,
-                    to_balance=to_balance,
-                )
-            await message.answer(
-                card_text,
-                reply_markup=transfer_card_keyboard(txn.id),
-                parse_mode="Markdown",
-            )
-
-        for op in clear_ops:
-            assert op.amount is not None
-            currency: Literal["UZS", "USD"] = op.currency or default_wallet.currency  # type: ignore[assignment]
-            resolved = await resolve_wallet(
-                session=session,
-                family_budget_id=user.family_budget_id,
-                writer=user,
-                wallet_hint=op.wallet_hint,
-                currency=op.currency,
-                default_wallet=default_wallet,
-            )
-            if isinstance(resolved, CurrencyMissing):
-                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                    return
-                spend_unparsed(budget)
-                await session.commit()
-                await message.answer(currency_missing_text(resolved.currency))
-                continue
-
-            wallet = resolved
-            comment = strip_date_words(op.comment, text)
-            category_id = await resolve_category_id(
-                session,
-                user.family_budget_id,
-                op_type=op.type,  # type: ignore[arg-type]
-                category_name=op.category,
-            )
-
-            if op.type == "expense":
-                txn = await create_quick_entry_expense(
-                    session,
-                    user,
-                    amount=op.amount,
-                    wallet_id=wallet.id,
-                    expense_category_id=category_id,
-                    comment=comment,
-                    transaction_date=txn_datetime,
-                )
-                sign = "➖"
-            else:
-                txn = await create_quick_entry_income(
-                    session,
-                    user,
-                    amount=op.amount,
-                    wallet_id=wallet.id,
-                    income_category_id=category_id,
-                    comment=comment,
-                    transaction_date=txn_datetime,
-                )
-                sign = "➕"
-
-            await _check_wallets_after_write(session, {wallet.id}, bot)
-
-            balance = await wallet_balance(session, wallet.id)
-            card_text = format_card(
-                sign=sign,
-                amount=op.amount,
-                currency=currency,
-                category_label=_category_label(op.category),
-                comment=comment,
-                wallet_name=wallet.name,
-                op_date=op_date,
-                balance=balance,
-            )
-            await message.answer(
-                card_text,
-                reply_markup=card_keyboard(txn.id),
-                parse_mode="Markdown",
-            )
-
-        for op in ambiguous_ops:
-            assert op.amount is not None
-            currency = op.currency or default_wallet.currency  # type: ignore[assignment]
-            resolved = await resolve_wallet(
-                session=session,
-                family_budget_id=user.family_budget_id,
-                writer=user,
-                wallet_hint=op.wallet_hint,
-                currency=op.currency,
-                default_wallet=default_wallet,
-            )
-            if isinstance(resolved, CurrencyMissing):
-                if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                    await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                    return
-                spend_unparsed(budget)
-                await session.commit()
-                await message.answer(currency_missing_text(resolved.currency))
-                continue
-
-            pending = await create_pending(
-                session,
-                user_id=user.id,
-                family_budget_id=user.family_budget_id,
-                amount=op.amount,
-                currency=currency,
-                wallet_id=resolved.id,
-                category_raw=op.category,
-                comment=strip_date_words(op.comment, text),
-                operation_date=op_date,
-                charge_on_confirm=not bool(clear_ops),
-            )
-            await message.answer(
-                _format_type_question(op.amount, currency, op.category),
-                reply_markup=type_question_keyboard(str(pending.id)),
-                parse_mode="Markdown",
-            )
 
 
 async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
@@ -574,36 +616,83 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
     buffer = await bot.download_file(file.file_path)
     audio = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
 
-    try:
-        transcript = await _get_speech_client().transcribe(audio)
-    except SpeechUnavailable:
+    if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
         await message.answer(MSG_MODEL_FAIL)
         return
 
-    text = transcript.strip()
-    if not text:
-        telegram_id = message.from_user.id
-        async with async_session_factory() as session:
-            user = await get_active_user_by_telegram_id(session, telegram_id)
-            if user is None:
-                await message.answer(MESSAGES["not_registered"]["ru"])
-                return
-            budget = await session.get(FamilyBudget, user.family_budget_id)
-            if budget is None or budget.is_deleted:
-                await message.answer(MESSAGES["not_registered"]["ru"])
-                return
-            today = tashkent_today_for_counters()
-            ensure_counters_day(budget, today)
+    audio_b64 = base64.b64encode(audio).decode()
+
+    telegram_id = message.from_user.id
+    async with async_session_factory() as session:
+        user = await get_active_user_by_telegram_id(session, telegram_id)
+        if user is None:
+            await message.answer(MESSAGES["not_registered"]["ru"])
+            return
+
+        budget = await session.get(FamilyBudget, user.family_budget_id)
+        if budget is None or budget.is_deleted:
+            await message.answer(MESSAGES["not_registered"]["ru"])
+            return
+
+        today = tashkent_today_for_counters()
+        ensure_counters_day(budget, today)
+        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
+            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+            await session.commit()
+            return
+
+        default_wallet = await _get_default_wallet(session, user)
+        if default_wallet is None:
+            await message.answer(MSG_NO_AMOUNT)
+            return
+
+        wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
+        parse_request = ParseRequest(
+            text="",
+            wallet_names=[w.name for w in wallets],
+            expense_category_names=await _list_expense_category_names(
+                session, user.family_budget_id
+            ),
+            income_category_names=await _list_income_category_names(
+                session, user.family_budget_id
+            ),
+            audio_base64=audio_b64,
+            audio_mime_type="audio/ogg",
+        )
+
+        parser = _get_parser()
+        try:
+            response = await parser.parse(parse_request)
+        except (ParserUnavailable, ParserMalformed):
+            await message.answer(MSG_MODEL_FAIL)
+            await session.commit()
+            return
+
+        if response.speech_status is None:
+            await message.answer(MSG_MODEL_FAIL)
+            await session.commit()
+            return
+
+        if response.speech_status == "not_recognized":
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
-                await session.commit()
                 return
             spend_unparsed(budget)
             await session.commit()
             await message.answer(MSG_VOICE_NOT_RECOGNIZED)
-        return
+            return
 
-    await process_quick_entry_text(message, bot, text)
+        await _process_parsed_response(
+            message,
+            bot,
+            session,
+            user,
+            budget,
+            default_wallet,
+            response,
+            "",
+            today,
+        )
 
 
 @router.message(F.voice)
