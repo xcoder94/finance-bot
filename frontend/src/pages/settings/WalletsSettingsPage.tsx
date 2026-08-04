@@ -20,7 +20,10 @@ import {
   invalidateWalletData,
   peekWallets,
 } from '../../store/dataCacheStore'
-import { countSharedWallets } from '../../utils/settingsSubtitles'
+import {
+  countPersonalWallets,
+  countSharedWallets,
+} from '../../utils/settingsSubtitles'
 import { getDisplayName } from '../../utils/getDisplayName'
 
 type LoadState =
@@ -50,6 +53,7 @@ export function WalletsSettingsPage() {
   const [reloadCount, setReloadCount] = useState(0)
   const [sheetState, setSheetState] = useState<SheetState>({ kind: 'closed' })
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false)
+  const [walletTypePickerOpen, setWalletTypePickerOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
 
@@ -77,6 +81,7 @@ export function WalletsSettingsPage() {
     [wallets],
   )
   const sharedCount = countSharedWallets(wallets)
+  const personalCount = countPersonalWallets(wallets)
 
   const selectedWallet =
     sheetState.kind === 'form' && sheetState.walletId
@@ -95,19 +100,27 @@ export function WalletsSettingsPage() {
       ? wallets.find((wallet) => wallet.id === sheetState.walletId) ?? null
       : null
 
+  const formEditable =
+    sheetState.kind === 'form' &&
+    (sheetState.mode === 'create' ||
+      (formWallet !== null && (formWallet.is_personal || isOwner)))
+
   const openCreateForm = () => {
     setCurrencyPickerOpen(false)
+    setWalletTypePickerOpen(false)
     setSheetState({ kind: 'form', mode: 'create', walletId: null })
   }
 
   const openEditForm = (walletId: string) => {
     setCurrencyPickerOpen(false)
+    setWalletTypePickerOpen(false)
     setSheetState({ kind: 'form', mode: 'edit', walletId })
   }
 
   const closeSheets = () => {
     setSheetState({ kind: 'closed' })
     setCurrencyPickerOpen(false)
+    setWalletTypePickerOpen(false)
     setDeleteError(false)
   }
 
@@ -116,13 +129,21 @@ export function WalletsSettingsPage() {
     setReloadCount((count) => count + 1)
   }
 
-  const handleSave = async (payload: { name: string; currency: 'UZS' | 'USD' }) => {
+  const handleSave = async (payload: {
+    name: string
+    currency: 'UZS' | 'USD'
+    is_personal: boolean
+  }) => {
     if (sheetState.kind !== 'form') {
       return
     }
 
     if (sheetState.mode === 'create') {
-      await createWallet(payload)
+      await createWallet({
+        name: payload.name,
+        currency: payload.currency,
+        is_personal: payload.is_personal,
+      })
     } else if (sheetState.walletId) {
       await patchWallet(sheetState.walletId, { name: payload.name })
     }
@@ -157,8 +178,8 @@ export function WalletsSettingsPage() {
         title={t('settings.wallets')}
         backLabel={t('settings.toc.back')}
         backTo="/settings"
-        actionLabel={isOwner ? t('settings.addWallet') : undefined}
-        onAction={isOwner ? openCreateForm : undefined}
+        actionLabel={t('settings.addWallet')}
+        onAction={openCreateForm}
       >
         {loadState.status === 'loading' ? (
           <div className="settings-entity-page__loading">
@@ -176,7 +197,11 @@ export function WalletsSettingsPage() {
                   key={wallet.id}
                   name={getDisplayName(wallet, t)}
                   subtitle={formatWalletSubtitle(wallet.currency)}
-                  onOpen={() => openEditForm(wallet.id)}
+                  onOpen={() => {
+                    if (isOwner) {
+                      openEditForm(wallet.id)
+                    }
+                  }}
                   swipeDeleteEnabled={isOwner}
                   onDelete={() => setSheetState({ kind: 'delete', walletId: wallet.id })}
                 />
@@ -193,7 +218,7 @@ export function WalletsSettingsPage() {
                   name={getDisplayName(wallet, t)}
                   subtitle={formatWalletSubtitle(wallet.currency)}
                   onOpen={() => openEditForm(wallet.id)}
-                  swipeDeleteEnabled={isOwner}
+                  swipeDeleteEnabled
                   onDelete={() => setSheetState({ kind: 'delete', walletId: wallet.id })}
                 />
               ))}
@@ -209,11 +234,15 @@ export function WalletsSettingsPage() {
           wallet={formWallet}
           displayName={selectedWallet ? getDisplayName(selectedWallet, t) : undefined}
           sharedWalletCount={sharedCount}
-          editable={isOwner}
+          personalWalletCount={personalCount}
+          canPickWalletType={isOwner}
+          editable={formEditable}
           onClose={closeSheets}
           onSave={handleSave}
           currencyPickerOpen={currencyPickerOpen}
           onCurrencyPickerOpenChange={setCurrencyPickerOpen}
+          walletTypePickerOpen={walletTypePickerOpen}
+          onWalletTypePickerOpenChange={setWalletTypePickerOpen}
         />
       ) : null}
 
