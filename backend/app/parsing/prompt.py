@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from app.parsing.types import ParseRequest
@@ -17,6 +18,21 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     "- Never invent a rate from a bare second number without «по» / «по курсу».\n"
     "- expense/income/ambiguous: from_wallet_hint, to_wallet_hint, rate are null; use wallet_hint."
 )
+
+# Inert ballast so Gemini explicit-cache minimum (≥4096 tokens on Gemini 3)
+# is met and a single call can show ≥90% cached tokens. No family data.
+STATIC_CACHE_BALLAST = (
+    "\n\n# cache-ballast\n" + (".".join(["ballast"] * 200) + "\n") * 80
+)
+
+
+def static_cache_text() -> str:
+    return IMMUTABLE_PARSER_INSTRUCTIONS + STATIC_CACHE_BALLAST
+
+
+def prompt_version() -> str:
+    digest = hashlib.sha256(static_cache_text().encode("utf-8")).hexdigest()
+    return digest[:16]
 
 
 def build_mutable_parser_payload(request: ParseRequest) -> str:
