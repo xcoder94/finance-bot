@@ -73,6 +73,7 @@ export type TransactionResponse = {
   expense_category_id: string | null
   comment: string | null
   created_by_user_id: string
+  changes?: string[]
 }
 
 export class TransactionsApiError extends Error {
