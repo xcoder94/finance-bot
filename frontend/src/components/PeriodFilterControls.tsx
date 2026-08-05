@@ -115,7 +115,6 @@ type PeriodFilterControlsProps = {
   onRangeFromTouched: () => void
   onRangeToTouched: () => void
   rangeOrderInvalid: boolean
-  monthSelectorClassName?: string
   periodHint?: string
 }
 
@@ -133,7 +132,6 @@ export function PeriodFilterControls({
   onRangeFromTouched,
   onRangeToTouched,
   rangeOrderInvalid,
-  monthSelectorClassName = 'home-page__month-selector',
   periodHint,
 }: PeriodFilterControlsProps) {
   const { t } = useTranslation()
@@ -156,7 +154,7 @@ export function PeriodFilterControls({
 
   return (
     <>
-      <div className="segmented-control-wrap history-page__period-tabs">
+      <div className="segmented-control-wrap analytics-page__period-tabs">
         <SegmentedControl>
           <SegmentedControl.Item
             selected={periodTab === 'month'}
@@ -174,26 +172,24 @@ export function PeriodFilterControls({
       </div>
 
       {periodTab === 'month' ? (
-        <div className={monthSelectorClassName}>
+        <div className="home-month-bar analytics-page__month-bar">
           <button
             type="button"
-            className="home-month-nav__button analytics-page__month-nav"
+            className="home-month-bar__nav"
             aria-label={t('home.previousMonth')}
             onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, -1))}
           >
             ‹
           </button>
           <div className="analytics-page__month-label-wrap">
-            <Text weight="2" className="home-page__month-label analytics-page__month-label">
-              {formatMonthLabel(selectedMonth)}
-            </Text>
+            <div className="home-month-bar__label">{formatMonthLabel(selectedMonth)}</div>
             {periodHint ? (
               <Text className="analytics-page__period-hint">{periodHint}</Text>
             ) : null}
           </div>
           <button
             type="button"
-            className="home-month-nav__button analytics-page__month-nav"
+            className="home-month-bar__nav"
             aria-label={t('home.nextMonth')}
             onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, 1))}
           >

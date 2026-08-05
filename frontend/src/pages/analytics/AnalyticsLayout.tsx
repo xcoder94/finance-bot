@@ -224,7 +224,6 @@ export function AnalyticsLayout() {
             onRangeFromTouched={() => setRangeFromTouched(true)}
             onRangeToTouched={() => setRangeToTouched(true)}
             rangeOrderInvalid={rangeOrderInvalid}
-            monthSelectorClassName="analytics-page__month-selector"
             periodHint={t('analytics.sharedPeriodHint')}
           />
         </div>
