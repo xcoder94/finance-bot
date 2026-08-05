@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   countExpenseParents,
   countExpenseSubcategories,
+  countNonProtectedExpenseParents,
   countPersonalWallets,
   countSharedWallets,
   defaultWalletSubtitle,
@@ -84,5 +85,16 @@ describe('settingsSubtitles', () => {
     ]
     expect(countExpenseParents(categories)).toBe(2)
     expect(countExpenseSubcategories(categories)).toBe(3)
+  })
+
+  it('counts only non-protected expense parents for limit UI', () => {
+    const categories = [
+      { parent_id: null, is_protected: true },
+      { parent_id: null, is_protected: true },
+      { parent_id: null, is_protected: false },
+      { parent_id: null },
+      { parent_id: 'a' },
+    ]
+    expect(countNonProtectedExpenseParents(categories)).toBe(2)
   })
 })

@@ -176,9 +176,11 @@ export function ExpenseSubcategoriesSettingsPage() {
         backTo="/settings/expense-categories"
         actionLabel={isOwner && parent ? t('settings.addSubcategory') : undefined}
         onAction={isOwner && parent ? openCreateForm : undefined}
-        dangerLabel={isOwner && parent ? CATEGORY_DELETE_DANGER_LABEL : undefined}
+        dangerLabel={
+          isOwner && parent && !parent.is_protected ? CATEGORY_DELETE_DANGER_LABEL : undefined
+        }
         onDanger={
-          isOwner && parent
+          isOwner && parent && !parent.is_protected
             ? () => setSheetState({ kind: 'delete', target: 'parent', categoryId: parent.id })
             : undefined
         }

@@ -4,6 +4,7 @@ export type WalletSubtitleInput = {
 
 export type ExpenseCategorySubtitleInput = {
   parent_id: string | null
+  is_protected?: boolean
 }
 
 export function walletsSubtitle(sharedCount: number, personalCount: number): string {
@@ -110,6 +111,12 @@ export function countPersonalWallets(wallets: WalletSubtitleInput[]): number {
 
 export function countExpenseParents(categories: ExpenseCategorySubtitleInput[]): number {
   return categories.filter((category) => category.parent_id === null).length
+}
+
+export function countNonProtectedExpenseParents(
+  categories: Array<{ parent_id: string | null; is_protected?: boolean }>,
+): number {
+  return categories.filter((c) => c.parent_id === null && !c.is_protected).length
 }
 
 export function countExpenseSubcategories(categories: ExpenseCategorySubtitleInput[]): number {
