@@ -10,12 +10,15 @@
     "unauthorized": "Autentifikatsiya xatosi",
     "notOnboarded": "Avval botni ishga tushiring",
     "removedFromFamily": "Siz oila byudjetidan olib tashlangansiz",
-    "passFailed": "Не удалось открыть приложение. Закройте его и откройте снова через меню бота.",
+    "passFailed": "Ilovani ochib bo‘lmadi. Uni yoping va bot menyusi orqali qayta oching.",
     "networkError": "Serverga ulanib bo'lmadi",
-    "retry": "Попробовать снова"
+    "retry": "Qayta urinib ko'ring"
   },
   "placeholder": {
     "comingSoon": "Tez orada"
+  },
+  "transaction": {
+    "gone": "Yozuv endi mavjud emas."
   },
   "settings": {
     "role": "Rol",
@@ -38,15 +41,73 @@
     "currencyLabel": "Valyuta",
     "nameRequired": "Nomni kiriting",
     "nameTooLong": "Nom 50 ta belgidan oshmasligi kerak",
+    "nameTooLong30": "Nom 30 ta belgidan oshmasligi kerak",
     "loadError": "Sozlamalarni yuklab bo'lmadi",
     "submitError": "O'zgarishlarni saqlab bo'lmadi",
     "members": "Oila a'zolari",
+    "toc": {
+      "defaultWallet": "Standart hamyon",
+      "members": "A'zolar",
+      "notifications": "Bildirishnomalar",
+      "back": "‹ Sozlamalar",
+      "backExpenseCategories": "‹ Xarajat kategoriyalari",
+      "footerHint": "Har bir bo'lim o'z ekranida sozlanadi. O'chirish ham o'sha yerda — ro'yxat qatorida emas.",
+      "profileOwner": "«{{name}}» byudjeti egasi",
+      "profileMember": "«{{name}}» byudjeti a'zosi"
+    },
     "inviteLink": "Taklif havolasi",
     "copyLink": "Nusxalash",
-    "linkCopied": "Nusxalandi"
+    "linkCopied": "Nusxalandi",
+    "walletForm": {
+      "newTitle": "Yangi hamyon",
+      "createIntroOwner": "Umumiy hamyonni faqat egasi yaratadi. Shaxsiyni — har kim o'ziga.",
+      "createIntroMember": "Siz faqat shaxsiy hamyon yaratishingiz mumkin."
+    },
+    "walletGroups": {
+      "sharedOwner": "Umumiy · siz o'zgartirasiz",
+      "sharedMember": "Umumiy · faqat egasi o'zgartiradi",
+      "personal": "Shaxsiy · faqat sizga ko'rinadi",
+      "personalNote": "Chapga suring — «O'chirish» va tasdiqlash ochiladi. Limit: 10 ta umumiy va 5 ta shaxsiy hamyon."
+    },
+    "walletType": {
+      "shared": "Umumiy",
+      "personal": "Shaxsiy"
+    },
+    "defaultWallet": {
+      "groupTitle": "Agar hamyon ko'rsatilmagan bo'lsa, bot qayerga yozadi",
+      "note": "Barcha hamyonlaringizdan bittasini tanlang. Darhol o'zgaradi, tasdiqlash shart emas."
+    },
+    "languageScreen": {
+      "groupTitle": "Interfeys va bot javoblari",
+      "note": "Darhol o'zgaradi, mini-ilovani qayta ishga tushirish shart emas."
+    },
+    "categoryGroups": {
+      "incomeNote": "Tekis ro'yxat: daromadlarda pastki kategoriya yo'q.",
+      "expenseNote": "Pastki kategoriyalar ota kategoriya ichida ochiladi. Limit — 8 ta kategoriya va har birida 8 ta pastki kategoriya.",
+      "subcategoriesTitle": "Pastki kategoriyalar",
+      "subcategoriesNote": "Pastki kategoriyani o'chirish — surish orqali; operatsiyalar ota kategoriyada qoladi."
+    },
+    "membersScreen": {
+      "noteOwner": "Egalik huquqini topshirish va a'zoni o'chirish — a'zo kartochkasida. Egasi chiqa olmaydi: avval huquqni topshiring.",
+      "noteMember": "Yangilarni faqat egasi taklif qila oladi.",
+      "leaveBudget": "Byudjetdan chiqish",
+      "linkFieldLabel": "Havola",
+      "reissueLink": "Qayta chiqarish",
+      "sincePrefix": "dan",
+      "backToMembers": "‹ A'zolar",
+      "transferOwnership": "Egalik huquqini topshirish",
+      "removeMember": "A'zoni o'chirish"
+    },
+    "notificationsScreen": {
+      "groupTitle": "Ikkita mustaqil tugma",
+      "note": "Mini-ilova pushi emas, bot xabari sifatida keladi.",
+      "eveningTitle": "Kechqurun eslatma",
+      "eveningSubtitle": "Agar kun davomida birorta ham yozuv bo'lmasa, 21:00",
+      "weeklyTitle": "Hafta yakunlari",
+      "weeklySubtitle": "Har dushanba, soat 10:00"
+    }
   },
   "home": {
-    "title": "Mening moliyam",
     "summary": "Xulosa",
     "income": "Daromad",
     "expense": "Xarajat",
@@ -62,17 +123,26 @@
     "loadError": "Ma'lumotlarni yuklab bo'lmadi",
     "previousMonth": "Oldingi oy",
     "nextMonth": "Keyingi oy",
-    "loading": "Yuklanmoqda"
+    "loading": "Yuklanmoqda",
+    "roleLineOwner": "Umumiy byudjet · {{count}} · siz egasisiz",
+    "roleLineMember": "Umumiy byudjet · {{count}}",
+    "participant_one": "{{count}} a'zo",
+    "participant_other": "{{count}} a'zo",
+    "emptyMonthHint": "Botga «taksi 32000» deb yozing — operatsiya shu yerda paydo bo'ladi.",
+    "opsNone": "operatsiyalar yo'q",
+    "opsCount": "{{count}} · {{monthShort}}",
+    "personalTitle": "shaxsiy",
+    "personalSubtitle": "{{name}} · umumiy byudjetdan tashqarida"
   },
   "addIncome": {
     "title": "Daromad qo'shish"
   },
   "addExpense": {
-    "title": "Xarajat qo'shish",
-    "subcategoryCreateError": "Pastki kategoriyani tayyorlab bo'lmadi. Ulanishni tekshirib, qayta urinib ko'ring."
+    "title": "Xarajat qo'shish"
   },
   "addTransfer": {
-    "title": "O'tkazma / valyuta almashinuvi"
+    "titleSame": "O'tkazma",
+    "titleExchange": "Almashinuv"
   },
   "addTransaction": {
     "dateTime": "Sana va vaqt",
@@ -94,6 +164,7 @@
     "goHome": "Bosh sahifaga",
     "addAnother": "Yana qo'shish",
     "invalidDateTime": "To'g'ri sana va vaqtni kiriting",
+    "invalidDate": "To'g'ri sanani kiriting",
     "amountTooLong": "Summa 10 ta raqamdan oshmasligi kerak"
   },
   "history": {
@@ -104,6 +175,8 @@
     "dateTo": "Gacha",
     "transfer": "O'tkazma",
     "exchange": "Valyuta almashinuvi",
+    "emptyTitle": "Davr uchun operatsiyalar yo'q",
+    "emptyHint": "Oyni almashtiring yoki kategoriya bo'yicha filtrni bekor qiling.",
     "loadMore": "Yana ko'rsatish",
     "invalidDate": "To'g'ri sanani kiriting",
     "invalidRange": "«Dan» sanasi «Gacha» sanasidan keyin bo'lishi mumkin emas",
@@ -127,16 +200,53 @@
   "editTransaction": {
     "save": "Saqlash"
   },
+  "categoryPicker": {
+    "expenseTitle": "Xarajat kategoriyasi",
+    "incomeTitle": "Daromad kategoriyasi",
+    "expenseIntro": "Ota kategoriyada to'xtashingiz mumkin — pastki kategoriya shart emas.",
+    "parentOnly": "Pastki kategoriyasiz · faqat «{{parent}}»"
+  },
+  "formSheet": {
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "date": "Sana",
+    "comment": "Izoh",
+    "commentTooLong": "Izoh 200 ta belgidan oshmasligi kerak",
+    "amountCurrencyHint": "Valyuta hamyondan olinadi va alohida tanlanmaydi.",
+    "defaultWalletHint": "Standart hamyon tanlangan",
+    "incomeCategoryHint": "Daromadlarda pastki kategoriya yo'q",
+    "transferSameIntro": "Valyutalar bir xil — kurs maydoni yo'q.",
+    "transferDiffIntro": "Valyutalar boshqacha — kurs va natija qatori paydo bo'ladi.",
+    "deleteRecord": "Yozuvni o'chirish",
+    "changes": "O'zgarishlar"
+  },
   "analytics": {
     "title": "Analitika",
+    "tabCharts": "Grafiklar",
+    "tabHistory": "Tarix",
+    "sharedPeriodHint": "Davr ikkala bo'lim uchun umumiy",
     "expensesByCategory": "Kategoriyalar bo'yicha xarajatlar",
     "incomeByCategory": "Kategoriyalar bo'yicha daromadlar",
     "monthlyTrend": "Oylar bo'yicha daromad va xarajat",
+    "trendTitle": "Daromad va xarajat, 12 oy",
+    "trendUnitUzs": "mln so'm",
+    "trendUnitUsd": "$",
     "summaryTitle": "Oy xulosasi",
     "transferNet": "O'tkazmalar (netto)",
     "netChange": "Yakuniy o'zgarish",
     "averageDailyExpense": "Kunlik o'rtacha xarajat",
+    "avgDaily": "Kunlik o'rtacha xarajat",
+    "mostExpensiveDay": "Eng qimmat kun",
     "weekdayExpenses": "Hafta kunlari bo'yicha xarajatlar",
+    "avgDailyCaption": "so'm · {{count}} {{dayWord}}",
+    "avgDailyCaptionUsd": "$ · {{count}} {{dayWord}}",
+    "mostExpensiveCaption": "o'rtacha {{amount}}",
+    "chartsEmptyTitle": "{{month}} uchun xarajatlar yo'q",
+    "chartsEmptyHint": "Diagramma oyning birinchi operatsiyasidan keyin paydo bo'ladi.",
+    "sharesInside": "Kategoriya ichidagi ulushlar · {{month}}",
+    "drillHintRoot": "Sektorga bosish pastki kategoriyalarni ochadi. Kulrang «Boshqalar» — to'qqizinchi kategoriyadan boshlab va ochilmaydi.",
+    "drillHintSubcategory": "Pastki kategoriyaga bosish o'sha davr tarixini ochadi. Ikkinchi darajadan chuqurroq hech narsa yo'q.",
+    "resetFilter": "Bekor qilish",
     "noData": "Tanlangan davr uchun ma'lumot yo'q",
     "other": "Boshqalar",
     "weekdayMon": "Du",
@@ -163,24 +273,38 @@
     "salary": "Ish haqi",
     "side_job": "Qo'shimcha ish",
     "gifts": "Sovg'alar",
+    "family_transfers": "Qarindoshlardan o'tkazmalar",
     "income_other": "Boshqa daromad",
     "food": "Ovqat",
-    "entertainment": "Ko'ngilochar",
-    "transport": "Transport",
-    "home": "Uy",
-    "expense_other": "Boshqa xarajat",
     "groceries": "Oziq-ovqat",
-    "lunch": "Tushlik",
-    "drinks_water": "Suv va ichimliklar",
-    "cafe": "Kafe",
-    "playstation": "Playstation",
-    "cinema": "Kino",
-    "subscriptions": "Obunalar",
+    "cafes_restaurants": "Kafe va restoranlar",
+    "delivery": "Yetkazib berish",
+    "transport": "Transport",
     "taxi": "Taksi",
     "fuel": "Yoqilg'i",
+    "public_transport": "Jamoat transporti",
+    "car_maintenance": "Avtomobil xizmati",
+    "home": "Uy",
     "rent": "Ijara",
-    "utilities": "Kommunal to'lovlar",
-    "subcategory_other": "Boshqa"
+    "utilities": "Kommunal xizmatlar",
+    "telecom_internet": "Aloqa va internet",
+    "repairs_furnishing": "Ta'mirlash va jihozlash",
+    "children": "Bolalar",
+    "kindergarten_school": "Bog'cha va maktab",
+    "clubs_tutoring": "To'garaklar va repetitorlar",
+    "kids_goods": "Bolalar mahsulotlari",
+    "health": "Sog'liq",
+    "pharmacy": "Dori-darmon va apteka",
+    "doctors_clinics": "Shifokorlar va klinikalar",
+    "dentistry": "Stomatologiya",
+    "events_celebrations": "Tadbirlar va to'ylar",
+    "toi_celebrations": "To'ylar va marosimlar",
+    "event_gifts": "Sovg'alar",
+    "shopping_leisure": "Xaridlar va dam olish",
+    "clothing": "Kiyim",
+    "entertainment": "Ko'ngilochar",
+    "subscriptions": "Obunalar",
+    "beauty_care": "Go'zallik va parvarish"
   },
   "goals": {
     "title": "Maqsadlar",

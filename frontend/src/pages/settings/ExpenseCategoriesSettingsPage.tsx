@@ -29,6 +29,7 @@ import { getDisplayName } from '../../utils/getDisplayName'
 import {
   countExpenseParents,
   countExpenseSubcategories,
+  countNonProtectedExpenseParents,
   expenseCategoriesSubtitle,
   expenseParentRowSubtitle,
 } from '../../utils/settingsSubtitles'
@@ -88,6 +89,7 @@ export function ExpenseCategoriesSettingsPage() {
   const categories = loadState.status === 'success' ? loadState.items : []
   const grouped = useMemo(() => groupParents(categories), [categories])
   const parentCount = countExpenseParents(categories)
+  const nonProtectedParentCount = countNonProtectedExpenseParents(categories)
   const subcategoryCount = countExpenseSubcategories(categories)
 
   const deleteTarget =
@@ -165,7 +167,7 @@ export function ExpenseCategoriesSettingsPage() {
                 name={getDisplayName(group.parent, t)}
                 subtitle={expenseParentRowSubtitle(group.subcategories.length)}
                 onOpen={() => navigate(`/settings/expense-categories/${group.parent.id}`)}
-                swipeDeleteEnabled={isOwner}
+                swipeDeleteEnabled={isOwner && !group.parent.is_protected}
                 onDelete={() => setSheetState({ kind: 'delete', categoryId: group.parent.id })}
               />
             ))}
@@ -179,8 +181,10 @@ export function ExpenseCategoriesSettingsPage() {
           mode="create"
           kind="expense-parent"
           category={null}
-          atLimit={parentCount >= PARENT_CATEGORY_LIMIT}
-          limitMessage={parentCount >= PARENT_CATEGORY_LIMIT ? LIMIT_EXPENSE_PARENTS : undefined}
+          atLimit={nonProtectedParentCount >= PARENT_CATEGORY_LIMIT}
+          limitMessage={
+            nonProtectedParentCount >= PARENT_CATEGORY_LIMIT ? LIMIT_EXPENSE_PARENTS : undefined
+          }
           editable={isOwner}
           onClose={closeSheets}
           onSave={handleSave}

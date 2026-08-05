@@ -1616,29 +1616,18 @@ button.home-ops-row:focus-visible {
   padding: 0 14px 12px;
 }
 
-.analytics-page__period .history-page__period-tabs {
-  padding: 0 0 12px;
+.analytics-page__period-tabs {
+  padding: 0 0 10px;
 }
 
-.analytics-page__month-selector {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px;
-  border: 1px solid var(--sep);
-  border-radius: 10px;
+.analytics-page__period .segmented-control-wrap > div {
+  width: 100%;
+  min-width: 220px;
+  max-width: 280px;
 }
 
-.analytics-page__month-nav {
-  border-radius: 0;
-  background: transparent;
-  color: var(--acc);
-  font-size: 16px;
-  font-weight: 500;
-  width: auto;
-  height: auto;
-  padding: 8px 14px;
+.analytics-page__month-bar {
+  width: 100%;
 }
 
 .analytics-page__month-label-wrap {
@@ -1647,10 +1636,8 @@ button.home-ops-row:focus-visible {
   text-align: center;
 }
 
-.analytics-page__month-label {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1;
+.analytics-page__month-bar .home-month-bar__label {
+  text-transform: capitalize;
 }
 
 .analytics-page__period-hint {

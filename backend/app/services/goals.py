@@ -12,7 +12,15 @@ from app.models.wallet import Wallet
 from app.schemas.goals import GoalCreate, GoalResponse, GoalUpdate
 from app.services.goal_notify import fan_out_achievement, resolve_bot
 from app.services.quick_entry_balance import wallet_balance
+from app.services.quick_entry_dates import tashkent_today
 from app.services.wallets_categories import get_active_wallet
+
+
+def _reject_backdated_deadline(deadline: date | None, *, existing: date | None = None) -> None:
+    if deadline is None:
+        return
+    if deadline < tashkent_today() and deadline != existing:
+        raise HTTPException(status_code=400, detail="deadline_before_today")
 
 
 def progress_fields(
@@ -157,6 +165,8 @@ async def create_goal(
     if existing is not None:
         raise HTTPException(status_code=409)
 
+    _reject_backdated_deadline(body.deadline)
+
     balance = await wallet_balance(session, wallet.id)
     name = body.name if body.name is not None and body.name.strip() else wallet.name
 
@@ -199,7 +209,9 @@ async def update_goal(
     if "target_amount" in update_data:
         goal.target_amount = update_data["target_amount"]
     if "deadline" in update_data:
-        goal.deadline = update_data["deadline"]
+        new_deadline = update_data["deadline"]
+        _reject_backdated_deadline(new_deadline, existing=goal.deadline)
+        goal.deadline = new_deadline
 
     await session.commit()
     await session.refresh(goal)

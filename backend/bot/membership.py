@@ -105,7 +105,7 @@ async def join_accept(callback: CallbackQuery) -> None:
 
     await callback.message.answer(
         welcome_invited(budget_name),
-        reply_markup=open_app_keyboard(),
+        reply_markup=open_app_keyboard(user.language),
         parse_mode="Markdown",
     )
     await callback.message.delete()

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
 import { PeriodFilterControls } from '../../components/PeriodFilterControls'
@@ -157,9 +156,27 @@ export function AnalyticsLayout() {
   return (
     <AnalyticsProvider value={contextValue}>
       <div className="page-content home-page analytics-page">
-        <Title level="1" weight="2" className="home-page__title analytics-page__title">
-          {t('analytics.title')}
-        </Title>
+        <div className="home-header">
+          <div className="home-header__info">
+            <h1 className="home-header__title">{t('analytics.title')}</h1>
+          </div>
+          <div className="home-currency-chip" role="group" aria-label={t('home.summary')}>
+            {CURRENCIES.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={
+                  currency === item
+                    ? 'home-currency-chip__btn home-currency-chip__btn--active'
+                    : 'home-currency-chip__btn'
+                }
+                onClick={() => setCurrency(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="analytics-toolbar">
           <div className="analytics-tabs" role="tablist" aria-label={t('analytics.title')}>
@@ -190,25 +207,6 @@ export function AnalyticsLayout() {
               {t('analytics.tabHistory')}
             </button>
           </div>
-
-          {activeTab === 'charts' ? (
-            <div className="home-currency-chip" role="group" aria-label={t('home.summary')}>
-              {CURRENCIES.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={
-                    currency === item
-                      ? 'home-currency-chip__btn home-currency-chip__btn--active'
-                      : 'home-currency-chip__btn'
-                  }
-                  onClick={() => setCurrency(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <div className="analytics-page__period">
@@ -226,7 +224,6 @@ export function AnalyticsLayout() {
             onRangeFromTouched={() => setRangeFromTouched(true)}
             onRangeToTouched={() => setRangeToTouched(true)}
             rangeOrderInvalid={rangeOrderInvalid}
-            monthSelectorClassName="analytics-page__month-selector"
             periodHint={t('analytics.sharedPeriodHint')}
           />
         </div>

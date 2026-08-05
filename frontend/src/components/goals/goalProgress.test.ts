@@ -58,6 +58,10 @@ describe('goalDueLabel', () => {
   it('formats active deadline', () => {
     expect(goalDueLabel('2027-06-01', null, false)).toBe('до 01.06.2027')
   })
+
+  it('keeps passed-deadline label for active goals', () => {
+    expect(goalDueLabel('2026-08-01', null, false)).toBe('до 01.08.2026')
+  })
 })
 
 describe('goalShowCloseButton', () => {

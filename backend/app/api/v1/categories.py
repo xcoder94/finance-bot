@@ -210,6 +210,7 @@ async def list_expense_categories(
             translation_key=category.translation_key,
             parent_id=category.parent_id,
             color_index=category.color_index,
+            is_protected=category.is_protected,
             transaction_count=int(transaction_count),
         )
         for category, transaction_count in rows
@@ -230,6 +231,7 @@ async def create_expense_category(
                 ExpenseCategory.family_budget_id == user.family_budget_id,
                 ExpenseCategory.is_deleted.is_(False),
                 ExpenseCategory.parent_id.is_(None),
+                ExpenseCategory.is_protected.is_(False),
             )
         )
         if parent_count is not None and parent_count >= PARENT_CATEGORY_LIMIT:
@@ -275,6 +277,7 @@ async def create_expense_category(
         translation_key=category.translation_key,
         parent_id=category.parent_id,
         color_index=category.color_index,
+        is_protected=category.is_protected,
         transaction_count=0,
     )
 
@@ -289,6 +292,8 @@ async def update_expense_category(
     category = await get_active_expense_category(session, category_id, user.family_budget_id)
     if category is None:
         raise HTTPException(status_code=404)
+    if category.is_protected:
+        raise HTTPException(status_code=403)
 
     category.name = body.name
     await session.commit()
@@ -299,6 +304,7 @@ async def update_expense_category(
         translation_key=category.translation_key,
         parent_id=category.parent_id,
         color_index=category.color_index,
+        is_protected=category.is_protected,
         transaction_count=await count_expense_category_transactions(session, category.id),
     )
 
@@ -312,6 +318,8 @@ async def delete_expense_category(
     category = await get_active_expense_category(session, category_id, user.family_budget_id)
     if category is None:
         raise HTTPException(status_code=404)
+    if category.is_protected:
+        raise HTTPException(status_code=403)
 
     affected_transactions_count = await count_expense_category_transactions(session, category.id)
     soft_delete(category)

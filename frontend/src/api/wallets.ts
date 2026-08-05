@@ -9,6 +9,7 @@ export type WalletResponse = {
   transaction_count: number
   is_personal: boolean
   has_active_goal: boolean
+  balance: number
 }
 
 export type WalletDeleteResponse = {

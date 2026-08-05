@@ -4,6 +4,7 @@ export type WalletSubtitleInput = {
 
 export type ExpenseCategorySubtitleInput = {
   parent_id: string | null
+  is_protected?: boolean
 }
 
 export function walletsSubtitle(sharedCount: number, personalCount: number): string {
@@ -24,11 +25,26 @@ export function formatDefaultWalletRowSubtitle(
   return `${typeLabel} · ${currency}`
 }
 
+function formatGroupedAmount(amount: number): string {
+  return Math.abs(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+function formatWalletSettingsAmount(balance: number, currency: string): string {
+  const sign = balance < 0 ? '-' : ''
+  const grouped = formatGroupedAmount(balance)
+  if (currency === 'USD') {
+    return `${sign}$${grouped}`
+  }
+  return `${sign}${grouped} сум`
+}
+
 export function formatWalletSettingsSubtitle(
   currency: string,
+  balance: number,
   hasActiveGoal: boolean,
 ): string {
-  return hasActiveGoal ? `${currency} · цель` : currency
+  const base = `${currency} · ${formatWalletSettingsAmount(balance, currency)}`
+  return hasActiveGoal ? `${base} · цель` : base
 }
 
 function categoryWordRu(count: number): string {
@@ -110,6 +126,12 @@ export function countPersonalWallets(wallets: WalletSubtitleInput[]): number {
 
 export function countExpenseParents(categories: ExpenseCategorySubtitleInput[]): number {
   return categories.filter((category) => category.parent_id === null).length
+}
+
+export function countNonProtectedExpenseParents(
+  categories: Array<{ parent_id: string | null; is_protected?: boolean }>,
+): number {
+  return categories.filter((c) => c.parent_id === null && !c.is_protected).length
 }
 
 export function countExpenseSubcategories(categories: ExpenseCategorySubtitleInput[]): number {

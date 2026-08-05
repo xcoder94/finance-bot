@@ -21,6 +21,7 @@ type CategoryFormSheetProps = {
   editable: boolean
   onClose: () => void
   onSave: (payload: { name: string }) => Promise<void>
+  onDelete?: () => void
 }
 
 function validateCategoryName(name: string): 'required' | 'tooLong' | null {
@@ -60,6 +61,7 @@ export function CategoryFormSheet({
   editable,
   onClose,
   onSave,
+  onDelete,
 }: CategoryFormSheetProps) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
@@ -140,6 +142,21 @@ export function CategoryFormSheet({
       onPrimary={() => void handleSave()}
       primaryDisabled={!canSave}
       primaryLoading={saving}
+      danger={
+        mode === 'edit' &&
+        onDelete &&
+        (kind === 'income' || kind === 'expense-subcategory')
+          ? (
+            <button
+              type="button"
+              className="form-sheet-danger-button"
+              onClick={onDelete}
+            >
+              Удалить
+            </button>
+          )
+          : undefined
+      }
     >
       <FormSheetField
         label="Название · до 30 знаков"

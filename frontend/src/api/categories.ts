@@ -30,6 +30,7 @@ export type ExpenseCategoryResponse = {
   parent_id: string | null
   transaction_count: number
   color_index: number
+  is_protected: boolean
 }
 
 export type ExpenseCategoryDeleteResponse = {

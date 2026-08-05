@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -8,6 +9,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -20,6 +22,7 @@ from app.config import (
     PARSER_PROVIDER,
 )
 from app.db import async_session_factory
+from app.models.cascade_fallback_log import CascadeFallbackLog
 from app.models.expense_category import ExpenseCategory
 from app.models.family_budget import FamilyBudget
 from app.models.income_category import IncomeCategory
@@ -28,6 +31,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
+from app.parsing.prefilter import PrefilterCategory, build_seed_name_by_key, try_prefilter
 from app.parsing.types import (
     ParseRequest,
     ParsedOperation,
@@ -77,6 +81,7 @@ from bot.quick_entry.cards import (
     format_transfer_card,
     transfer_card_keyboard,
     type_question_keyboard,
+    parse_wallet_set_callback,
     wallet_picker_keyboard,
 )
 from bot.quick_entry.pending import consume_pending, create_pending, get_pending
@@ -95,6 +100,7 @@ from bot.quick_entry.texts import (
 )
 
 router = Router()
+logger = logging.getLogger(__name__)
 TASHKENT = ZoneInfo("Asia/Tashkent")
 MAX_MESSAGE_LEN = 500
 MAX_OPERATIONS = 5
@@ -256,6 +262,52 @@ async def _list_income_category_names(
     return list((await session.scalars(stmt)).all())
 
 
+async def _list_expense_categories_for_prefilter(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> list[PrefilterCategory]:
+    stmt = (
+        select(ExpenseCategory)
+        .where(
+            ExpenseCategory.family_budget_id == family_budget_id,
+            ExpenseCategory.is_deleted.is_(False),
+        )
+        .order_by(ExpenseCategory.name)
+    )
+    rows = (await session.scalars(stmt)).all()
+    return [
+        PrefilterCategory(
+            id=row.id,
+            name=row.name,
+            translation_key=row.translation_key,
+            parent_id=row.parent_id,
+        )
+        for row in rows
+    ]
+
+
+async def _list_income_categories_for_prefilter(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> list[PrefilterCategory]:
+    stmt = (
+        select(IncomeCategory)
+        .where(
+            IncomeCategory.family_budget_id == family_budget_id,
+            IncomeCategory.is_deleted.is_(False),
+        )
+        .order_by(IncomeCategory.name)
+    )
+    rows = (await session.scalars(stmt)).all()
+    return [
+        PrefilterCategory(
+            id=row.id,
+            name=row.name,
+            translation_key=row.translation_key,
+            parent_id=None,
+        )
+        for row in rows
+    ]
+
+
 async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | None:
     if user.default_wallet_id is not None:
         wallet = await session.get(Wallet, user.default_wallet_id)
@@ -275,6 +327,8 @@ async def _process_parsed_response(
     response: ParseResponse,
     source_text: str,
     today: date,
+    *,
+    charge_model_call: bool = True,
 ) -> None:
     countable = _filter_countable(response.operations)
     clear_ops = [op for op in countable if _is_clear(op)]
@@ -287,7 +341,7 @@ async def _process_parsed_response(
         and bool(ambiguous_ops)
         and len(countable) <= MAX_OPERATIONS
     )
-    if not ambiguous_only:
+    if charge_model_call and not ambiguous_only:
         spend_model_call(budget)
         await session.commit()
 
@@ -521,7 +575,13 @@ async def _process_parsed_response(
         )
 
 
-async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> None:
+async def process_quick_entry_text(
+    message: Message,
+    bot: Bot,
+    text: str,
+    *,
+    prefilter_enabled: bool = False,
+) -> None:
     if message.from_user is None:
         return
 
@@ -544,10 +604,6 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
 
         today = tashkent_today_for_counters()
         ensure_counters_day(budget, today)
-        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
-            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
-            await session.commit()
-            return
 
         default_wallet = await _get_default_wallet(session, user)
         if default_wallet is None:
@@ -555,24 +611,82 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
             return
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
-        parse_request = ParseRequest(
-            text=text,
-            wallet_names=[w.name for w in wallets],
-            expense_category_names=await _list_expense_category_names(
-                session, user.family_budget_id
-            ),
-            income_category_names=await _list_income_category_names(
-                session, user.family_budget_id
-            ),
+        wallet_names = [w.name for w in wallets]
+        expense_categories = await _list_expense_categories_for_prefilter(
+            session, user.family_budget_id
+        )
+        income_categories = await _list_income_categories_for_prefilter(
+            session, user.family_budget_id
         )
 
-        parser = _get_parser()
-        try:
-            response = await parser.parse(parse_request)
-        except (ParserUnavailable, ParserMalformed):
-            await message.answer(MSG_MODEL_FAIL)
-            await session.commit()
-            return
+        prefilter_op = None
+        prefilter_hit = False
+        fallback_reason: str = "prefilter_disabled"
+        if prefilter_enabled:
+            prefilter_result = try_prefilter(
+                text,
+                wallet_names=wallet_names,
+                expense_categories=expense_categories,
+                income_categories=income_categories,
+                seed_name_by_key=build_seed_name_by_key(),
+            )
+            prefilter_op = prefilter_result.operation
+            prefilter_hit = prefilter_op is not None
+            if not prefilter_hit:
+                fallback_reason = prefilter_result.reason or "prefilter_disabled"
+
+        if prefilter_hit:
+            response = ParseResponse(operations=[prefilter_op])
+        else:
+            try:
+                async with session.begin_nested():
+                    session.add(
+                        CascadeFallbackLog(
+                            family_budget_id=user.family_budget_id,
+                            telegram_user_id=telegram_id,
+                            text=text,
+                            reason=fallback_reason,
+                        )
+                    )
+                    await session.flush()
+            except Exception:
+                logger.exception(
+                    "Failed to write cascade_fallback_log family_budget_id=%s "
+                    "telegram_user_id=%s reason=%s",
+                    user.family_budget_id,
+                    telegram_id,
+                    fallback_reason,
+                )
+
+            if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
+                await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+                await session.commit()
+                return
+
+            parse_request = ParseRequest(
+                text=text,
+                wallet_names=wallet_names,
+                expense_category_names=await _list_expense_category_names(
+                    session, user.family_budget_id
+                ),
+                income_category_names=await _list_income_category_names(
+                    session, user.family_budget_id
+                ),
+            )
+
+            parser = _get_parser()
+            try:
+                response = await parser.parse(parse_request)
+            except (ParserUnavailable, ParserMalformed) as exc:
+                logger.exception(
+                    "Parser failure entry_path=text family_budget_id=%s telegram_user_id=%s: %s",
+                    user.family_budget_id,
+                    message.from_user.id,
+                    exc,
+                )
+                await message.answer(MSG_MODEL_FAIL)
+                await session.commit()
+                return
 
         await _process_parsed_response(
             message,
@@ -584,6 +698,7 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
             response,
             text,
             today,
+            charge_model_call=not prefilter_hit,
         )
 
 
@@ -595,7 +710,7 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
     if not text:
         return
 
-    await process_quick_entry_text(message, bot, text)
+    await process_quick_entry_text(message, bot, text, prefilter_enabled=True)
 
 
 @router.message(F.text, ~F.text.startswith("/"))
@@ -663,7 +778,13 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
         parser = _get_parser()
         try:
             response = await parser.parse(parse_request)
-        except (ParserUnavailable, ParserMalformed):
+        except (ParserUnavailable, ParserMalformed) as exc:
+            logger.exception(
+                "Parser failure entry_path=voice family_budget_id=%s telegram_user_id=%s: %s",
+                user.family_budget_id,
+                message.from_user.id,
+                exc,
+            )
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return
@@ -728,8 +849,11 @@ async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
         if transaction.to_wallet_id is not None:
             affected.add(transaction.to_wallet_id)
         await _check_wallets_after_write(session, affected, bot)
-        await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer()
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest:
+            pass
 
 
 async def handle_quick_entry_wallet_list(callback: CallbackQuery, bot: Bot) -> None:
@@ -765,15 +889,11 @@ async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> No
     if callback.from_user is None or callback.message is None or callback.data is None:
         return
 
-    parts = callback.data.split(":")
-    if len(parts) != 4:
+    parsed = parse_wallet_set_callback(callback.data)
+    if parsed is None:
         return
 
-    try:
-        txn_id = uuid.UUID(parts[2])
-        wallet_id = uuid.UUID(parts[3])
-    except ValueError:
-        return
+    txn_id, wallet_id = parsed
 
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, callback.from_user.id)
@@ -911,14 +1031,12 @@ async def quick_entry_delete_callback(callback: CallbackQuery, bot: Bot) -> None
     await handle_quick_entry_delete(callback, bot)
 
 
-@router.callback_query(
-    F.data.startswith("qe:wal:") & ~F.data.startswith("qe:walset:")
-)
+@router.callback_query(F.data.startswith("qe:wal:"))
 async def quick_entry_wallet_list_callback(callback: CallbackQuery, bot: Bot) -> None:
     await handle_quick_entry_wallet_list(callback, bot)
 
 
-@router.callback_query(F.data.startswith("qe:walset:"))
+@router.callback_query(F.data.startswith("qe:ws:"))
 async def quick_entry_wallet_set_callback(callback: CallbackQuery, bot: Bot) -> None:
     await handle_quick_entry_wallet_set(callback, bot)
 

@@ -1,6 +1,9 @@
 import { type PointerEvent as ReactPointerEvent, useRef, useState } from 'react'
 
-import { SETTINGS_SWIPE_DELETE_WIDTH } from '../../utils/settingsEntitySwipe'
+import {
+  exceedsPointerDragThreshold,
+  SETTINGS_SWIPE_DELETE_WIDTH,
+} from '../../utils/settingsEntitySwipe'
 
 type SwipeableSettingsRowProps = {
   name: string
@@ -20,14 +23,15 @@ export function SwipeableSettingsRow({
   const [offset, setOffset] = useState(0)
   const startX = useRef(0)
   const startOffset = useRef(0)
-  const dragging = useRef(false)
+  const pointerDown = useRef(false)
+  const dragActive = useRef(false)
 
   const revealed = offset <= -SETTINGS_SWIPE_DELETE_WIDTH / 2
   const clampedOffset =
     swipeDeleteEnabled ? Math.max(-SETTINGS_SWIPE_DELETE_WIDTH, Math.min(0, offset)) : 0
 
   const finishDrag = () => {
-    dragging.current = false
+    dragActive.current = false
     if (!swipeDeleteEnabled) {
       setOffset(0)
       return
@@ -39,17 +43,24 @@ export function SwipeableSettingsRow({
     if (!swipeDeleteEnabled) {
       return
     }
-    dragging.current = true
+    pointerDown.current = true
+    dragActive.current = false
     startX.current = event.clientX
     startOffset.current = offset
-    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging.current || !swipeDeleteEnabled) {
+    if (!pointerDown.current || !swipeDeleteEnabled) {
       return
     }
     const delta = event.clientX - startX.current
+    if (!dragActive.current) {
+      if (!exceedsPointerDragThreshold(delta)) {
+        return
+      }
+      dragActive.current = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }
     setOffset(
       Math.max(
         -SETTINGS_SWIPE_DELETE_WIDTH,
@@ -59,7 +70,11 @@ export function SwipeableSettingsRow({
   }
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging.current) {
+    if (!pointerDown.current) {
+      return
+    }
+    pointerDown.current = false
+    if (!dragActive.current) {
       return
     }
     event.currentTarget.releasePointerCapture(event.pointerId)

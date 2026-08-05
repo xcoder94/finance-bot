@@ -749,8 +749,10 @@ wallet's currency** and is not selectable.
 ### 12.2 Progress
 
 Progress = wallet balance ÷ target × 100, computed from the real balance and
-**capped at 100% for display**. A passed deadline is a label only; the date
-remains editable at any time.
+**capped at 100% for display**. When setting or editing a deadline, the
+earliest allowed date is today — a backdated deadline is rejected. A
+deadline that later passes while the goal stays open is a label only, not a
+block; the date remains editable at any time.
 
 When the balance exceeds the target, the line "осталось накопить" is replaced:
 
@@ -805,8 +807,12 @@ Goal progress is never shown on a quick-entry card.
    figures, no percentage, and no return control. Wallet balances are unchanged.
 7. Create a new goal on the same wallet — allowed, since the previous one is
    closed.
-8. Set a deadline in the past. The card shows a label only, and the date is
-   still editable.
+8. Attempt to set a deadline before today, on creation and on edit. It is
+   rejected; the earliest date accepted is today.
+9. Create a goal with a deadline that later passes while the goal is still
+   open (balance under target). The card shows a passed-deadline label
+   only — it does not block progress, closing, or further edits, and the
+   date remains editable at any time.
 
 ---
 

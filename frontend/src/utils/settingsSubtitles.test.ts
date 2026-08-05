@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   countExpenseParents,
   countExpenseSubcategories,
+  countNonProtectedExpenseParents,
   countPersonalWallets,
   countSharedWallets,
   defaultWalletSubtitle,
@@ -27,9 +28,14 @@ describe('settingsSubtitles', () => {
     expect(defaultWalletSubtitle(undefined)).toBe('—')
   })
 
-  it('formats wallet settings subtitle with active goal mark', () => {
-    expect(formatWalletSettingsSubtitle('UZS', false)).toBe('UZS')
-    expect(formatWalletSettingsSubtitle('USD', true)).toBe('USD · цель')
+  it('formats wallet settings subtitle with balance and active goal mark', () => {
+    expect(formatWalletSettingsSubtitle('UZS', 840_000, false)).toBe('UZS · 840 000 сум')
+    expect(formatWalletSettingsSubtitle('USD', 1_240, false)).toBe('USD · $1 240')
+    expect(formatWalletSettingsSubtitle('UZS', 2_350_000, true)).toBe(
+      'UZS · 2 350 000 сум · цель',
+    )
+    expect(formatWalletSettingsSubtitle('USD', 1_240, true)).toBe('USD · $1 240 · цель')
+    expect(formatWalletSettingsSubtitle('UZS', 0, false)).toBe('UZS · 0 сум')
   })
 
   it('formats income categories subtitle with Russian plural forms', () => {
@@ -84,5 +90,16 @@ describe('settingsSubtitles', () => {
     ]
     expect(countExpenseParents(categories)).toBe(2)
     expect(countExpenseSubcategories(categories)).toBe(3)
+  })
+
+  it('counts only non-protected expense parents for limit UI', () => {
+    const categories = [
+      { parent_id: null, is_protected: true },
+      { parent_id: null, is_protected: true },
+      { parent_id: null, is_protected: false },
+      { parent_id: null },
+      { parent_id: 'a' },
+    ]
+    expect(countNonProtectedExpenseParents(categories)).toBe(2)
   })
 })

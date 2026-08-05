@@ -40,6 +40,7 @@ class WalletResponse(BaseModel):
     is_personal: bool
     transaction_count: int = Field(default=0)
     has_active_goal: bool = Field(default=False)
+    balance: int = Field(default=0)
 
 
 class WalletDeleteResponse(BaseModel):
@@ -118,6 +119,7 @@ class ExpenseCategoryResponse(BaseModel):
     translation_key: str | None
     parent_id: uuid.UUID | None
     color_index: int
+    is_protected: bool = Field(default=False)
     transaction_count: int = Field(default=0)
 
 

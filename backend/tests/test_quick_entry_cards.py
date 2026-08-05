@@ -10,6 +10,7 @@ from bot.quick_entry.cards import (
     format_card,
     type_question_keyboard,
     wallet_picker_keyboard,
+    wallet_set_callback_data,
 )
 from bot.quick_entry.texts import (
     MSG_GONE,
@@ -169,12 +170,18 @@ class TestWalletPickerKeyboard:
         kb = wallet_picker_keyboard(txn_id, wallets)
         assert len(kb.inline_keyboard) == 2
         assert kb.inline_keyboard[0][0].text == "Карта сум"
-        assert (
-            kb.inline_keyboard[0][0].callback_data
-            == f"qe:walset:{txn_id}:{wallets[0].id}"
+        assert kb.inline_keyboard[0][0].callback_data == wallet_set_callback_data(
+            txn_id, wallets[0].id
         )
         assert kb.inline_keyboard[1][0].text == "Наличный сум"
-        assert (
-            kb.inline_keyboard[1][0].callback_data
-            == f"qe:walset:{txn_id}:{wallets[1].id}"
+        assert kb.inline_keyboard[1][0].callback_data == wallet_set_callback_data(
+            txn_id, wallets[1].id
         )
+        lengths = [
+            btn.callback_data
+            for row in kb.inline_keyboard
+            for btn in row
+            if btn.callback_data is not None
+        ]
+        assert all(len(data) <= 64 for data in lengths)
+        assert max(len(data) for data in lengths) <= 64

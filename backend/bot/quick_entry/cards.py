@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import uuid
 from datetime import date
 
@@ -173,6 +174,36 @@ def type_question_keyboard(pending_id: str) -> InlineKeyboardMarkup:
     )
 
 
+_WALLET_SET_PREFIX = "qe:ws:"
+
+
+def wallet_set_callback_data(
+    transaction_id: uuid.UUID, wallet_id: uuid.UUID
+) -> str:
+    payload = transaction_id.bytes + wallet_id.bytes
+    encoded = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+    return f"{_WALLET_SET_PREFIX}{encoded}"
+
+
+def parse_wallet_set_callback(data: str) -> tuple[uuid.UUID, uuid.UUID] | None:
+    if not data.startswith(_WALLET_SET_PREFIX):
+        return None
+    encoded = data[len(_WALLET_SET_PREFIX) :]
+    padding = (-len(encoded)) % 4
+    if padding:
+        encoded += "=" * padding
+    try:
+        payload = base64.urlsafe_b64decode(encoded)
+    except Exception:
+        return None
+    if len(payload) != 32:
+        return None
+    try:
+        return uuid.UUID(bytes=payload[:16]), uuid.UUID(bytes=payload[16:])
+    except ValueError:
+        return None
+
+
 def wallet_picker_keyboard(
     transaction_id: uuid.UUID,
     wallets: list[Wallet],
@@ -182,7 +213,7 @@ def wallet_picker_keyboard(
             [
                 InlineKeyboardButton(
                     text=wallet.name,
-                    callback_data=f"qe:walset:{transaction_id}:{wallet.id}",
+                    callback_data=wallet_set_callback_data(transaction_id, wallet.id),
                 )
             ]
             for wallet in wallets

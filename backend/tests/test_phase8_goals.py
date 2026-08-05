@@ -2,7 +2,7 @@ import socket
 import uuid
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -356,7 +356,79 @@ async def test_member_cannot_close(
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")
 @pytest.mark.anyio
-async def test_patch_deadline_in_past_allowed(
+@patch("app.services.goals.tashkent_today", return_value=date(2026, 8, 5))
+async def test_create_rejects_backdated_deadline(
+    _mock_today: object,
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid = _random_tid()
+    owner, budget = await create_user_with_budget(
+        session, telegram_id=owner_tid, role="owner"
+    )
+    wallet = await _create_shared_wallet(session, budget.id)
+    await session.flush()
+
+    past = date(2026, 8, 4)
+    resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={
+            "wallet_id": str(wallet.id),
+            "target_amount": 1_000_000,
+            "deadline": past.isoformat(),
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "deadline_before_today"
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+@patch("app.services.goals.tashkent_today", return_value=date(2026, 8, 5))
+async def test_create_accepts_today_and_future_deadline(
+    _mock_today: object,
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid = _random_tid()
+    owner, budget = await create_user_with_budget(
+        session, telegram_id=owner_tid, role="owner"
+    )
+    wallet_today = await _create_shared_wallet(session, budget.id, name="Today")
+    wallet_future = await _create_shared_wallet(session, budget.id, name="Future")
+    await session.flush()
+
+    today_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={
+            "wallet_id": str(wallet_today.id),
+            "target_amount": 1_000_000,
+            "deadline": "2026-08-05",
+        },
+    )
+    assert today_resp.status_code == 201, today_resp.text
+    assert today_resp.json()["deadline"] == "2026-08-05"
+
+    future_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={
+            "wallet_id": str(wallet_future.id),
+            "target_amount": 2_000_000,
+            "deadline": "2026-12-31",
+        },
+    )
+    assert future_resp.status_code == 201, future_resp.text
+    assert future_resp.json()["deadline"] == "2026-12-31"
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+@patch("app.services.goals.tashkent_today", return_value=date(2026, 8, 5))
+async def test_patch_rejects_new_backdated_deadline(
+    _mock_today: object,
     api_client: tuple[AsyncClient, AsyncSession],
 ) -> None:
     client, session = api_client
@@ -375,14 +447,100 @@ async def test_patch_deadline_in_past_allowed(
     assert create_resp.status_code == 201
     goal_id = create_resp.json()["id"]
 
-    past = date(2020, 1, 15)
+    past = date(2026, 8, 4)
     patch_resp = await client.patch(
         f"/api/v1/goals/{goal_id}",
         headers=auth_headers(owner_tid),
         json={"deadline": past.isoformat()},
     )
+    assert patch_resp.status_code == 400
+    assert patch_resp.json()["detail"] == "deadline_before_today"
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+@patch("app.services.goals.tashkent_today", return_value=date(2026, 8, 5))
+async def test_patch_allows_keeping_existing_past_deadline(
+    _mock_today: object,
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid = _random_tid()
+    owner, budget = await create_user_with_budget(
+        session, telegram_id=owner_tid, role="owner"
+    )
+    wallet = await _create_shared_wallet(session, budget.id)
+    await session.flush()
+
+    create_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 1_000_000},
+    )
+    assert create_resp.status_code == 201
+    goal_id = uuid.UUID(create_resp.json()["id"])
+
+    past = date(2026, 8, 1)
+    goal = await session.get(Goal, goal_id)
+    assert goal is not None
+    goal.deadline = past
+    await session.commit()
+
+    patch_resp = await client.patch(
+        f"/api/v1/goals/{goal_id}",
+        headers=auth_headers(owner_tid),
+        json={"deadline": past.isoformat(), "target_amount": 1_100_000},
+    )
     assert patch_resp.status_code == 200
-    assert patch_resp.json()["deadline"] == past.isoformat()
+    body = patch_resp.json()
+    assert body["deadline"] == past.isoformat()
+    assert body["target_amount"] == 1_100_000
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+@patch("app.services.goals.tashkent_today", return_value=date(2026, 8, 5))
+async def test_goal_with_passed_deadline_stays_active_with_label(
+    _mock_today: object,
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    owner_tid = _random_tid()
+    owner, budget = await create_user_with_budget(
+        session, telegram_id=owner_tid, role="owner"
+    )
+    wallet = await _create_shared_wallet(session, budget.id)
+    await session.flush()
+
+    create_resp = await client.post(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        json={"wallet_id": str(wallet.id), "target_amount": 1_000_000},
+    )
+    assert create_resp.status_code == 201
+    goal_id = uuid.UUID(create_resp.json()["id"])
+
+    past = date(2026, 8, 1)
+    goal = await session.get(Goal, goal_id)
+    assert goal is not None
+    goal.deadline = past
+    await session.commit()
+
+    list_resp = await client.get(
+        "/api/v1/goals",
+        headers=auth_headers(owner_tid),
+        params={"status": "active"},
+    )
+    assert list_resp.status_code == 200
+    listed = next(item for item in list_resp.json() if item["id"] == str(goal_id))
+    assert listed["status"] == "active"
+    assert listed["deadline"] == past.isoformat()
+
+    close_resp = await client.post(
+        f"/api/v1/goals/{goal_id}/close",
+        headers=auth_headers(owner_tid),
+    )
+    assert close_resp.status_code == 200
 
 
 def _mock_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
