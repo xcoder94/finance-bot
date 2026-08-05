@@ -36,6 +36,17 @@ describe('switchAnalyticsTab', () => {
     expect(next.periodTab).toBe(baseState.periodTab)
     expect(next.drillParent).toEqual(baseState.drillParent)
     expect(next.historyCategoryFilter).toEqual(baseState.historyCategoryFilter)
+    expect(next.currency).toBe(baseState.currency)
+  })
+
+  it('keeps currency when switching between charts and history', () => {
+    const usdState: AnalyticsShellState = { ...baseState, currency: 'USD' }
+
+    const history = switchAnalyticsTab(usdState, 'history')
+    expect(history.currency).toBe('USD')
+
+    const backToCharts = switchAnalyticsTab(history, 'charts')
+    expect(backToCharts.currency).toBe('USD')
   })
 
   it('clears history filter when switching to charts', () => {
@@ -66,6 +77,19 @@ describe('applyAnalyticsCurrencyChange', () => {
     expect(next.selectedMonth).toEqual(baseState.selectedMonth)
     expect(next.rangeFrom).toBe(baseState.rangeFrom)
     expect(next.rangeTo).toBe(baseState.rangeTo)
+  })
+
+  it('changes currency on history tab without affecting active tab', () => {
+    const historyState: AnalyticsShellState = {
+      ...baseState,
+      activeTab: 'history',
+    }
+
+    const next = applyAnalyticsCurrencyChange(historyState, 'USD')
+
+    expect(next.currency).toBe('USD')
+    expect(next.activeTab).toBe('history')
+    expect(next.historyCategoryFilter).toEqual(baseState.historyCategoryFilter)
   })
 })
 
