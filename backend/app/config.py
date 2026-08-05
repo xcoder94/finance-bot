@@ -13,6 +13,7 @@ if not APP_PASS_SECRET:
     raise RuntimeError("APP_PASS_SECRET environment variable is empty")
 _raw_mini_app_url = (os.environ.get("MINI_APP_URL") or "").strip()
 MINI_APP_URL: str | None = _raw_mini_app_url or None
+SUPPORT_CHAT_ID: str | None = os.environ.get("SUPPORT_CHAT_ID") or None
 
 PARSER_PROVIDER = os.environ.get("PARSER_PROVIDER") or None
 PARSER_API_KEY = os.environ.get("PARSER_API_KEY") or None
