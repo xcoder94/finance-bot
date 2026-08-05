@@ -1,3 +1,4 @@
+import logging
 import socket
 import uuid
 from collections.abc import AsyncIterator
@@ -744,8 +745,9 @@ class TestModelFailure:
             assert budget.daily_model_calls == 0
 
     async def test_parser_malformed_does_not_increment_unparsed(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ) -> None:
+        caplog.set_level(logging.ERROR, logger="bot.quick_entry.handlers")
         async with rollback_session() as session:
             user, budget = await create_user(session, telegram_id=9_007_002)
             wallet = make_wallet(budget, name="Карта сум")
@@ -770,6 +772,17 @@ class TestModelFailure:
             await session.refresh(budget)
             assert budget.daily_unparsed == 0
             assert budget.daily_model_calls == 0
+            parser_logs = [
+                r
+                for r in caplog.records
+                if r.name == "bot.quick_entry.handlers"
+                and "entry_path=text" in r.getMessage()
+            ]
+            assert len(parser_logs) == 1
+            log_message = parser_logs[0].getMessage()
+            assert str(user.family_budget_id) in log_message
+            assert str(user.telegram_id) in log_message
+            assert "bad json" in log_message
 
 
 class TestWalletNameLeak:

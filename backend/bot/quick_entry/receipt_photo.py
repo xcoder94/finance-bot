@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import uuid
 from datetime import date, datetime
 from typing import Literal
@@ -65,6 +66,7 @@ from bot.quick_entry.texts import (
 )
 
 router = Router()
+logger = logging.getLogger(__name__)
 TASHKENT = ZoneInfo("Asia/Tashkent")
 
 _parser_override: MessageParser | None = None
@@ -240,7 +242,13 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         parser = _get_parser()
         try:
             response = await parser.parse(parse_request)
-        except (ParserUnavailable, ParserMalformed):
+        except (ParserUnavailable, ParserMalformed) as exc:
+            logger.exception(
+                "Parser failure entry_path=receipt family_budget_id=%s telegram_user_id=%s: %s",
+                user.family_budget_id,
+                message.from_user.id,
+                exc,
+            )
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return

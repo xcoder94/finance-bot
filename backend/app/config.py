@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(_REPO_ROOT / ".env")
 
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -23,6 +24,9 @@ DAILY_MODEL_CALL_LIMIT = int(os.environ.get("DAILY_MODEL_CALL_LIMIT", "50"))
 DAILY_UNPARSED_LIMIT = int(os.environ.get("DAILY_UNPARSED_LIMIT", "20"))
 
 RECEIPT_PHOTO_ENABLED = os.environ.get("RECEIPT_PHOTO_ENABLED")
+
+_default_log_file = _BACKEND_ROOT / "logs" / "app.log"
+LOG_FILE_PATH = os.environ.get("LOG_FILE_PATH") or str(_default_log_file)
 
 
 def receipt_photo_enabled() -> bool:

@@ -10,6 +10,16 @@ from app.parsing.cascade_keywords import CASCADE_KEYWORDS
 from app.parsing.types import ParsedOperation
 from app.services.budget_seed import SEED_EXPENSE_CATEGORIES, SEED_INCOME_CATEGORIES
 
+PrefilterReason = Literal[
+    "transfer_signal",
+    "multi_operation",
+    "amount_not_singular",
+    "no_category_match",
+    "category_ambiguous",
+    "wallet_ambiguous",
+    "prefilter_disabled",
+]
+
 # Wallet transfer / exchange signals — conservative; doubt → fall through.
 _TRANSFER_SIGNALS: tuple[str, ...] = (
     "с карты",
@@ -36,6 +46,12 @@ _PLAIN_AMOUNT_RE = re.compile(
     r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов)?|долл\.?)?(?!\d)",
     re.IGNORECASE,
 )
+
+
+@dataclass(frozen=True)
+class PrefilterResult:
+    operation: ParsedOperation | None
+    reason: PrefilterReason | None  # set iff operation is None; None on hit
 
 
 @dataclass(frozen=True)
@@ -245,19 +261,19 @@ def try_prefilter(
     expense_categories: list[PrefilterCategory],
     income_categories: list[PrefilterCategory],
     seed_name_by_key: dict[str, str] | None = None,
-) -> ParsedOperation | None:
+) -> PrefilterResult:
     """Return one fully resolved op, or None to fall through to the LLM parser."""
     if not text.strip():
-        return None
+        return PrefilterResult(operation=None, reason="amount_not_singular")
 
     if _has_transfer_signal(text):
-        return None
+        return PrefilterResult(operation=None, reason="transfer_signal")
 
     amounts = _find_amounts(text)
     if _has_multi_op_signal(text, amounts):
-        return None
+        return PrefilterResult(operation=None, reason="multi_operation")
     if len(amounts) != 1:
-        return None
+        return PrefilterResult(operation=None, reason="amount_not_singular")
 
     amount = amounts[0]
     seeds = seed_name_by_key if seed_name_by_key is not None else build_seed_name_by_key()
@@ -271,20 +287,26 @@ def try_prefilter(
     resolved = _unique_categories(expense_matches + income_matches)
 
     if len(resolved) != 1:
-        return None
+        reason: PrefilterReason = (
+            "no_category_match" if len(resolved) == 0 else "category_ambiguous"
+        )
+        return PrefilterResult(operation=None, reason=reason)
 
     match = resolved[0]
     wallet_hits = _match_wallets(text, wallet_names)
     if len(wallet_hits) > 1:
-        return None
+        return PrefilterResult(operation=None, reason="wallet_ambiguous")
 
     comment = _build_comment(text, amount.span, [match.span])
 
-    return ParsedOperation(
-        type=match.op_type,
-        amount=amount.value,
-        currency=amount.currency,
-        wallet_hint=wallet_hits[0] if wallet_hits else None,
-        category=match.category.name,
-        comment=comment,
+    return PrefilterResult(
+        operation=ParsedOperation(
+            type=match.op_type,
+            amount=amount.value,
+            currency=amount.currency,
+            wallet_hint=wallet_hits[0] if wallet_hits else None,
+            category=match.category.name,
+            comment=comment,
+        ),
+        reason=None,
     )

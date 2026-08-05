@@ -104,6 +104,7 @@ def make_callback(
         text=message_text,
         edit_text=AsyncMock(),
         edit_reply_markup=AsyncMock(),
+        delete=AsyncMock(),
     )
     return SimpleNamespace(
         from_user=SimpleNamespace(id=telegram_id),
@@ -517,10 +518,8 @@ class TestTransferDelete:
             assert transfer.is_deleted is True
             assert await wallet_balance(session, card_uzs.id) == card_before
             assert await wallet_balance(session, cash_uzs.id) == cash_before
-            callback.message.edit_reply_markup.assert_awaited_once_with(
-                reply_markup=None
-            )
             callback.answer.assert_awaited_once()
+            callback.message.delete.assert_awaited_once()
 
 
 class TestMixedRefusedTransferAndExpense:

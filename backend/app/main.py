@@ -3,7 +3,8 @@ import logging
 from contextlib import asynccontextmanager
 
 import asyncpg
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.api.v1.demo_data import router as demo_data_router
 from app.api.v1.analytics import router as analytics_router
@@ -17,7 +18,9 @@ from app.api.v1.goals import router as goals_router
 from app.api.v1.wallets import router as wallets_router
 from app.config import asyncpg_dsn
 from app.db import dispose_engine
+from app.logging_setup import setup_logging
 
+setup_logging()
 logger = logging.getLogger(__name__)
 
 DB_CONNECT_TIMEOUT_SECONDS = 5.0
@@ -67,6 +70,21 @@ app.include_router(history_router)
 app.include_router(transactions_router)
 app.include_router(analytics_router)
 app.include_router(members_router)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(
+        "Unhandled API exception method=%s path=%s: %s",
+        request.method,
+        request.url.path,
+        exc,
+        exc_info=exc,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
 
 
 @app.get("/health")

@@ -19,6 +19,7 @@ from app.models.quick_entry_pending import QuickEntryPending
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
+from bot.quick_entry.cards import wallet_set_callback_data
 from bot.quick_entry.handlers import (
     handle_quick_entry_delete,
     handle_quick_entry_type,
@@ -123,6 +124,7 @@ def make_callback(
         text=message_text,
         edit_text=AsyncMock(),
         edit_reply_markup=AsyncMock(),
+        delete=AsyncMock(),
     )
     return SimpleNamespace(
         from_user=SimpleNamespace(id=telegram_id),
@@ -190,10 +192,8 @@ class TestDeleteCallback:
 
             await session.refresh(txn)
             assert txn.is_deleted is True
-            callback.message.edit_reply_markup.assert_awaited_once_with(
-                reply_markup=None
-            )
             callback.answer.assert_awaited_once()
+            callback.message.delete.assert_awaited_once()
 
     async def test_gone_when_missing_or_soft_deleted(
         self, monkeypatch: pytest.MonkeyPatch
@@ -215,7 +215,7 @@ class TestDeleteCallback:
             await handle_quick_entry_delete(callback, SimpleNamespace())
 
             callback.answer.assert_awaited_once_with(MSG_GONE)
-            callback.message.edit_reply_markup.assert_not_awaited()
+            callback.message.delete.assert_not_awaited()
 
 
 class TestWalletListCallback:
@@ -308,7 +308,7 @@ class TestWalletSetCallback:
             )
             callback = make_callback(
                 telegram_id=user.telegram_id,
-                data=f"qe:walset:{txn.id}:{wallet_b.id}",
+                data=wallet_set_callback_data(txn.id, wallet_b.id),
             )
             await handle_quick_entry_wallet_set(callback, SimpleNamespace())
 
@@ -336,7 +336,7 @@ class TestWalletSetCallback:
             )
             callback = make_callback(
                 telegram_id=user.telegram_id,
-                data=f"qe:walset:{txn.id}:{wallet.id}",
+                data=wallet_set_callback_data(txn.id, wallet.id),
             )
             await handle_quick_entry_wallet_set(callback, SimpleNamespace())
             callback.answer.assert_awaited_once_with(MSG_GONE)
