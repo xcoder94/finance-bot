@@ -22,7 +22,6 @@ import {
   formatDateDigits,
   formatThousandsDigits,
   insertDigitAt,
-  isValidMaskedDate,
   MAX_AMOUNT_DIGITS,
 } from '../../utils/transactionForm'
 import {
@@ -30,6 +29,7 @@ import {
   maskedDateToTashkentIso,
   walletCurrencySuffix,
 } from '../../utils/transactionFormFields'
+import { goalDeadlineValidation } from './goalFormDeadline'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
 import { FormSheetField } from '../forms/FormSheetField'
@@ -265,9 +265,18 @@ export function GoalFormSheet({
 
   useNativeBackButtonOverlay(open && !walletPickerOpen, onClose)
 
+  const existingDeadlineMasked =
+    mode === 'edit' && goal?.deadline
+      ? isoToMaskedDateInTashkent(`${goal.deadline}T12:00:00.000Z`)
+      : ''
+  const deadlineValidation = goalDeadlineValidation(deadlineMasked, {
+    mode,
+    existingDeadlineMasked,
+  })
+  const deadlineValid = deadlineValidation.valid
+  const deadlineHintKey = deadlineTouched ? deadlineValidation.hintKey : null
   const targetAmount = Number(targetAmountDigits)
   const hasValidAmount = targetAmountDigits.length > 0 && targetAmount > 0 && !amountOverLimit
-  const deadlineValid = deadlineMasked.length === 0 || isValidMaskedDate(deadlineMasked)
   const canSave =
     hasValidAmount &&
     deadlineValid &&
@@ -408,7 +417,7 @@ export function GoalFormSheet({
         label={t('goals.form.deadlineLabel')}
         right="›"
         muted={deadlineMasked.length === 0}
-        hint={deadlineTouched && !deadlineValid ? t('goals.form.deadlineInvalid') : undefined}
+        hint={deadlineHintKey ? t(deadlineHintKey) : undefined}
         hintError={deadlineTouched && !deadlineValid}
       >
         <input
