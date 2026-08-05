@@ -22,10 +22,12 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
+from app.parsing.prefilter import PrefilterCategory, build_seed_name_by_key, try_prefilter
 from app.speech.base import SpeechClient, SpeechUnavailable
 from app.speech.factory import get_speech_client
 from app.parsing.types import (
     ParseRequest,
+    ParseResponse,
     ParsedOperation,
     ParserMalformed,
     ParserUnavailable,
@@ -238,6 +240,52 @@ async def _list_income_category_names(
     return list((await session.scalars(stmt)).all())
 
 
+async def _list_expense_categories_for_prefilter(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> list[PrefilterCategory]:
+    stmt = (
+        select(ExpenseCategory)
+        .where(
+            ExpenseCategory.family_budget_id == family_budget_id,
+            ExpenseCategory.is_deleted.is_(False),
+        )
+        .order_by(ExpenseCategory.name)
+    )
+    rows = (await session.scalars(stmt)).all()
+    return [
+        PrefilterCategory(
+            id=row.id,
+            name=row.name,
+            translation_key=row.translation_key,
+            parent_id=row.parent_id,
+        )
+        for row in rows
+    ]
+
+
+async def _list_income_categories_for_prefilter(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> list[PrefilterCategory]:
+    stmt = (
+        select(IncomeCategory)
+        .where(
+            IncomeCategory.family_budget_id == family_budget_id,
+            IncomeCategory.is_deleted.is_(False),
+        )
+        .order_by(IncomeCategory.name)
+    )
+    rows = (await session.scalars(stmt)).all()
+    return [
+        PrefilterCategory(
+            id=row.id,
+            name=row.name,
+            translation_key=row.translation_key,
+            parent_id=None,
+        )
+        for row in rows
+    ]
+
+
 async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | None:
     if user.default_wallet_id is not None:
         wallet = await session.get(Wallet, user.default_wallet_id)
@@ -247,7 +295,13 @@ async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | Non
     return wallets[0] if wallets else None
 
 
-async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> None:
+async def process_quick_entry_text(
+    message: Message,
+    bot: Bot,
+    text: str,
+    *,
+    prefilter_enabled: bool = False,
+) -> None:
     if message.from_user is None:
         return
 
@@ -270,10 +324,6 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
 
         today = tashkent_today_for_counters()
         ensure_counters_day(budget, today)
-        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
-            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
-            await session.commit()
-            return
 
         default_wallet = await _get_default_wallet(session, user)
         if default_wallet is None:
@@ -281,24 +331,52 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
             return
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
-        parse_request = ParseRequest(
-            text=text,
-            wallet_names=[w.name for w in wallets],
-            expense_category_names=await _list_expense_category_names(
-                session, user.family_budget_id
-            ),
-            income_category_names=await _list_income_category_names(
-                session, user.family_budget_id
-            ),
+        wallet_names = [w.name for w in wallets]
+        expense_categories = await _list_expense_categories_for_prefilter(
+            session, user.family_budget_id
+        )
+        income_categories = await _list_income_categories_for_prefilter(
+            session, user.family_budget_id
         )
 
-        parser = _get_parser()
-        try:
-            response = await parser.parse(parse_request)
-        except (ParserUnavailable, ParserMalformed):
-            await message.answer(MSG_MODEL_FAIL)
-            await session.commit()
-            return
+        prefilter_op = None
+        prefilter_hit = False
+        if prefilter_enabled:
+            prefilter_op = try_prefilter(
+                text,
+                wallet_names=wallet_names,
+                expense_categories=expense_categories,
+                income_categories=income_categories,
+                seed_name_by_key=build_seed_name_by_key(),
+            )
+            prefilter_hit = prefilter_op is not None
+
+        if prefilter_hit:
+            response = ParseResponse(operations=[prefilter_op])
+        else:
+            if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
+                await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+                await session.commit()
+                return
+
+            parse_request = ParseRequest(
+                text=text,
+                wallet_names=wallet_names,
+                expense_category_names=await _list_expense_category_names(
+                    session, user.family_budget_id
+                ),
+                income_category_names=await _list_income_category_names(
+                    session, user.family_budget_id
+                ),
+            )
+
+            parser = _get_parser()
+            try:
+                response = await parser.parse(parse_request)
+            except (ParserUnavailable, ParserMalformed):
+                await message.answer(MSG_MODEL_FAIL)
+                await session.commit()
+                return
 
         countable = _filter_countable(response.operations)
         clear_ops = [op for op in countable if _is_clear(op)]
@@ -311,7 +389,7 @@ async def process_quick_entry_text(message: Message, bot: Bot, text: str) -> Non
             and bool(ambiguous_ops)
             and len(countable) <= MAX_OPERATIONS
         )
-        if not ambiguous_only:
+        if not ambiguous_only and not prefilter_hit:
             spend_model_call(budget)
             await session.commit()
 
@@ -553,7 +631,7 @@ async def handle_quick_entry_text(message: Message, bot: Bot) -> None:
     if not text:
         return
 
-    await process_quick_entry_text(message, bot, text)
+    await process_quick_entry_text(message, bot, text, prefilter_enabled=True)
 
 
 @router.message(F.text, ~F.text.startswith("/"))

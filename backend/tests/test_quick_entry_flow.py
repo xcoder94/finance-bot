@@ -229,7 +229,6 @@ class TestSingleExpenseCard:
             card_text = message.answer.await_args.args[0]
             assert card_text == (
                 "➖ **25 000 сум** · Такси\n"
-                "такси до работы\n"
                 "Наличный сум · 1 августа\n"
                 "Осталось: 1 275 000 сум"
             )
