@@ -15,7 +15,11 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
-from app.services.budget_seed import copy_seed_data, seed_demo_operations
+from app.services.budget_seed import (
+    _expected_partial_demo_row_count,
+    copy_seed_data,
+    seed_demo_operations,
+)
 from app.services.membership_lifecycle import detach_member_to_own_budget
 from tests.test_wallets_categories import (
     api_client,
@@ -51,6 +55,20 @@ def _previous_month_bounds() -> tuple[datetime, datetime]:
 def _current_month_start() -> datetime:
     now = datetime.now(UTC)
     return datetime(now.year, now.month, 1, 0, 0, tzinfo=UTC)
+
+
+def _current_month_end() -> datetime:
+    now = datetime.now(UTC)
+    return datetime(
+        now.year, now.month, now.day, 23, 59, 59, tzinfo=UTC
+    )
+
+
+def _expected_demo_row_count() -> int:
+    now = datetime.now(UTC)
+    _, days_in_month = monthrange(now.year, now.month)
+    partial = _expected_partial_demo_row_count(now.day, days_in_month)
+    return 21 + partial
 
 
 pytestmark = [
@@ -120,6 +138,10 @@ async def test_seed_demo_operations_creates_previous_month_demo_rows(
 
     prev_start, prev_end = _previous_month_bounds()
     current_start = _current_month_start()
+    current_end = _current_month_end()
+    now = datetime.now(UTC)
+    _, days_in_month = monthrange(now.year, now.month)
+    expected_partial = _expected_partial_demo_row_count(now.day, days_in_month)
 
     demo_rows = (
         await session.scalars(
@@ -130,21 +152,19 @@ async def test_seed_demo_operations_creates_previous_month_demo_rows(
             )
         )
     ).all()
-    assert len(demo_rows) == 21
+    assert len(demo_rows) == _expected_demo_row_count()
     assert all(row.is_demo for row in demo_rows)
-    assert all(prev_start <= row.transaction_date <= prev_end for row in demo_rows)
 
-    current_demo = await session.scalar(
-        select(func.count())
-        .select_from(Transaction)
-        .where(
-            Transaction.family_budget_id == budget.id,
-            Transaction.is_demo.is_(True),
-            Transaction.is_deleted.is_(False),
-            Transaction.transaction_date >= current_start,
-        )
+    prev_demo = [row for row in demo_rows if prev_start <= row.transaction_date <= prev_end]
+    current_demo_rows = [
+        row for row in demo_rows if current_start <= row.transaction_date <= current_end
+    ]
+    assert len(prev_demo) == 21
+    assert all(prev_start <= row.transaction_date <= prev_end for row in prev_demo)
+    assert len(current_demo_rows) == expected_partial
+    assert all(
+        current_start <= row.transaction_date <= current_end for row in current_demo_rows
     )
-    assert current_demo == 0
 
     uzs_expense = await session.scalar(
         select(func.coalesce(func.sum(Transaction.amount), 0))
@@ -156,6 +176,8 @@ async def test_seed_demo_operations_creates_previous_month_demo_rows(
             Transaction.is_deleted.is_(False),
             Transaction.type == "expense",
             Wallet.currency == "UZS",
+            Transaction.transaction_date >= prev_start,
+            Transaction.transaction_date <= prev_end,
         )
     )
     uzs_income = await session.scalar(
@@ -168,6 +190,8 @@ async def test_seed_demo_operations_creates_previous_month_demo_rows(
             Transaction.is_deleted.is_(False),
             Transaction.type == "income",
             Wallet.currency == "UZS",
+            Transaction.transaction_date >= prev_start,
+            Transaction.transaction_date <= prev_end,
         )
     )
     usd_expense = await session.scalar(
@@ -180,6 +204,8 @@ async def test_seed_demo_operations_creates_previous_month_demo_rows(
             Transaction.is_deleted.is_(False),
             Transaction.type == "expense",
             Wallet.currency == "USD",
+            Transaction.transaction_date >= prev_start,
+            Transaction.transaction_date <= prev_end,
         )
     )
     usd_income = await session.scalar(
@@ -192,6 +218,8 @@ async def test_seed_demo_operations_creates_previous_month_demo_rows(
             Transaction.is_deleted.is_(False),
             Transaction.type == "income",
             Wallet.currency == "USD",
+            Transaction.transaction_date >= prev_start,
+            Transaction.transaction_date <= prev_end,
         )
     )
     assert int(uzs_income or 0) - int(uzs_expense or 0) == 2_000_000
@@ -246,7 +274,7 @@ async def test_detach_without_personal_wallets_seeds_demo_data(
             Transaction.is_deleted.is_(False),
         )
     )
-    assert demo_count == 21
+    assert demo_count == _expected_demo_row_count()
 
 
 @pytest.mark.anyio
@@ -322,7 +350,7 @@ async def test_detach_with_personal_wallets_seeds_demo_after_shared_cards(
             Transaction.is_deleted.is_(False),
         )
     )
-    assert demo_count == 21
+    assert demo_count == _expected_demo_row_count()
 
 
 @pytest.mark.anyio
@@ -387,7 +415,7 @@ async def test_demo_data_status_and_clear_owner_only(
         headers=auth_headers(owner_tid),
     )
     assert clear_resp.status_code == 200
-    assert clear_resp.json()["cleared_count"] == 21
+    assert clear_resp.json()["cleared_count"] == _expected_demo_row_count()
 
     after_status = await client.get(
         "/api/v1/demo-data/status",
