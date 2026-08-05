@@ -40,6 +40,7 @@ class WalletResponse(BaseModel):
     is_personal: bool
     transaction_count: int = Field(default=0)
     has_active_goal: bool = Field(default=False)
+    balance: int = Field(default=0)
 
 
 class WalletDeleteResponse(BaseModel):

@@ -23,6 +23,7 @@ from app.services.entity_limits import (
     SHARED_WALLET_LIMIT,
 )
 from app.services.goals import get_active_goal_for_wallet
+from app.services.quick_entry_balance import wallet_balance
 from app.services.membership_lifecycle import reassign_defaults_after_shared_wallet_deleted
 from app.services.wallet_visibility import require_wallet_visible, visible_wallets_clause
 from app.services.wallets_categories import (
@@ -80,18 +81,21 @@ async def list_wallets(
         .order_by(Wallet.created_at)
     )
     rows = (await session.execute(stmt)).all()
-    return [
-        WalletResponse(
-            id=wallet.id,
-            name=wallet.name,
-            currency=wallet.currency,
-            translation_key=wallet.translation_key,
-            is_personal=wallet.is_personal,
-            transaction_count=int(transaction_count),
-            has_active_goal=bool(has_active_goal),
+    result: list[WalletResponse] = []
+    for wallet, transaction_count, has_active_goal in rows:
+        result.append(
+            WalletResponse(
+                id=wallet.id,
+                name=wallet.name,
+                currency=wallet.currency,
+                translation_key=wallet.translation_key,
+                is_personal=wallet.is_personal,
+                transaction_count=int(transaction_count),
+                has_active_goal=bool(has_active_goal),
+                balance=await wallet_balance(session, wallet.id),
+            )
         )
-        for wallet, transaction_count, has_active_goal in rows
-    ]
+    return result
 
 
 @router.post("/wallets", status_code=201)
@@ -155,6 +159,7 @@ async def create_wallet(
         is_personal=wallet.is_personal,
         transaction_count=0,
         has_active_goal=False,
+        balance=0,
     )
 
 
@@ -186,6 +191,7 @@ async def update_wallet(
         is_personal=wallet.is_personal,
         transaction_count=await count_wallet_transactions(session, wallet.id),
         has_active_goal=active_goal is not None,
+        balance=await wallet_balance(session, wallet.id),
     )
 
 

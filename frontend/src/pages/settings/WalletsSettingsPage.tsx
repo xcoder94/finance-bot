@@ -195,6 +195,7 @@ export function WalletsSettingsPage() {
                   name={getDisplayName(wallet, t)}
                   subtitle={formatWalletSettingsSubtitle(
                     wallet.currency,
+                    wallet.balance,
                     wallet.has_active_goal,
                   )}
                   onOpen={() => {
@@ -218,6 +219,7 @@ export function WalletsSettingsPage() {
                   name={getDisplayName(wallet, t)}
                   subtitle={formatWalletSettingsSubtitle(
                     wallet.currency,
+                    wallet.balance,
                     wallet.has_active_goal,
                   )}
                   onOpen={() => openEditForm(wallet.id)}

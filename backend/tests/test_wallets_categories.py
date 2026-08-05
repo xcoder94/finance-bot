@@ -235,6 +235,7 @@ class TestWalletsApi:
         assert created["name"] == "Cash UZS"
         assert created["currency"] == "UZS"
         assert created["transaction_count"] == 0
+        assert created["balance"] == 0
 
         list_resp = await client.get("/api/v1/wallets", headers=headers)
         assert list_resp.status_code == 200
@@ -251,8 +252,10 @@ class TestWalletsApi:
             "is_personal",
             "transaction_count",
             "has_active_goal",
+            "balance",
         }
         assert active_listed["transaction_count"] == 2
+        assert active_listed["balance"] == 150
 
         patch_resp = await client.patch(
             f"/api/v1/wallets/{created['id']}",
@@ -582,7 +585,7 @@ class TestListingQueryCounts:
 
         event.listen(engine.sync_engine, "before_cursor_execute", record_select)
         try:
-            for path, expected_keys in (
+            for path, expected_keys, expected_select_count in (
                 (
                     "/api/v1/wallets",
                     {
@@ -593,11 +596,14 @@ class TestListingQueryCounts:
                         "is_personal",
                         "transaction_count",
                         "has_active_goal",
+                        "balance",
                     },
+                    5,
                 ),
                 (
                     "/api/v1/categories/income",
                     {"id", "name", "translation_key", "color_index", "transaction_count"},
+                    3,
                 ),
                 (
                     "/api/v1/categories/expense",
@@ -610,12 +616,13 @@ class TestListingQueryCounts:
                         "is_protected",
                         "transaction_count",
                     },
+                    3,
                 ),
             ):
                 select_statements.clear()
                 response = await client.get(path, headers=auth_headers(telegram_id))
                 assert response.status_code == 200
-                assert len(select_statements) == 3
+                assert len(select_statements) == expected_select_count
                 assert all(set(item) == expected_keys for item in response.json())
         finally:
             event.remove(engine.sync_engine, "before_cursor_execute", record_select)

@@ -28,9 +28,14 @@ describe('settingsSubtitles', () => {
     expect(defaultWalletSubtitle(undefined)).toBe('—')
   })
 
-  it('formats wallet settings subtitle with active goal mark', () => {
-    expect(formatWalletSettingsSubtitle('UZS', false)).toBe('UZS')
-    expect(formatWalletSettingsSubtitle('USD', true)).toBe('USD · цель')
+  it('formats wallet settings subtitle with balance and active goal mark', () => {
+    expect(formatWalletSettingsSubtitle('UZS', 840_000, false)).toBe('UZS · 840 000 сум')
+    expect(formatWalletSettingsSubtitle('USD', 1_240, false)).toBe('USD · $1 240')
+    expect(formatWalletSettingsSubtitle('UZS', 2_350_000, true)).toBe(
+      'UZS · 2 350 000 сум · цель',
+    )
+    expect(formatWalletSettingsSubtitle('USD', 1_240, true)).toBe('USD · $1 240 · цель')
+    expect(formatWalletSettingsSubtitle('UZS', 0, false)).toBe('UZS · 0 сум')
   })
 
   it('formats income categories subtitle with Russian plural forms', () => {
