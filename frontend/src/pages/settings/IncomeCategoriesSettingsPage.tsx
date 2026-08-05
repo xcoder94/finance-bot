@@ -189,6 +189,11 @@ export function IncomeCategoriesSettingsPage() {
           editable={isOwner}
           onClose={closeSheets}
           onSave={handleSave}
+          onDelete={
+            sheetState.mode === 'edit' && isOwner && formCategory
+              ? () => setSheetState({ kind: 'delete', categoryId: formCategory.id })
+              : undefined
+          }
         />
       ) : null}
 

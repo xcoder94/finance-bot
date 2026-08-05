@@ -34,6 +34,7 @@ type WalletFormSheetProps = {
   onCurrencyPickerOpenChange: (open: boolean) => void
   walletTypePickerOpen: boolean
   onWalletTypePickerOpenChange: (open: boolean) => void
+  onDelete?: () => void
 }
 
 function validateWalletName(name: string): 'required' | 'tooLong' | null {
@@ -66,6 +67,7 @@ export function WalletFormSheet({
   onCurrencyPickerOpenChange,
   walletTypePickerOpen,
   onWalletTypePickerOpenChange,
+  onDelete,
 }: WalletFormSheetProps) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
@@ -257,6 +259,19 @@ export function WalletFormSheet({
       onPrimary={() => void handleSave()}
       primaryDisabled={!canSave}
       primaryLoading={saving}
+      danger={
+        mode === 'edit' && onDelete
+          ? (
+            <button
+              type="button"
+              className="form-sheet-danger-button"
+              onClick={onDelete}
+            >
+              Удалить
+            </button>
+          )
+          : undefined
+      }
     >
       <FormSheetField
         label="Название · до 30 знаков"

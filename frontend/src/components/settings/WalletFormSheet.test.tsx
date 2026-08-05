@@ -57,3 +57,42 @@ describe('WalletFormSheet create limits', () => {
     expect(html).toContain('Личный')
   })
 })
+
+const editWallet = {
+  id: 'wallet-1',
+  name: 'Наличные',
+  currency: 'UZS',
+  balance: 0,
+  is_personal: true,
+  transaction_count: 0,
+  has_active_goal: false,
+} as const
+
+describe('WalletFormSheet edit delete', () => {
+  it('shows delete button in edit mode when onDelete is provided', () => {
+    const html = renderWalletForm({
+      mode: 'edit',
+      wallet: editWallet,
+      onDelete: () => undefined,
+    })
+    expect(html).toContain('form-sheet-danger-button')
+    expect(html).toContain('Удалить')
+  })
+
+  it('hides delete button in create mode', () => {
+    const html = renderWalletForm({
+      mode: 'create',
+      wallet: null,
+      onDelete: () => undefined,
+    })
+    expect(html).not.toContain('form-sheet-danger-button')
+  })
+
+  it('hides delete button in edit mode without onDelete', () => {
+    const html = renderWalletForm({
+      mode: 'edit',
+      wallet: editWallet,
+    })
+    expect(html).not.toContain('form-sheet-danger-button')
+  })
+})

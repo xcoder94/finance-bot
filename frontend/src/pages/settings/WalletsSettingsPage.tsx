@@ -248,6 +248,13 @@ export function WalletsSettingsPage() {
           onCurrencyPickerOpenChange={setCurrencyPickerOpen}
           walletTypePickerOpen={walletTypePickerOpen}
           onWalletTypePickerOpenChange={setWalletTypePickerOpen}
+          onDelete={
+            sheetState.mode === 'edit' &&
+            formWallet &&
+            (formWallet.is_personal || isOwner)
+              ? () => setSheetState({ kind: 'delete', walletId: formWallet.id })
+              : undefined
+          }
         />
       ) : null}
 
