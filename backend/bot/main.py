@@ -10,6 +10,7 @@ from app.services.notification_scheduler import notification_loop
 from bot.onboarding import router as onboarding_router
 from bot.membership import router as membership_router
 from bot.goals import router as goals_router
+from bot.support import router as support_router
 from bot.quick_entry.handlers import router as quick_entry_router
 
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +27,7 @@ async def main() -> None:
     dp.include_router(onboarding_router)
     dp.include_router(membership_router)
     dp.include_router(goals_router)
+    dp.include_router(support_router)
     dp.include_router(quick_entry_router)
     loop_task = asyncio.create_task(_run_notification_loop(bot))
     try:

@@ -46,9 +46,9 @@ async def send_release_announcements(
         return len(users)
 
     delivered_at = now or datetime.now(timezone.utc)
-    markup = open_app_keyboard()
     sent = 0
     for user in users:
+        markup = open_app_keyboard(user.language)
         kwargs: dict = {"parse_mode": "Markdown"}
         if markup is not None:
             kwargs["reply_markup"] = markup

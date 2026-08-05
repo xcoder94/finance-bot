@@ -74,7 +74,8 @@ def test_open_app_button_label_exact() -> None:
 
 
 def test_open_app_keyboard_single_button(monkeypatch) -> None:
-    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", "https://example.test/app")
+    monkeypatch.setattr("bot.support.MINI_APP_URL", "https://example.test/app")
+    monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
     kb = open_app_keyboard()
     assert isinstance(kb, ReplyKeyboardMarkup)
     assert len(kb.keyboard) == 1
@@ -88,7 +89,8 @@ def test_open_app_keyboard_single_button(monkeypatch) -> None:
 
 
 def test_open_app_keyboard_absent_when_url_missing(monkeypatch) -> None:
-    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", None)
+    monkeypatch.setattr("bot.support.MINI_APP_URL", None)
+    monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
     assert open_app_keyboard() is None
 
 
@@ -296,7 +298,8 @@ async def test_announcement_sent_once_then_skipped(
     api_client: tuple[object, AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", "https://example.test/app")
+    monkeypatch.setattr("bot.support.MINI_APP_URL", "https://example.test/app")
+    monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
     _, session = api_client
     await _mark_prior_users_delivered(session)
     tid = _tid()

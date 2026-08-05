@@ -10,15 +10,12 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
-    WebAppInfo,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import MINI_APP_URL
 from app.db import async_session_factory
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
@@ -115,21 +112,10 @@ def language_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def open_app_keyboard() -> ReplyKeyboardMarkup | None:
-    if not MINI_APP_URL:
-        return None
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(
-                    text=OPEN_APP_BUTTON_LABEL,
-                    web_app=WebAppInfo(url=MINI_APP_URL),
-                )
-            ]
-        ],
-        resize_keyboard=True,
-        is_persistent=True,
-    )
+def open_app_keyboard(language: str = "ru") -> ReplyKeyboardMarkup | None:
+    from bot.support import build_main_reply_keyboard
+
+    return build_main_reply_keyboard(language)
 
 
 def join_confirm_keyboard(token: str) -> InlineKeyboardMarkup:
@@ -330,7 +316,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
 
     await callback.message.answer(
         welcome,
-        reply_markup=open_app_keyboard(),
+        reply_markup=open_app_keyboard(language),
         parse_mode="Markdown",
     )
     await callback.message.delete()
