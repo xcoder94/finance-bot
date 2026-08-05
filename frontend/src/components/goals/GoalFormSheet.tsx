@@ -292,8 +292,6 @@ export function GoalFormSheet({
   const walletDisplay =
     selectedWallet != null ? formatWalletPickerLabel(selectedWallet, t) : '—'
 
-  const deadlineDisplay = deadlineMasked.length > 0 ? deadlineMasked : t('goals.form.deadlineNotSelected')
-
   const handleDeadlineKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Backspace') {
       event.preventDefault()

@@ -7,12 +7,12 @@ import {
 
 describe('category picker lists', () => {
   const activeParents = [
-    { id: 'food', name: 'Еда', translation_key: null, parent_id: null, transaction_count: 0, color_index: 1 },
-    { id: 'transport', name: 'Транспорт', translation_key: null, parent_id: null, transaction_count: 0, color_index: 2 },
+    { id: 'food', name: 'Еда', translation_key: null, parent_id: null, transaction_count: 0, color_index: 1, is_protected: false },
+    { id: 'transport', name: 'Транспорт', translation_key: null, parent_id: null, transaction_count: 0, color_index: 2, is_protected: false },
   ]
   const activeSubs = [
-    { id: 'groceries', name: 'Продукты', translation_key: null, parent_id: 'food', transaction_count: 0, color_index: 3 },
-    { id: 'cafe', name: 'Кафе', translation_key: null, parent_id: 'food', transaction_count: 0, color_index: 4 },
+    { id: 'groceries', name: 'Продукты', translation_key: null, parent_id: 'food', transaction_count: 0, color_index: 3, is_protected: false },
+    { id: 'cafe', name: 'Кафе', translation_key: null, parent_id: 'food', transaction_count: 0, color_index: 4, is_protected: false },
   ]
 
   it('lists only categories returned by GET (soft-deleted omitted server-side)', () => {

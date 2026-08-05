@@ -1,13 +1,8 @@
 import { getAuthHeader } from './authHeader'
+import type { ExpenseCategoryResponse } from './categories'
+import type { WalletResponse } from './wallets'
 
-export type Wallet = {
-  id: string
-  name: string
-  currency: string
-  translation_key: string | null
-  transaction_count: number
-  is_personal: boolean
-}
+export type Wallet = WalletResponse
 
 export type IncomeCategory = {
   id: string
@@ -17,14 +12,7 @@ export type IncomeCategory = {
   color_index: number
 }
 
-export type ExpenseCategory = {
-  id: string
-  name: string
-  translation_key: string | null
-  parent_id: string | null
-  transaction_count: number
-  color_index: number
-}
+export type ExpenseCategory = ExpenseCategoryResponse
 
 export type IncomeCreatePayload = {
   transaction_date: string

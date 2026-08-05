@@ -103,6 +103,7 @@ const editWallet = {
   id: 'wallet-1',
   name: 'Наличные',
   currency: 'UZS',
+  translation_key: null,
   balance: 0,
   is_personal: true,
   transaction_count: 0,

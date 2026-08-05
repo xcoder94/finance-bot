@@ -111,7 +111,20 @@ describe('NotificationsSettingsBody', () => {
     mockSetLocalWeeklyDigest.mockImplementation((value: boolean) => {
       authState.user.weeklyDigestEnabled = value
     })
-    mockPatchMe.mockResolvedValue({})
+    mockPatchMe.mockResolvedValue({
+      id: 'user-1',
+      telegramId: 123456789,
+      familyBudgetId: 'family-1',
+      role: 'owner',
+      firstName: 'Тест',
+      username: 'testuser',
+      language: 'ru',
+      budgetName: 'Семья',
+      memberCount: 1,
+      defaultWalletId: null,
+      eveningReminderEnabled: true,
+      weeklyDigestEnabled: false,
+    })
   })
 
   it('renders static notification rows from design copy', () => {
