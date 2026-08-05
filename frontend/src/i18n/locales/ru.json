@@ -17,6 +17,9 @@
   "placeholder": {
     "comingSoon": "Скоро"
   },
+  "transaction": {
+    "gone": "Запись больше не существует."
+  },
   "settings": {
     "role": "Роль",
     "roles": {

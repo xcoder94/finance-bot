@@ -77,8 +77,11 @@ export type TransactionResponse = {
 }
 
 export class TransactionsApiError extends Error {
-  constructor(message?: string) {
+  readonly status: number | null
+
+  constructor(status?: number, message?: string) {
     super(message ?? 'request failed')
+    this.status = status ?? null
   }
 }
 
@@ -96,7 +99,7 @@ async function apiGet<T>(url: string): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new TransactionsApiError()
+    throw new TransactionsApiError(response.status)
   }
 
   return (await response.json()) as T

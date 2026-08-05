@@ -23,6 +23,7 @@ import { GoalsPage } from '../pages/GoalsPage'
 import { HistoryPage } from '../pages/HistoryPage'
 import { HomePage } from '../pages/HomePage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { TransactionGonePage } from '../pages/TransactionGonePage'
 import { DefaultWalletSettingsPage } from '../pages/settings/DefaultWalletSettingsPage'
 import { ExpenseCategoriesSettingsPage } from '../pages/settings/ExpenseCategoriesSettingsPage'
 import { ExpenseSubcategoriesSettingsPage } from '../pages/settings/ExpenseSubcategoriesSettingsPage'
@@ -34,6 +35,7 @@ import { NotificationsSettingsShellPage } from '../pages/settings/NotificationsS
 import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
+import { useTxDeepLink } from '../hooks/useTxDeepLink'
 
 export { MAIN_TABS } from './mainTabs'
 
@@ -173,7 +175,32 @@ function AnalyticsRoute() {
   )
 }
 
+function TxDeepLinkResolvingScreen() {
+  const { t } = useTranslation()
+
+  return (
+    <div
+      className="page-content page-content--centered"
+      role="status"
+      aria-live="polite"
+    >
+      <Spinner size="m" aria-hidden="true" />
+      <span className="visually-hidden">{t('home.loading')}</span>
+    </div>
+  )
+}
+
 export function AppShell() {
+  const txDeepLinkPhase = useTxDeepLink()
+
+  if (txDeepLinkPhase === 'resolving') {
+    return (
+      <NativeBackButtonProvider>
+        <TxDeepLinkResolvingScreen />
+      </NativeBackButtonProvider>
+    )
+  }
+
   return (
     <NativeBackButtonProvider>
       <Routes>
@@ -183,6 +210,7 @@ export function AppShell() {
         <Route path="edit-income/:id" element={<EditIncomePage />} />
         <Route path="edit-expense/:id" element={<EditExpensePage />} />
         <Route path="edit-transfer/:id" element={<EditTransferPage />} />
+        <Route path="transaction-gone" element={<TransactionGonePage />} />
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
           <Route path="analytics/*" element={<AnalyticsRoute />} />
