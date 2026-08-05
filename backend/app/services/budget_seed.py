@@ -79,6 +79,8 @@ SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
     ),
 }
 
+PROTECTED_EXPENSE_PARENT_KEYS = frozenset({"food", "home", "health"})
+
 SEED_WALLETS: list[tuple[str, str, str]] = [
     ("Наличный сум", "UZS", "cash_uzs"),
     ("Карта сум", "UZS", "card_uzs"),
@@ -120,6 +122,7 @@ async def copy_seed_categories_only(
             name=parent_name,
             parent_id=None,
             translation_key=parent_key,
+            is_protected=parent_key in PROTECTED_EXPENSE_PARENT_KEYS,
             color_index=await assign_category_color(
                 session, family_budget_id, kind="expense"
             ),

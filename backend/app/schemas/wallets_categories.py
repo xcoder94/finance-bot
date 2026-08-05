@@ -118,6 +118,7 @@ class ExpenseCategoryResponse(BaseModel):
     translation_key: str | None
     parent_id: uuid.UUID | None
     color_index: int
+    is_protected: bool = Field(default=False)
     transaction_count: int = Field(default=0)
 
 

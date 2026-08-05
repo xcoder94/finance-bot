@@ -446,6 +446,7 @@ class TestExpenseCategoriesApi:
             "translation_key",
             "parent_id",
             "color_index",
+            "is_protected",
             "transaction_count",
         }
         assert by_id[top_id]["transaction_count"] == 0
@@ -606,6 +607,7 @@ class TestListingQueryCounts:
                         "translation_key",
                         "parent_id",
                         "color_index",
+                        "is_protected",
                         "transaction_count",
                     },
                 ),
