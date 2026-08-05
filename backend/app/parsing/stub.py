@@ -92,13 +92,22 @@ _DEFAULT_RESPONSES: dict[str, ParseResponse] = {
 
 
 class StubParser:
-    def __init__(self, responses: dict[str, ParseResponse] | None = None) -> None:
+    def __init__(
+        self,
+        responses: dict[str, ParseResponse] | None = None,
+        audio_responses: dict[str, ParseResponse] | None = None,
+    ) -> None:
         merged = dict(_DEFAULT_RESPONSES)
         if responses is not None:
             merged.update(responses)
         self._responses = merged
+        self._audio_responses = audio_responses or {}
 
     async def parse(self, request: ParseRequest) -> ParseResponse:
+        if request.audio_base64 is not None:
+            if "__audio__" in self._audio_responses:
+                return self._audio_responses["__audio__"]
+            return ParseResponse(operations=[])
         if request.text in self._responses:
             return self._responses[request.text]
         return ParseResponse(operations=[])

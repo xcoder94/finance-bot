@@ -27,6 +27,10 @@ MSG_EXCHANGE_RATE_REQUIRED = (
 MSG_VOICE_NOT_RECOGNIZED = (
     "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом."
 )
+MSG_RECEIPT_UNREADABLE = (
+    "Не разобрал чек. Сфотографируйте его целиком при хорошем свете или запишите\n"
+    "сумму текстом."
+)
 
 
 def currency_missing_text(currency: Literal["UZS", "USD"]) -> str:
