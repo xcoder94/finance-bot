@@ -17,6 +17,7 @@ from app.services.budget_seed import (
     assign_default_card_uzs,
     copy_seed_categories_only,
     copy_seed_wallets_only,
+    seed_demo_operations,
 )
 from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT
 from app.services.goal_notify import resolve_bot
@@ -194,6 +195,24 @@ async def detach_member_to_own_budget(
         await assign_default_card_uzs(session, departing_user)
     else:
         departing_user.default_wallet_id = personal_wallets[0].id
+
+    card_uzs = await session.scalar(
+        select(Wallet).where(
+            Wallet.family_budget_id == new_budget.id,
+            Wallet.translation_key == "card_uzs",
+            Wallet.is_deleted.is_(False),
+        )
+    )
+    card_usd = await session.scalar(
+        select(Wallet).where(
+            Wallet.family_budget_id == new_budget.id,
+            Wallet.translation_key == "card_usd",
+            Wallet.is_deleted.is_(False),
+        )
+    )
+    if card_uzs is None or card_usd is None:
+        await copy_seed_wallets_only(session, new_budget.id)
+    await seed_demo_operations(session, new_budget.id, departing_user.id)
 
     resolved_bot, owned = await resolve_bot(bot)
     try:

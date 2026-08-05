@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import asyncpg
 from fastapi import FastAPI
 
+from app.api.v1.demo_data import router as demo_data_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
@@ -58,6 +59,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(me_router)
+app.include_router(demo_data_router)
 app.include_router(wallets_router)
 app.include_router(goals_router)
 app.include_router(categories_router)

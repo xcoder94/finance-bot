@@ -166,6 +166,7 @@ def test_owner_language_callback_sends_18_1_with_markdown_and_keyboard() -> None
                 new=AsyncMock(return_value=None),
             ),
             patch("bot.onboarding.copy_seed_data", new=AsyncMock()),
+            patch("bot.onboarding.seed_demo_operations", new=AsyncMock()),
             patch("bot.onboarding.assign_default_card_uzs", new=AsyncMock()),
             patch("bot.onboarding.open_app_keyboard", return_value=fake_kb),
         ):

@@ -360,7 +360,7 @@ async def test_remove_member_personal_follows_shared_stays_aggregates_unchanged(
     assert shared_expense_after == shared_expense_before
 
     new_wallet_count = await _count_wallets_in_budget(session, member.family_budget_id)
-    assert new_wallet_count == 1
+    assert new_wallet_count == 5
 
     assert member.default_wallet_id == personal_wallet.id
 
