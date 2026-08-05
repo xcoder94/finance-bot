@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import base64
 import io
 import json
@@ -24,15 +26,13 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.parsing.prompt import IMMUTABLE_PARSER_INSTRUCTIONS, build_mutable_parser_payload
 from app.parsing.stub import StubParser
-from app.parsing.types import ParseResponse, ParsedOperation
-from app.speech.base import SpeechUnavailable
-from app.speech.factory import get_speech_client
-from app.speech.google_client import GoogleSpeechClient
+from app.parsing.types import ParseRequest, ParseResponse, ParsedOperation
+from app.services.quick_entry_dates import apply_date_hint
 from bot.quick_entry.handlers import (
     handle_quick_entry_voice,
     set_parser_override,
-    set_speech_client_override,
 )
 from bot.quick_entry.texts import MSG_MODEL_FAIL, MSG_NO_AMOUNT, MSG_VOICE_NOT_RECOGNIZED
 
@@ -40,6 +40,147 @@ MSG_VOICE_NOT_RECOGNIZED_EXPECTED = (
     "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом."
 )
 SECRET_TRANSCRIPT = "СЕКРЕТНАЯ_РАСШИФРОВКА_такси_25_тысяч"
+SECRET_AUDIO_LEAK = "SECRET_AUDIO_LEAK_MARKER"
+
+
+class FixedParser:
+    def __init__(self, response: ParseResponse) -> None:
+        self.response = response
+        self.calls: list[ParseRequest] = []
+
+    async def parse(self, request: ParseRequest) -> ParseResponse:
+        self.calls.append(request)
+        return self.response
+
+
+# --- Task 1 (phase 14b): types, prompt, date_hint ---
+
+
+def test_parse_request_accepts_optional_audio_fields():
+    req = ParseRequest(
+        text="",
+        wallet_names=[],
+        expense_category_names=[],
+        income_category_names=[],
+        audio_base64="AAAA",
+        audio_mime_type="audio/ogg",
+    )
+    assert req.audio_base64 == "AAAA"
+    assert req.audio_mime_type == "audio/ogg"
+
+
+def test_parse_response_accepts_speech_status_and_date_hint():
+    r = ParseResponse(operations=[], speech_status="not_recognized", date_hint="2026-08-03")
+    assert r.speech_status == "not_recognized"
+    assert r.date_hint == "2026-08-03"
+
+
+def test_mutable_payload_includes_today():
+    req = ParseRequest(text="x", wallet_names=[], expense_category_names=[], income_category_names=[])
+    payload = build_mutable_parser_payload(req)
+    assert '"today"' in payload
+
+
+def test_instructions_document_speech_status_and_date_hint():
+    assert "speech_status" in IMMUTABLE_PARSER_INSTRUCTIONS
+    assert "date_hint" in IMMUTABLE_PARSER_INSTRUCTIONS
+
+
+def test_apply_date_hint_yesterday_iso():
+    today = date(2026, 8, 4)
+    assert apply_date_hint("2026-08-03", today) == date(2026, 8, 3)
+
+
+def test_apply_date_hint_too_old_becomes_today():
+    today = date(2026, 8, 4)
+    assert apply_date_hint("2026-01-01", today) == today
+
+
+def test_apply_date_hint_none_is_today():
+    today = date(2026, 8, 4)
+    assert apply_date_hint(None, today) == today
+
+
+# --- Task 2 (phase 14b): HttpParser audio + speech_status ---
+
+
+from app.parsing.http_adapter import HttpParser
+from app.parsing.types import ParserMalformed, ParserUnavailable
+
+
+@pytest.mark.anyio
+async def test_http_parser_google_posts_inline_audio_part():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content.decode())
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "operations": [
+                                                {
+                                                    "type": "expense",
+                                                    "amount": 25000,
+                                                    "currency": "UZS",
+                                                    "wallet_hint": None,
+                                                    "category": "Такси",
+                                                    "comment": None,
+                                                    "from_wallet_hint": None,
+                                                    "to_wallet_hint": None,
+                                                    "rate": None,
+                                                }
+                                            ],
+                                            "speech_status": "recognized",
+                                            "date_hint": None,
+                                        }
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        parser = HttpParser("google", "key", "env-model", client=client)
+        resp = await parser.parse(
+            ParseRequest(
+                text="",
+                wallet_names=["Карта"],
+                expense_category_names=["Такси"],
+                income_category_names=[],
+                audio_base64="QQ==",
+                audio_mime_type="audio/ogg",
+            )
+        )
+    assert resp.speech_status == "recognized"
+    parts = captured["body"]["contents"][0]["parts"]
+    assert any("inlineData" in p or "inline_data" in p for p in parts)
+
+
+@pytest.mark.anyio
+async def test_http_parser_rejects_audio_when_not_google():
+    parser = HttpParser("openai", "key", "m")
+    with pytest.raises(ParserUnavailable):
+        await parser.parse(
+            ParseRequest(
+                text="",
+                wallet_names=[],
+                expense_category_names=[],
+                income_category_names=[],
+                audio_base64="QQ==",
+                audio_mime_type="audio/ogg",
+            )
+        )
 
 
 def _db_available() -> bool:
@@ -140,19 +281,6 @@ async def seed_taxi_setup(
     return wallet, taxi
 
 
-class StubSpeech:
-    def __init__(self, text: str = "", *, exc: Exception | None = None) -> None:
-        self.text = text
-        self.exc = exc
-        self.calls: list[bytes] = []
-
-    async def transcribe(self, audio: bytes) -> str:
-        self.calls.append(audio)
-        if self.exc is not None:
-            raise self.exc
-        return self.text
-
-
 def make_voice_message(*, telegram_id: int, chat_id: int = 42) -> SimpleNamespace:
     return SimpleNamespace(
         from_user=SimpleNamespace(id=telegram_id),
@@ -186,100 +314,12 @@ def _answer_text_parts(call: object) -> list[str]:
     return parts
 
 
-@pytest.mark.anyio
-async def test_google_speech_client_posts_ogg_and_returns_transcript() -> None:
-    audio = b"fake-ogg-bytes"
-    captured: dict = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["url"] = str(request.url)
-        captured["body"] = json.loads(request.content.decode())
-        return httpx.Response(
-            200,
-            json={
-                "results": [
-                    {"alternatives": [{"transcript": "такси 25 тысяч"}]},
-                ]
-            },
-        )
-
-    transport = httpx.MockTransport(handler)
-    client = GoogleSpeechClient(api_key="test-key", model="env-model-name")
-    with patch.object(client, "_http", httpx.AsyncClient(transport=transport)):
-        text = await client.transcribe(audio)
-
-    assert text == "такси 25 тысяч"
-    assert "speech:recognize" in captured["url"]
-    assert "key=test-key" in captured["url"]
-    body = captured["body"]
-    assert body["config"]["encoding"] == "OGG_OPUS"
-    assert body["config"]["sampleRateHertz"] == 48000
-    assert body["config"]["languageCode"] == "ru-RU"
-    assert body["config"]["model"] == "env-model-name"
-    assert body["audio"]["content"] == base64.b64encode(audio).decode()
-
-
-@pytest.mark.anyio
-async def test_google_speech_client_empty_results_returns_empty_string() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"results": []})
-
-    client = GoogleSpeechClient(api_key="k", model="m")
-    with patch.object(
-        client, "_http", httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    ):
-        assert await client.transcribe(b"x") == ""
-
-
-@pytest.mark.anyio
-async def test_google_speech_client_http_error_raises_unavailable() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(503, json={"error": {"message": "down"}})
-
-    client = GoogleSpeechClient(api_key="k", model="m")
-    with patch.object(
-        client, "_http", httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    ):
-        with pytest.raises(SpeechUnavailable):
-            await client.transcribe(b"x")
-
-
-def test_get_speech_client_inactive_without_credentials(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("app.speech.factory.SPEECH_API_KEY", None)
-    monkeypatch.setattr("app.speech.factory.SPEECH_PROVIDER", None)
-    monkeypatch.setattr("app.speech.factory.SPEECH_MODEL", None)
-    client = get_speech_client()
-    assert client.__class__.__name__ == "_InactiveSpeechClient"
-
-
-def test_get_speech_client_google_when_configured(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("app.speech.factory.SPEECH_API_KEY", "key")
-    monkeypatch.setattr("app.speech.factory.SPEECH_PROVIDER", "google")
-    monkeypatch.setattr("app.speech.factory.SPEECH_MODEL", "from-env")
-    client = get_speech_client()
-    assert isinstance(client, GoogleSpeechClient)
-
-
-def test_get_speech_client_inactive_for_non_google_provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("app.speech.factory.SPEECH_API_KEY", "key")
-    monkeypatch.setattr("app.speech.factory.SPEECH_PROVIDER", "other")
-    monkeypatch.setattr("app.speech.factory.SPEECH_MODEL", "m")
-    client = get_speech_client()
-    assert client.__class__.__name__ == "_InactiveSpeechClient"
-
-
-def test_config_exposes_speech_env_vars() -> None:
+def test_config_has_no_speech_env_vars() -> None:
     from app import config
 
-    assert hasattr(config, "SPEECH_PROVIDER")
-    assert hasattr(config, "SPEECH_API_KEY")
-    assert hasattr(config, "SPEECH_MODEL")
+    assert not hasattr(config, "SPEECH_PROVIDER")
+    assert not hasattr(config, "SPEECH_API_KEY")
+    assert not hasattr(config, "SPEECH_MODEL")
 
 
 def test_process_quick_entry_text_is_importable() -> None:
@@ -293,12 +333,16 @@ def test_msg_voice_not_recognized_constant() -> None:
 
 
 @pytest.fixture(autouse=True)
-def reset_speech_override() -> AsyncIterator[None]:
-    set_speech_client_override(None)
+def reset_parser_override() -> AsyncIterator[None]:
     set_parser_override(None)
     yield
-    set_speech_client_override(None)
     set_parser_override(None)
+
+
+@pytest.fixture(autouse=True)
+def parser_provider_google(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bot.quick_entry.handlers.PARSER_PROVIDER", "google")
+    monkeypatch.setattr("bot.quick_entry.handlers.PARSER_API_KEY", "test-key")
 
 
 @pytest.mark.skipif(not _db_available(), reason="PostgreSQL not available")
@@ -311,26 +355,22 @@ class TestVoiceAcceptance:
             user, budget = await create_user(session, telegram_id=9_014_001)
             await seed_taxi_setup(session, user, budget)
 
-            transcript = "такси 25 тысяч"
-            set_speech_client_override(StubSpeech(transcript))
-            set_parser_override(
-                StubParser(
-                    responses={
-                        transcript: ParseResponse(
-                            operations=[
-                                ParsedOperation(
-                                    type="expense",
-                                    amount=25_000,
-                                    currency="UZS",
-                                    wallet_hint=None,
-                                    category="Такси",
-                                    comment=None,
-                                )
-                            ]
+            parser = FixedParser(
+                ParseResponse(
+                    operations=[
+                        ParsedOperation(
+                            type="expense",
+                            amount=25_000,
+                            currency="UZS",
+                            wallet_hint=None,
+                            category="Такси",
+                            comment=None,
                         )
-                    }
+                    ],
+                    speech_status="recognized",
                 )
             )
+            set_parser_override(parser)
             monkeypatch.setattr(
                 "bot.quick_entry.handlers.async_session_factory",
                 SessionFactory(session),
@@ -358,7 +398,7 @@ class TestVoiceAcceptance:
                 chat_id=message.chat.id, action="typing"
             )
 
-    async def test_voice_transcribed_text_reaches_card_path(
+    async def test_voice_parsed_audio_reaches_card_path(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         async with rollback_session() as session:
@@ -376,24 +416,21 @@ class TestVoiceAcceptance:
             )
             await session.flush()
 
-            transcript = "такси 25000"
-            set_speech_client_override(StubSpeech(transcript))
             set_parser_override(
-                StubParser(
-                    responses={
-                        transcript: ParseResponse(
-                            operations=[
-                                ParsedOperation(
-                                    type="expense",
-                                    amount=25_000,
-                                    currency="UZS",
-                                    wallet_hint=None,
-                                    category="Такси",
-                                    comment=None,
-                                )
-                            ]
-                        )
-                    }
+                FixedParser(
+                    ParseResponse(
+                        operations=[
+                            ParsedOperation(
+                                type="expense",
+                                amount=25_000,
+                                currency="UZS",
+                                wallet_hint=None,
+                                category="Такси",
+                                comment=None,
+                            )
+                        ],
+                        speech_status="recognized",
+                    )
                 )
             )
             monkeypatch.setattr(
@@ -401,8 +438,8 @@ class TestVoiceAcceptance:
                 SessionFactory(session),
             )
             monkeypatch.setattr(
-                "bot.quick_entry.handlers.resolve_operation_date",
-                lambda _text, now=None: datetime(2026, 8, 1).date(),
+                "bot.quick_entry.handlers.apply_date_hint",
+                lambda _hint, today=None: datetime(2026, 8, 1).date(),
             )
 
             message = make_voice_message(telegram_id=user.telegram_id)
@@ -425,7 +462,14 @@ class TestVoiceAcceptance:
             user.default_wallet_id = wallet.id
             await session.flush()
 
-            set_speech_client_override(StubSpeech(""))
+            set_parser_override(
+                FixedParser(
+                    ParseResponse(
+                        operations=[],
+                        speech_status="not_recognized",
+                    )
+                )
+            )
             monkeypatch.setattr(
                 "bot.quick_entry.handlers.async_session_factory",
                 SessionFactory(session),
@@ -440,7 +484,7 @@ class TestVoiceAcceptance:
             assert budget.daily_unparsed == 1
             assert budget.daily_model_calls == 0
 
-    async def test_voice_speech_unavailable_returns_model_fail_without_unparsed(
+    async def test_voice_provider_gate_returns_model_fail_without_unparsed(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         async with rollback_session() as session:
@@ -450,9 +494,65 @@ class TestVoiceAcceptance:
             user.default_wallet_id = wallet.id
             await session.flush()
 
-            set_speech_client_override(
-                StubSpeech(exc=SpeechUnavailable("down"))
+            monkeypatch.setattr("bot.quick_entry.handlers.PARSER_PROVIDER", "openai")
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
             )
+
+            message = make_voice_message(telegram_id=user.telegram_id)
+            bot = make_voice_bot()
+            await handle_quick_entry_voice(message, bot)
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
+            assert budget.daily_model_calls == 0
+
+    async def test_voice_missing_speech_status_returns_model_fail_without_counters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_014_008)
+            wallet = make_wallet(budget, name="Карта сум")
+            session.add(wallet)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            set_parser_override(
+                FixedParser(
+                    ParseResponse(
+                        operations=[],
+                        speech_status=None,
+                    )
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+
+            message = make_voice_message(telegram_id=user.telegram_id)
+            bot = make_voice_bot()
+            await handle_quick_entry_voice(message, bot)
+
+            message.answer.assert_awaited_once_with(MSG_MODEL_FAIL)
+            await session.refresh(budget)
+            assert budget.daily_unparsed == 0
+            assert budget.daily_model_calls == 0
+
+    async def test_voice_missing_parser_api_key_returns_model_fail_without_counters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_014_009)
+            wallet = make_wallet(budget, name="Карта сум")
+            session.add(wallet)
+            user.default_wallet_id = wallet.id
+            await session.flush()
+
+            monkeypatch.setattr("bot.quick_entry.handlers.PARSER_PROVIDER", "google")
+            monkeypatch.setattr("bot.quick_entry.handlers.PARSER_API_KEY", None)
             monkeypatch.setattr(
                 "bot.quick_entry.handlers.async_session_factory",
                 SessionFactory(session),
@@ -477,10 +577,13 @@ class TestVoiceAcceptance:
             user.default_wallet_id = wallet.id
             await session.flush()
 
-            transcript = "просто такси"
-            set_speech_client_override(StubSpeech(transcript))
             set_parser_override(
-                StubParser(responses={transcript: ParseResponse(operations=[])})
+                FixedParser(
+                    ParseResponse(
+                        operations=[],
+                        speech_status="recognized",
+                    )
+                )
             )
             monkeypatch.setattr(
                 "bot.quick_entry.handlers.async_session_factory",
@@ -517,42 +620,38 @@ class TestVoiceAcceptance:
             user.default_wallet_id = wallet.id
             await session.flush()
 
-            transcript = "три операции голосом"
-            set_speech_client_override(StubSpeech(transcript))
-            set_parser_override(
-                StubParser(
-                    responses={
-                        transcript: ParseResponse(
-                            operations=[
-                                ParsedOperation(
-                                    type="expense",
-                                    amount=10_000,
-                                    currency="UZS",
-                                    wallet_hint=None,
-                                    category="Продукты",
-                                    comment=None,
-                                ),
-                                ParsedOperation(
-                                    type="expense",
-                                    amount=5_000,
-                                    currency="UZS",
-                                    wallet_hint=None,
-                                    category="Такси",
-                                    comment=None,
-                                ),
-                                ParsedOperation(
-                                    type="income",
-                                    amount=50_000,
-                                    currency="UZS",
-                                    wallet_hint=None,
-                                    category="Зарплата",
-                                    comment=None,
-                                ),
-                            ]
-                        )
-                    }
+            parser = FixedParser(
+                ParseResponse(
+                    operations=[
+                        ParsedOperation(
+                            type="expense",
+                            amount=10_000,
+                            currency="UZS",
+                            wallet_hint=None,
+                            category="Продукты",
+                            comment=None,
+                        ),
+                        ParsedOperation(
+                            type="expense",
+                            amount=5_000,
+                            currency="UZS",
+                            wallet_hint=None,
+                            category="Такси",
+                            comment=None,
+                        ),
+                        ParsedOperation(
+                            type="income",
+                            amount=50_000,
+                            currency="UZS",
+                            wallet_hint=None,
+                            category="Зарплата",
+                            comment=None,
+                        ),
+                    ],
+                    speech_status="recognized",
                 )
             )
+            set_parser_override(parser)
             salary = IncomeCategory(family_budget_id=budget.id, name="Зарплата")
             session.add(salary)
             await session.flush()
@@ -566,6 +665,7 @@ class TestVoiceAcceptance:
             bot = make_voice_bot()
             await handle_quick_entry_voice(message, bot)
 
+            assert len(parser.calls) == 1
             assert message.answer.await_count == 3
             for call in message.answer.await_args_list:
                 text = call.args[0]
@@ -573,7 +673,7 @@ class TestVoiceAcceptance:
             await session.refresh(budget)
             assert budget.daily_model_calls == 1
 
-    async def test_voice_reply_never_contains_transcription_string(
+    async def test_voice_reply_never_contains_audio_base64_or_transcript(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         async with rollback_session() as session:
@@ -589,23 +689,23 @@ class TestVoiceAcceptance:
             user.default_wallet_id = wallet.id
             await session.flush()
 
-            set_speech_client_override(StubSpeech(SECRET_TRANSCRIPT))
+            audio = b"ogg-bytes-for-leak-test"
+            audio_b64 = base64.b64encode(audio).decode()
             set_parser_override(
-                StubParser(
-                    responses={
-                        SECRET_TRANSCRIPT: ParseResponse(
-                            operations=[
-                                ParsedOperation(
-                                    type="expense",
-                                    amount=15_000,
-                                    currency="UZS",
-                                    wallet_hint=None,
-                                    category="Продукты",
-                                    comment="на ужин",
-                                )
-                            ]
-                        )
-                    }
+                FixedParser(
+                    ParseResponse(
+                        operations=[
+                            ParsedOperation(
+                                type="expense",
+                                amount=15_000,
+                                currency="UZS",
+                                wallet_hint=None,
+                                category="Продукты",
+                                comment="на ужин",
+                            )
+                        ],
+                        speech_status="recognized",
+                    )
                 )
             )
             monkeypatch.setattr(
@@ -614,10 +714,12 @@ class TestVoiceAcceptance:
             )
 
             message = make_voice_message(telegram_id=user.telegram_id)
-            bot = make_voice_bot()
+            bot = make_voice_bot(audio=audio)
             await handle_quick_entry_voice(message, bot)
 
             message.answer.assert_awaited_once()
             for call in message.answer.await_args_list:
                 for part in _answer_text_parts(call):
+                    assert audio_b64 not in part
                     assert SECRET_TRANSCRIPT not in part
+                    assert SECRET_AUDIO_LEAK not in part

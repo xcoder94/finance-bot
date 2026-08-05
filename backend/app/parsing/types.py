@@ -23,11 +23,18 @@ class ParseRequest:
     wallet_names: list[str]
     expense_category_names: list[str]
     income_category_names: list[str]
+    audio_base64: str | None = None
+    audio_mime_type: str | None = None
+    image_base64: str | None = None
+    image_mime_type: str | None = None
 
 
 @dataclass(frozen=True)
 class ParseResponse:
     operations: list[ParsedOperation]
+    speech_status: Literal["recognized", "not_recognized"] | None = None
+    date_hint: str | None = None
+    receipt_status: Literal["ok", "unreadable"] | None = None
 
 
 class ParserUnavailable(Exception):

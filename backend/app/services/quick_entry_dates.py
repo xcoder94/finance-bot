@@ -74,6 +74,17 @@ def _resolve_weekday(match: re.Match[str], today: date) -> date:
     return today - timedelta(days=days_back)
 
 
+def apply_date_hint(date_hint: str | None, today: date | None = None) -> date:
+    ref = today if today is not None else tashkent_today()
+    if date_hint is None:
+        return ref
+    try:
+        resolved = date.fromisoformat(date_hint)
+    except ValueError:
+        return ref
+    return _finalize_date(resolved, ref)
+
+
 def resolve_operation_date(text: str, now: datetime | None = None) -> date:
     today = _reference_today(now)
 
