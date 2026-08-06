@@ -90,7 +90,10 @@ later". If that list is empty, say so.
 - Every string the user sees is quoted verbatim in Russian in the PRD.
   Carry it over character for character — no rephrasing, no shortening,
   no emoji that are not there.
-- Uzbek translations are out of scope.
+- Full interface localisation (`uz.json`) is out of scope until I say
+  otherwise, after the Russian strings lock. Short, self-contained
+  new-feature strings (e.g. support-relay quick messages) may be drafted
+  in Uzbek by the assistant for my review.
 - Words that never appear in user-facing text:
   ошибка, сессия, сервер, токен, запрос.
 - Interface labels are localised; category names and comments entered by
@@ -100,9 +103,9 @@ later". If that list is empty, say so.
 ## Outside your scope
 
 Keys and provider accounts, domains, hosting, TLS, deployment, restarts,
-backups, bot registration, server configuration values, Uzbek
-translations, slicing the PRD into phases. Do not do these and do not
-offer to do them for me.
+backups, bot registration, server configuration values, full Uzbek
+interface localisation (`uz.json`), slicing the PRD into phases. Do not do
+these and do not offer to do them for me.
 
 ## Editing this file
 
