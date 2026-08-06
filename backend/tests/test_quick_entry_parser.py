@@ -179,6 +179,81 @@ def test_parsed_operation_accepts_transfer_fields():
     assert op.rate is None
 
 
+def test_prompt_bare_direction_words_rule():
+    lowered = IMMUTABLE_PARSER_INSTRUCTIONS.lower()
+    for keyword in (
+        "kirim",
+        "приход",
+        "доход",
+        "получил",
+        "получила",
+        "заработал",
+        "заработала",
+        "chiqim",
+        "расход",
+        "потратил",
+        "потратила",
+        "заплатил",
+        "заплатила",
+    ):
+        assert keyword in lowered
+    assert "never default to expense" in lowered
+
+
+@pytest.mark.anyio
+async def test_stub_bare_kirim_income_no_category():
+    parser = StubParser()
+    response = await parser.parse(
+        ParseRequest(
+            text="Kirim 500000 som",
+            wallet_names=[],
+            expense_category_names=[],
+            income_category_names=[],
+        )
+    )
+    assert len(response.operations) == 1
+    op = response.operations[0]
+    assert op.type == "income"
+    assert op.amount == 500_000
+    assert op.currency == "UZS"
+    assert op.category is None
+
+
+@pytest.mark.anyio
+async def test_stub_bare_kirim_ming_income():
+    parser = StubParser()
+    response = await parser.parse(
+        ParseRequest(
+            text="kirim 500 ming",
+            wallet_names=[],
+            expense_category_names=[],
+            income_category_names=[],
+        )
+    )
+    assert len(response.operations) == 1
+    assert response.operations[0].type == "income"
+    assert response.operations[0].amount == 500_000
+
+
+@pytest.mark.anyio
+async def test_stub_bare_chiqim_expense():
+    parser = StubParser()
+    response = await parser.parse(
+        ParseRequest(
+            text="Chiqim 500000 som",
+            wallet_names=[],
+            expense_category_names=[],
+            income_category_names=[],
+        )
+    )
+    assert len(response.operations) == 1
+    op = response.operations[0]
+    assert op.type == "expense"
+    assert op.amount == 500_000
+    assert op.currency == "UZS"
+    assert op.category is None
+
+
 def test_prompt_immutable_then_mutable_order():
     req = ParseRequest(
         text="переложил 500 тысяч с карты на наличные",

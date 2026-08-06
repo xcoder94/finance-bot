@@ -88,6 +88,42 @@ _DEFAULT_RESPONSES: dict[str, ParseResponse] = {
             )
         ]
     ),
+    "Kirim 500000 som": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="income",
+                amount=500_000,
+                currency="UZS",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+            )
+        ]
+    ),
+    "kirim 500 ming": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="income",
+                amount=500_000,
+                currency="UZS",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+            )
+        ]
+    ),
+    "Chiqim 500000 som": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="expense",
+                amount=500_000,
+                currency="UZS",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+            )
+        ]
+    ),
 }
 
 
