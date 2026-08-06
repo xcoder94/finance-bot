@@ -1,4 +1,4 @@
-# Handoff — income/demo-data fix merged to main (unpushed); Android mini-app mystery solved (dev-server, not React)
+# Handoff — leaked secret purged from local history, dev ports moved to 5001/5002, backend hardened for production
 
 Last updated: 2026-08-06 (end of session — this file was fully rewritten,
 not appended to; everything before this point in the file's history is
@@ -6,190 +6,183 @@ superseded).
 
 ## Read this first — current branch state
 
-**Checked out: `main`, 3 commits ahead of `origin/main`. NOT pushed.**
+**Checked out: `main`, in sync with `origin/main` (both at `50b05ba`).**
+Nothing pending to push. The PM pushed during this session (outside the
+assistant's visibility — confirmed via `git fetch`, not assumed).
 
 ```
+50b05ba Harden backend for production: CORS, rate limiting, prod server docs
+e54a64f Switch local dev ports: backend 5001, frontend 5002
+a500e2a update                                    (PM's own commit, pre-session)
+024547a env example update                        (rewritten this session, see below)
 b5da2f7 Remove demo transaction seeding and clear-demo feature.
-54867b5 Add one-off script to clear seeded demo transactions across budgets.
-87aca28 fix(parser): classify bare kirim/chiqim messages by direction word
 ```
 
-These are the same three commits from `fix/income-type-and-demo-data-removal`,
-fast-forward-merged into `main` this session (main hadn't diverged, so no
-merge commit). The branch itself still exists locally, fully merged —
-routine cleanup (delete it), not done, low priority.
-
-Backend on `main`: 3 failed / 512 passed (same 3 pre-existing
-`test_cascade_fallback_log.py` failures, unrelated, already broken before
-this branch). Frontend: 244/244. Re-ran both suites fresh on `main` after
-the merge — same numbers as on the branch, nothing regressed.
+Backend on `main`: 515 passed, 0 failed (after fixing an unmigrated local
+dev DB — see below). Frontend not touched this session, not re-run.
 
 ## What happened this session, in order
 
-1. **Verified the income/expense fix against the real Gemini API** (the
-   thing flagged as unverified at the end of last session — no test had
-   ever called the actual model). Wrote a throwaway script
-   (not committed, was in scratchpad) that calls `app.parsing.factory.get_parser()`
-   directly — the real `HttpParser` with `provider="google"` — bypassing
-   Telegram entirely. Sent the exact reported message `Kirim 500.000 som`
-   plus 3 variants (`kirim`/`chiqim`, with/without dot). Result: **fix
-   confirmed** — `Kirim 500.000 som` now returns `type='income'`,
-   amount 500000, category "Зарплата". Expense-direction messages still
-   classify correctly. This is real evidence, not a report claim.
+1. **Explained why `.env` lives at repo root** (PM question, no change made)
+   — `docker-compose.yml` and `app/config.py` both read it from there.
+   Note: this was true *at the time*; see item 3 below, PM moved it since.
 
-2. **Re-ran the demo cleanup script.** Queried DB first: 23 non-deleted
-   `is_demo=True` transactions remained in family budget
-   `dd462eda-1c18-48d6-855b-8d427baaad2f` (the ones the stale process
-   reseeded between the cleanup commit and last session's 10:54 restart —
-   see previous handoff for that story). Ran
-   `backend/scripts/clear_seeded_demo_transactions.py` — cleared all 23,
-   confirmed 0 remain via a follow-up query.
+2. **`git push origin main` was rejected by GitHub Push Protection.**
+   Root cause: `docs/app.log`, committed in `b4b00a1` ("env example
+   update"), contained a real Gemini API key
+   (`PARSER_API_KEY=AQ.Ab8RN6J2Eg...`) in plaintext inside a logged Google
+   API request URL. This was one of 3 commits sitting locally, unpushed —
+   **`origin/main` was never at risk**, confirmed via `git fetch` before
+   touching anything.
+   - Fixed via `git rebase -i b5da2f7` (b5da2f7 = last commit already on
+     `origin/main` at the time): re-edited `b4b00a1` to `git rm
+     docs/app.log`, which made the next commit (`82aa10b`, whose only
+     content was deleting that same file) empty — dropped it from the
+     rebase todo instead of leaving an empty commit.
+   - Result: `docs/app.log` no longer exists anywhere in reachable git
+     history (verified with `git log --all -- docs/app.log` → empty, and
+     a full-history grep for the leaked key string → 0 hits). The file
+     also doesn't exist in the working tree and was never tracked outside
+     that one purged commit.
+   - **The key itself was never exposed on GitHub** (origin/main didn't
+     have the commit). It's still sitting in plaintext in `backend/.env`
+     (gitignored, that's normal) as `PARSER_API_KEY`. Rotating it is still
+     worth doing on general hygiene grounds (it did sit in a log file
+     locally for "several sessions" per the previous handoff) but it is
+     **not** a "this key is now public" emergency.
 
-3. **Merged `fix/income-type-and-demo-data-removal` into `main`.**
-   `main` had not diverged (merge-base == main HEAD == `9eb378b`), so it
-   was a clean fast-forward. Re-ran both test suites on `main`
-   post-merge — same results as above. **Did not push to `origin`** —
-   that's a separate call, deliberately left for the PM.
+3. **PM moved `.env` and `docker-compose.yml` from repo root into
+   `backend/`** (their own change, commit `963aaf6`, done outside this
+   session before it started). Confirmed intentional when asked directly.
+   `app/config.py` now does `load_dotenv(_BACKEND_ROOT / ".env")`, not
+   `_REPO_ROOT`. **Root `.env` no longer exists — `backend/.env` is now
+   the only one.** Docker Compose auto-reads `.env` from the same
+   directory as `docker-compose.yml`, so this is self-consistent, not a
+   half-done change.
 
-4. **PM reported, via manual testing, a new/different bug shape** than
-   last session's theory: an **old Android phone opens the mini app fine
-   through the production bot** (deployed on the server) but **AI doesn't
-   respond there**; the same phone, on the same wifi, testing the
-   **local** dev setup, has it backwards — **AI works, mini app doesn't
-   open**. PM's hypothesis: maybe a React version downgrade (19→18/17)
-   would help old phones open the app.
+4. **PM asked to move local dev ports: backend → 5001, frontend → 5002**
+   (previously 8000 and 5173/whatever Vite default). Changed:
+   - `frontend/vite.config.ts` — `server.port: 5002`; proxy target for
+     `/api` changed from `http://127.0.0.1:8000` to `http://127.0.0.1:5001`.
+   - `backend/README.md` — run/verify commands updated to `--port 5001` /
+     `curl http://127.0.0.1:5001/health`.
+   - Started both locally this session to confirm: backend `/health` →
+     `200 {"status":"ok"}` on 5001, frontend serving on 5002. Both were
+     running via `nohup` in the background at end of session (uvicorn
+     `--reload`, `npm run dev`) — **these are ephemeral, will not survive
+     past this session/shell**, not something a fresh session needs to
+     manage.
+   - Frontend has **no** `VITE_API_URL` / base-URL env var. It calls
+     relative `/api/...` paths; the vite dev-server proxy above is what
+     actually routes to the backend port. In production (built `dist/`,
+     no vite dev server) this proxy doesn't exist — whatever serves the
+     built frontend needs its own `/api` → backend rule (nginx or
+     similar). Not set up, not this session's scope.
+   - Committed as `e54a64f`.
 
-5. **Investigated the React-downgrade hypothesis — found it's not React,
-   found and confirmed the real cause.**
-   - Web research first (per PM's explicit "search, don't answer from
-     memory" instruction): React 17/18/19's actual differences are
-     concurrent rendering (18) and Actions/useOptimistic/less boilerplate
-     (19) — nothing about minimum device/browser support changed
-     meaningfully across versions. Explained this to PM in plain language
-     with a cashier metaphor.
-   - **The real, confirmed cause: dev-server vs. production build.**
-     `frontend/index.html:11` uses `<script type="module">` — native ES
-     modules. No `@vitejs/plugin-legacy` installed, no `browserslist`
-     config anywhere in the project. In dev mode (`npm run dev`, port
-     5173, tunneled via a rotating `trycloudflare.com` quick-tunnel
-     hostname), Vite serves ~2900 raw untranspiled module files straight
-     to the browser — nothing is "translated" for old engines. A
-     production build (`vite build`) at least bundles/minifies (though
-     still no down-leveling, since no legacy plugin is installed).
-   - **The PM's own manual re-test proved it, independent of React
-     version**: production and local both run the *exact same* React 19
-     from the *same* `package.json`. Production (served as a build) opens
-     on the old phone; local (served as raw dev-server ESM over the
-     rotating tunnel) doesn't. Since the React version is identical in
-     both, the version cannot be the differentiator — this alone falsifies
-     the downgrade hypothesis regardless of the dev-server theory.
-   - **Built `frontend/dist/` this session** (`npm run build` —
-     `tsc -b && vite build`, clean, no errors; `dist/` is gitignored,
-     nothing to commit). Told PM to run `npm run preview` (port 4173) and
-     manually repoint `cloudflared` at it — restarts/tunnel reconfig are
-     outside this assistant's scope per `AGENTS.md`, PM did this part
-     themselves.
-   - **PM re-tested on the old Android phone against the `preview` build
-     — it opened.** Hypothesis fully confirmed by direct evidence, not
-     just theory: the failure was dev-server delivery (raw ES modules +
-     ephemeral tunnel domain), not React, not the phone's WebView being
-     fundamentally broken (proven since production already worked on it).
+5. **PM asked to bring the backend to "production ready".** Scope was
+   unclear (no phase spec covers this) — asked the PM to pick from a
+   checklist grounded in an actual gap-check of the code, not guesses.
+   PM picked all four. Implemented:
+   - **CORS** — `CORSMiddleware` added in `app/main.py` (there was none
+     before — any cross-origin browser call would have failed silently).
+     Allowed origins come from new `CORS_ALLOWED_ORIGINS` env var
+     (comma-separated), defaulting to `[MINI_APP_URL]` if unset. No
+     cookies are used (auth is a Bearer token), so
+     `allow_credentials=False`.
+   - **Production process model** — added `gunicorn` +
+     `uvicorn.workers.UvicornWorker` as the documented prod run command
+     in `backend/README.md` (new "Running the API in production"
+     section), replacing bare `uvicorn --reload` (dev-only, single
+     process). Worker count left as an adjustable flag
+     (`2 x cores + 1` guidance) — actual value for the real server is a
+     deploy-time decision, outside this assistant's scope.
+   - **Rate limiting** — `slowapi`, global per-IP default limit via new
+     `RATE_LIMIT_DEFAULT` env var (default `120/minute`), wired as
+     middleware + exception handler (`429` on breach) in `app/main.py`.
+   - **Logging** — checked first: `app/logging_setup.py` already existed
+     and was already production-grade (rotating file handler, 5 MB × 5
+     backups, plus console, applied to root logger, called from both
+     `app/main.py` and `bot/main.py` at import time). **No change made
+     here** — flagged to the PM as already done rather than redone.
+   - New deps pinned in `requirements.txt` by actually installing them in
+     the venv and reading the resolved versions (not assumed): `gunicorn`,
+     `slowapi`, `limits`, `deprecated`, `wrapt`.
+   - New env vars documented in `backend/.env.example`:
+     `CORS_ALLOWED_ORIGINS`, `RATE_LIMIT_DEFAULT`.
+   - Verified live with `curl`: preflight from `MINI_APP_URL`'s origin
+     passes, preflight from an arbitrary origin gets `400`; firing ~130
+     requests at `/health` in a loop produced `429`s once past the
+     120/minute budget.
+   - Committed as `50b05ba`.
 
-6. **PM asked about day-to-day dev workflow implications** — does every
-   save now require a manual `npm run build` + `npm run preview` +
-   re-tunnel cycle? Answered: no. Recommended workflow, not yet acted on:
-   - Normal feature/bugfix dev: keep using `npm run dev` (port 5173, HMR)
-     exactly as before — nothing changes, fast iteration on
-     desktop/iPhone is unaffected.
-   - Only when specifically testing old/weak-device compatibility: run
-     `vite build --watch` in one terminal (auto-rebuilds `dist/` on save)
-     + `npm run preview` in another (started once, left running, serves
-     whatever's currently in `dist/` — no restart needed per rebuild) +
-     point the tunnel at port 4173 once. After that, the only manual step
-     per save is refreshing the mini app on the test phone.
-   - Offered to add a `"build:watch": "vite build --watch"` convenience
-     script to `frontend/package.json`. **PM has not answered yet — asked
-     to be reminded of this question in a future session.** Do not assume
-     an answer either way; ask again.
+6. **Test suite scare, root-caused and fixed.** First full `pytest` run
+   after the above showed **320 failed / 195 passed** — looked like the
+   new middleware broke everything. It didn't: one failing test's
+   traceback showed `relation "family_budgets" does not exist` — the
+   local Postgres container (now under `backend/docker-compose.yml`,
+   different Compose project name than before the file moved in item 3)
+   had a **fresh, unmigrated volume**. `alembic current` showed nothing
+   applied. Ran `alembic upgrade head` (19 migrations applied cleanly),
+   re-ran the suite: **515 passed, 0 failed.** Nothing to do with CORS or
+   rate limiting — pure local-environment drift from the `.env`/compose
+   relocation in item 3.
 
-## Two separate, unrelated bugs are now on the table — do not conflate them
+## Uncommitted / working-tree notes right now
 
-- **Bug A (mini app not opening on old Android) — SOLVED this session**,
-  root-caused and fixed by testing/serving via a production-style build
-  instead of the dev server. Nothing left to build; only the open
-  `build:watch` convenience-script question above remains.
-- **Bug B (production bot's AI not responding)** — **not solved, not new**.
-  Matches a previously diagnosed, still-unresolved issue from an earlier
-  session: Gemini's "User location is not supported" block, seen only in
-  production (server IP/account-country mismatch), never reproduced
-  locally (local testing this session again went through Gemini
-  successfully every time — see item 1 above, real `200 OK`s throughout).
-  Outside this assistant's scope (keys/provider accounts/server config)
-  — waiting on the PM/hosting contact to try one of the previously
-  discussed remediation paths. Nothing to build here from this side.
-
-## Uncommitted working-tree state right now (by design, not oversight)
-
-- **`AGENTS.md`** — modified, never committed, PM-only file per its own
-  rule. Do not stage it, ever.
-- **`docs/context/*`** — never committed (standing PM rule). Carried over
-  unchanged from before, still open, still not deleted:
-  - `cascade-keyword-review.md` — status still unclear, still stale. Ask
-    the PM directly; standing policy is to delete once done+verified.
-  - `cursor-prompt-phase-16e-bugfix-tx-deeplink-and-delete-card.md` and
-    `cursor-prompt-phase-16g-cascade-fallback-log.md` — both fully
-    executed and verified, still not deleted. Offer again next session.
-  - `mini-prd-cascade-demo-protected-categories.md` — status unknown,
-    untouched.
-  - `deploy-mvp2-vs-mvp1-notes.md` — written for the PM to paste into the
-    separate deploy chat. Still there; deploy status unknown.
-  - `cursor-prompt-bugfix-income-type-and-demo-data-removal.md` and
-    `report-income-type-and-demo-data-removal.md` — task spec and report
-    for the now-merged fix, from last session. Still there, untouched.
+- **`AGENTS.md`** — PM-only file, never staged by the assistant.
+- **`docs/context/*`** — never committed (standing PM rule), this file
+  included. Carried over from before, status unchanged, still open:
+  - `cascade-keyword-review.md`, `mini-prd-cascade-demo-protected-categories.md`,
+    `deploy-mvp2-vs-mvp1-notes.md`, `cursor-prompt-bugfix-income-type-and-demo-data-removal.md`,
+    `report-income-type-and-demo-data-removal.md`,
+    `cursor-prompt-phase-16e-bugfix-tx-deeplink-and-delete-card.md`,
+    `cursor-prompt-phase-16g-cascade-fallback-log.md` — none touched this
+    session, same open questions as last time (see previous handoff
+    content in git history if needed).
 - **`docs/bugs_screens/`** — still untracked, still an open call whether
   to commit. Unchanged this session.
-- **`docs/app.log`** — still sitting there untracked, still contains the
-  production Google API key in plaintext (from several sessions ago). Not
-  touched this session. Still worth flagging key rotation once production
-  Bug B (above) is sorted.
+- **`docs/app.log`** — gone. Purged from history this session (item 2
+  above), doesn't exist in the working tree either. Remove this line next
+  time it's confirmed still gone — keeping it one more session as a
+  paper trail.
 - **`.claude/`** — local tool config, never committed.
-- **`frontend/dist/`** — new this session, from the production build test.
-  Gitignored (`frontend/.gitignore:11`), nothing to commit, nothing to
-  clean up.
+- **`frontend/dist/`** — if still present from a previous session's
+  production-build test, gitignored, not touched this session.
 
 ## Open questions / next steps for a fresh session
 
-1. **`build:watch` convenience script** — PM said they'll ask about this
-   later. Remind them if it doesn't come up; don't assume an answer.
-2. **Push `main` to `origin`** — 3 commits sitting locally ahead of
-   `origin/main`, never pushed. PM decision, not yet made.
-3. **Delete the now-fully-merged `fix/income-type-and-demo-data-removal`
+1. **Rotate the Gemini `PARSER_API_KEY`** — not urgent (never reached
+   GitHub), but it sat in a local log file across several sessions before
+   being purged this session. PM's call on timing.
+2. **`build:watch` convenience script** — still unanswered from a prior
+   session. Remind the PM if it doesn't come up.
+3. **Delete the fully-merged `fix/income-type-and-demo-data-removal`
    branch** — routine cleanup, not done.
 4. **Bug B — production Gemini location block** — still open, still
-   needs the PM/hosting contact. See above.
-5. **`is_demo` column** — not dropped, per the original task spec (schema
-   changes are a "stop and ask"). Still present on `Transaction`, now
-   written only by nothing in product code (the seeding feature is fully
-   removed) and read only by the one-off cleanup script. PM decision
-   needed on whether to drop it later.
+   needs the PM/hosting contact. Unrelated to this session's work.
+5. **`is_demo` column** — still present on `Transaction`, still not
+   dropped (schema changes are a "stop and ask"). PM decision pending.
 6. **Prefilter dot-as-thousands-separator bug**
    (`app/parsing/prefilter.py:44`, `_PLAIN_AMOUNT_RE`) — still diagnosed,
-   still not fixed. Small regex change (accept `.` alongside space/`_`),
-   ready whenever the PM says go.
-7. Everything already open before this session, still open, untouched:
+   still not fixed.
+7. **Frontend has no `/api` proxy outside `npm run dev`** — flagged in
+   item 4 above. Whenever the PM's deploy story for the built frontend
+   comes up, this needs an actual answer (reverse-proxy rule or a real
+   `VITE_API_URL`), not before.
+8. Everything already open before this session, unchanged:
    - `uz.json` still has 2 keys in Russian
      (`settings.membersScreen.sincePrefix`, `home.personalTitle`).
-   - `docs/bugs_screens/` — commit or not, still open.
-   - Several other `mvp2/phase-*` branches still exist locally, all fully
-     merged into `main` — routine cleanup, not done.
+   - Several other `mvp2/phase-*` branches exist locally, fully merged —
+     routine cleanup, not done.
    - Customer's 18-of-20 voice-recognition gate and 20-receipt accuracy
-     gate (PRD §23) — neither run yet; timing of the phase-12 release
-     announcement — still open, still the customer's call.
-   - Deploy itself (migrations, restarts, env vars on the real server) is
-     still outside this session's scope.
+     gate (PRD §23) — neither run yet.
+   - Deploy itself (migrations, restarts, env vars on the real server) —
+     still outside this assistant's scope.
 
 ## Immediate next step
 
-Nothing blocked on the assistant. Whenever a fresh session starts: check
-whether the PM wants `main` pushed to `origin`, and remind them about the
-open `build:watch` script question if they haven't brought it up.
+Nothing blocked on the assistant. If a fresh local dev environment is
+ever spun up again (new Postgres volume, moved `.env`, etc.), check
+`alembic current` before assuming test failures mean broken code — item 6
+above is exactly that trap.
