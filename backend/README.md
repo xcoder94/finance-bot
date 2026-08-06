@@ -35,13 +35,13 @@ alembic upgrade head
 From `backend/` with the venv activated:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 5001
 ```
 
 Verify:
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:5001/health
 # Expected: {"status":"ok"}
 ```
 
