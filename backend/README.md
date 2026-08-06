@@ -49,6 +49,34 @@ The API verifies a PostgreSQL connection on startup (inside the FastAPI
 `lifespan` handler). If Postgres is down, uvicorn exits immediately with a
 clear error — it will not hang silently.
 
+## Running the API in production
+
+Use Gunicorn with Uvicorn workers instead of `--reload` (single process,
+auto-restart on code change — not meant for production):
+
+```bash
+gunicorn app.main:app \
+  -k uvicorn.workers.UvicornWorker \
+  --workers 4 \
+  --bind 0.0.0.0:5001 \
+  --access-logfile - \
+  --error-logfile -
+```
+
+Adjust `--workers` to the host's CPU count (rule of thumb: `2 x cores + 1`).
+
+Two env vars control the hardening added for production (see
+`.env.example`):
+
+- `CORS_ALLOWED_ORIGINS` — comma-separated list of origins allowed to call
+  the API. Empty by default, which falls back to `MINI_APP_URL` alone.
+- `RATE_LIMIT_DEFAULT` — per-IP request limit applied to every route,
+  e.g. `120/minute`. Requests over the limit get `429 Too Many Requests`.
+
+Logging (console + rotating file, 5 MB x 5 backups) is already wired via
+`app/logging_setup.py` and used by both the API and the bot — no
+additional setup needed.
+
 ## Running the bot
 
 In a **separate terminal**, from `backend/` with the venv activated:

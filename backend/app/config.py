@@ -16,6 +16,16 @@ _raw_mini_app_url = (os.environ.get("MINI_APP_URL") or "").strip()
 MINI_APP_URL: str | None = _raw_mini_app_url or None
 SUPPORT_CHAT_ID: str | None = os.environ.get("SUPPORT_CHAT_ID") or None
 
+_raw_cors_origins = (os.environ.get("CORS_ALLOWED_ORIGINS") or "").strip()
+if _raw_cors_origins:
+    CORS_ALLOWED_ORIGINS: list[str] = [
+        origin.strip() for origin in _raw_cors_origins.split(",") if origin.strip()
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [MINI_APP_URL] if MINI_APP_URL else []
+
+RATE_LIMIT_DEFAULT = os.environ.get("RATE_LIMIT_DEFAULT") or "120/minute"
+
 PARSER_PROVIDER = os.environ.get("PARSER_PROVIDER") or None
 PARSER_API_KEY = os.environ.get("PARSER_API_KEY") or None
 PARSER_MODEL = os.environ.get("PARSER_MODEL") or None
