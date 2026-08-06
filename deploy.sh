@@ -15,9 +15,8 @@ cd "$BASEDIR/backend"
 source venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
-deactivate
 
-echo ">>> Running the API"
+echo ">>> Running the API..."
 
 pm2 stop $BACKEND_NODE_NAME 2>/dev/null || true
 pm2 delete $BACKEND_NODE_NAME 2>/dev/null || true
@@ -33,9 +32,17 @@ pm2 start ./venv/bin/gunicorn \
   --access-logfile - \
   --error-logfile -
 
-echo ">>> Running frontend"
-echo $BASEDIR
-echo ""
+echo ">>> Running bot..."
+source venv/bin/activate
+pm2 delete financebot-bot 2>/dev/null || true
+
+pm2 start python3.13 \
+  --name financebot-bot \
+  --interpreter none \
+  -- -m bot.main
+deactivate
+
+echo ">>> Running frontend..."
 cd "$BASEDIR/frontend"
 npm i --legacy-peer-deps
 
