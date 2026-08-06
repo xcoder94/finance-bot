@@ -26,7 +26,6 @@ from app.services.budget_seed import (
     assign_default_card_uzs,
     copy_seed_data,
     count_seed_rows,
-    seed_demo_operations,
 )
 from app.services.invite import (
     build_invite_link,
@@ -274,7 +273,6 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 session.add(user)
                 await session.flush()
                 await copy_seed_data(session, budget.id)
-                await seed_demo_operations(session, budget.id, user.id)
                 await assign_default_card_uzs(session, user)
             else:
                 budget_id = uuid.UUID(data["family_budget_id"])

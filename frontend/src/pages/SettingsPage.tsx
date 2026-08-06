@@ -8,7 +8,6 @@ import {
   type ExpenseCategoryResponse,
   type IncomeCategoryResponse,
 } from '../api/categories'
-import { clearDemoData, getDemoDataStatus } from '../api/demoData'
 import { getWallets, type WalletResponse } from '../api/wallets'
 import { SETTINGS_TOC_ICONS } from '../components/settings/settingsTocIcons'
 import i18n from '../i18n'
@@ -70,9 +69,6 @@ export function SettingsPage() {
   const user = useAuthStore((state) => state.user)
   const familyId = user?.familyBudgetId ?? ''
 
-  const [hasDemoData, setHasDemoData] = useState(false)
-  const [clearingDemo, setClearingDemo] = useState(false)
-
   const [loadState, setLoadState] = useState<TocLoadState>(() => {
     const wallets = peekWallets(familyId)
     const incomeCategories = peekIncomeCategories(familyId)
@@ -115,42 +111,6 @@ export function SettingsPage() {
   useEffect(() => {
     void loadTocData()
   }, [loadTocData])
-
-  const loadDemoStatus = useCallback(async () => {
-    if (!user || user.role !== 'owner') {
-      setHasDemoData(false)
-      return
-    }
-
-    try {
-      const status = await getDemoDataStatus()
-      setHasDemoData(status.has_demo_data)
-    } catch {
-      setHasDemoData(false)
-    }
-  }, [user])
-
-  useEffect(() => {
-    void loadDemoStatus()
-  }, [loadDemoStatus])
-
-  const handleClearDemo = useCallback(async () => {
-    if (clearingDemo) {
-      return
-    }
-
-    setClearingDemo(true)
-    try {
-      await clearDemoData()
-      setHasDemoData(false)
-    } catch {
-      await loadDemoStatus()
-    } finally {
-      setClearingDemo(false)
-    }
-  }, [clearingDemo, loadDemoStatus])
-
-  const showClearDemo = user?.role === 'owner' && hasDemoData
 
   const subtitles = useMemo(() => {
     if (loadState.status !== 'success' || !user) {
@@ -265,17 +225,6 @@ export function SettingsPage() {
           </Link>
         ))}
       </div>
-
-      {showClearDemo ? (
-        <button
-          type="button"
-          className="settings-sub-page__danger"
-          disabled={clearingDemo}
-          onClick={() => void handleClearDemo()}
-        >
-          Очистка демо данных
-        </button>
-      ) : null}
 
       <p className="settings-page__footer-hint">{t('settings.toc.footerHint')}</p>
     </div>

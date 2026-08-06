@@ -22,7 +22,7 @@ from sqlalchemy import distinct, select
 from app.config import DATABASE_URL
 from app.db import async_session_factory, dispose_engine
 from app.models.transaction import Transaction
-from app.services.demo_data import clear_demo_transactions
+from app.services.transactions import soft_delete_transaction
 
 _LOCAL_DB_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
@@ -46,6 +46,15 @@ def assert_local_database() -> str:
 async def run() -> tuple[int, int]:
     try:
         async with async_session_factory() as session:
+            transactions = (
+                await session.scalars(
+                    select(Transaction).where(
+                        Transaction.is_demo.is_(True),
+                        Transaction.is_deleted.is_(False),
+                    )
+                )
+            ).all()
+
             budget_ids = (
                 await session.scalars(
                     select(distinct(Transaction.family_budget_id)).where(
@@ -55,12 +64,11 @@ async def run() -> tuple[int, int]:
                 )
             ).all()
 
-            total_cleared = 0
-            for budget_id in budget_ids:
-                total_cleared += await clear_demo_transactions(session, budget_id)
+            for transaction in transactions:
+                soft_delete_transaction(transaction)
 
             await session.commit()
-            return total_cleared, len(budget_ids)
+            return len(transactions), len(budget_ids)
     finally:
         await dispose_engine()
 
