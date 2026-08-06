@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(_REPO_ROOT / ".env")
+load_dotenv(_BACKEND_ROOT / ".env")
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
