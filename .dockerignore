@@ -1,0 +1,27 @@
+# VCS / tooling
+.git
+.gitignore
+.cursorignore
+.claude
+.superpowers
+cursor
+docs
+*.md
+
+# Python
+**/venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache
+backend/logs/
+backend/tests/
+
+# Node
+**/node_modules/
+frontend/dist/
+
+# Local env / secrets
+.env
+.env.*
+**/.env
+**/.env.*
