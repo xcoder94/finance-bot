@@ -43,12 +43,12 @@ from app.services.goals import check_goal_achievement
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.quick_entry_counters import (
-    can_model_call,
     can_unparsed,
     ensure_counters_day,
-    spend_model_call,
+    refund_model_call,
     spend_unparsed,
     tashkent_today_for_counters,
+    try_spend_model_call,
 )
 from app.services.quick_entry_create import (
     create_quick_entry_expense,
@@ -61,7 +61,13 @@ from app.services.quick_entry_transfer import (
     needs_exchange_refusal,
     resolve_transfer_wallets,
 )
-from app.services.transactions import get_active_transaction, soft_delete_transaction
+from app.services.transactions import (
+    get_active_transaction,
+    get_transaction_wallets,
+    require_transaction_modify_permission,
+    require_transaction_visible,
+    soft_delete_transaction,
+)
 from app.services.quick_entry_dates import (
     apply_date_hint,
     resolve_operation_date,
@@ -75,6 +81,7 @@ from app.services.quick_entry_wallets import (
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id
 from bot.quick_entry.cards import (
     card_keyboard,
+    escape_markdown,
     format_amount,
     format_card,
     format_exchange_card,
@@ -102,6 +109,7 @@ from bot.quick_entry.texts import (
 router = Router()
 logger = logging.getLogger(__name__)
 TASHKENT = ZoneInfo("Asia/Tashkent")
+MAX_VOICE_BYTES = 5 * 1024 * 1024
 MAX_MESSAGE_LEN = 500
 MAX_OPERATIONS = 5
 
@@ -130,31 +138,44 @@ def _resolve_op_date(
 def _resolve_rate(op: ParsedOperation, source_text: str) -> int | None:
     if source_text:
         return effective_rate(op, source_text)
-    if op.rate is not None and op.rate > 0:
+    if op.rate is not None and 0 < op.rate <= MAX_AMOUNT:
         return op.rate
     return None
 
 
+MAX_COMMENT_LEN = 200
+MAX_AMOUNT = 2_000_000_000
+
+
 def _strip_op_comment(op: ParsedOperation, source_text: str) -> str | None:
     strip_source = source_text if source_text else (op.comment or "")
-    return strip_date_words(op.comment, strip_source)
+    comment = strip_date_words(op.comment, strip_source)
+    if comment is None:
+        return None
+    return comment[:MAX_COMMENT_LEN]
+
+
+def _is_usable_amount(amount: int | None) -> bool:
+    return amount is not None and 0 < amount <= MAX_AMOUNT
 
 
 def _is_clear(op: ParsedOperation) -> bool:
-    return op.type in ("expense", "income") and op.amount is not None
+    return op.type in ("expense", "income") and _is_usable_amount(op.amount)
 
 
 def _is_ambiguous(op: ParsedOperation) -> bool:
-    return op.type == "ambiguous" and op.amount is not None
+    return op.type == "ambiguous" and _is_usable_amount(op.amount)
 
 
 def _is_transfer_op(op: ParsedOperation) -> bool:
-    return op.type in ("transfer", "exchange") and op.amount is not None
+    return op.type in ("transfer", "exchange") and _is_usable_amount(op.amount)
 
 
 def _filter_countable(ops: list[ParsedOperation]) -> list[ParsedOperation]:
     known = ("expense", "income", "ambiguous", "transfer", "exchange")
-    return [op for op in ops if op.type in known and op.amount is not None]
+    return [
+        op for op in ops if op.type in known and _is_usable_amount(op.amount)
+    ]
 
 
 def _category_label(category: str | None) -> str:
@@ -167,7 +188,7 @@ def _category_label(category: str | None) -> str:
 def _format_type_question(amount: int, currency: str, category: str | None) -> str:
     line = f"**{format_amount(amount, currency)}**"
     if category is not None and category.strip():
-        line += f" · {_category_label(category)}"
+        line += f" · {escape_markdown(_category_label(category))}"
     return f"{line}\n{MSG_TYPE_QUESTION}"
 
 
@@ -328,7 +349,7 @@ async def _process_parsed_response(
     source_text: str,
     today: date,
     *,
-    charge_model_call: bool = True,
+    model_call_granted: bool = False,
 ) -> None:
     countable = _filter_countable(response.operations)
     clear_ops = [op for op in countable if _is_clear(op)]
@@ -341,15 +362,19 @@ async def _process_parsed_response(
         and bool(ambiguous_ops)
         and len(countable) <= MAX_OPERATIONS
     )
-    if charge_model_call and not ambiguous_only:
-        spend_model_call(budget)
+    # The caller already atomically reserved one daily_model_calls slot
+    # (via try_spend_model_call) before invoking the parser, so the counter
+    # is already spent here. The only remaining business rule is that an
+    # ambiguous-only response is free — refund the reservation for that case.
+    if model_call_granted and ambiguous_only:
+        await refund_model_call(session, budget)
         await session.commit()
 
     if len(countable) > MAX_OPERATIONS:
         if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
             await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
             return
-        spend_unparsed(budget)
+        await spend_unparsed(session, budget)
         await session.commit()
         await message.answer(MSG_TOO_MANY_OPS)
         return
@@ -358,7 +383,7 @@ async def _process_parsed_response(
         if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
             await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
             return
-        spend_unparsed(budget)
+        await spend_unparsed(session, budget)
         await session.commit()
         await message.answer(MSG_NO_AMOUNT)
         return
@@ -384,7 +409,7 @@ async def _process_parsed_response(
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(currency_missing_text(resolved.currency))
             continue
@@ -398,7 +423,7 @@ async def _process_parsed_response(
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
             continue
@@ -420,7 +445,7 @@ async def _process_parsed_response(
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
             continue
@@ -480,7 +505,7 @@ async def _process_parsed_response(
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(currency_missing_text(resolved.currency))
             continue
@@ -551,7 +576,7 @@ async def _process_parsed_response(
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(currency_missing_text(resolved.currency))
             continue
@@ -603,7 +628,7 @@ async def process_quick_entry_text(
             return
 
         today = tashkent_today_for_counters()
-        ensure_counters_day(budget, today)
+        await ensure_counters_day(session, budget, today)
 
         default_wallet = await _get_default_wallet(session, user)
         if default_wallet is None:
@@ -638,6 +663,19 @@ async def process_quick_entry_text(
         if prefilter_hit:
             response = ParseResponse(operations=[prefilter_op])
         else:
+            granted = await try_spend_model_call(
+                session, budget, DAILY_MODEL_CALL_LIMIT
+            )
+            await session.commit()
+            if not granted:
+                await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+                return
+
+            # Log only messages that actually reach the parser — a message
+            # refused for exhausting the daily limit never gets a row, so the
+            # table cannot be grown without bound by refused traffic. Legitimate
+            # traffic (anything that proceeds to be parsed) is still logged in
+            # full for parser-tuning purposes.
             try:
                 async with session.begin_nested():
                     session.add(
@@ -657,11 +695,6 @@ async def process_quick_entry_text(
                     telegram_id,
                     fallback_reason,
                 )
-
-            if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
-                await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
-                await session.commit()
-                return
 
             parse_request = ParseRequest(
                 text=text,
@@ -684,6 +717,7 @@ async def process_quick_entry_text(
                     message.from_user.id,
                     exc,
                 )
+                await refund_model_call(session, budget)
                 await message.answer(MSG_MODEL_FAIL)
                 await session.commit()
                 return
@@ -698,7 +732,7 @@ async def process_quick_entry_text(
             response,
             text,
             today,
-            charge_model_call=not prefilter_hit,
+            model_call_granted=not prefilter_hit,
         )
 
 
@@ -722,21 +756,6 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
     if message.from_user is None or message.voice is None:
         return
 
-    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
-
-    file = await bot.get_file(message.voice.file_id)
-    if file.file_path is None:
-        await message.answer(MSG_MODEL_FAIL)
-        return
-    buffer = await bot.download_file(file.file_path)
-    audio = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
-
-    if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
-        await message.answer(MSG_MODEL_FAIL)
-        return
-
-    audio_b64 = base64.b64encode(audio).decode()
-
     telegram_id = message.from_user.id
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, telegram_id)
@@ -750,16 +769,39 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             return
 
         today = tashkent_today_for_counters()
-        ensure_counters_day(budget, today)
-        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
-            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
-            await session.commit()
-            return
+        await ensure_counters_day(session, budget, today)
 
         default_wallet = await _get_default_wallet(session, user)
         if default_wallet is None:
             await message.answer(MSG_NO_AMOUNT)
             return
+
+        await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+        file = await bot.get_file(message.voice.file_id)
+        if file.file_path is None:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+        if file.file_size is not None and file.file_size > MAX_VOICE_BYTES:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+        buffer = await bot.download_file(file.file_path)
+        audio = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
+        if len(audio) > MAX_VOICE_BYTES:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+
+        if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+
+        granted = await try_spend_model_call(session, budget, DAILY_MODEL_CALL_LIMIT)
+        await session.commit()
+        if not granted:
+            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+            return
+
+        audio_b64 = base64.b64encode(audio).decode()
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
         parse_request = ParseRequest(
@@ -785,20 +827,24 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
                 message.from_user.id,
                 exc,
             )
+            await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return
 
         if response.speech_status is None:
+            await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return
 
         if response.speech_status == "not_recognized":
+            await refund_model_call(session, budget)
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await session.commit()
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(MSG_VOICE_NOT_RECOGNIZED)
             return
@@ -813,6 +859,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             response,
             "",
             today,
+            model_call_granted=True,
         )
 
 
@@ -840,6 +887,17 @@ async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
             session, txn_id, user.family_budget_id
         )
         if transaction is None:
+            await _answer_gone(callback)
+            return
+
+        from_wallet, to_wallet = await get_transaction_wallets(
+            session, transaction, user.family_budget_id
+        )
+        try:
+            require_transaction_modify_permission(
+                user, transaction, from_wallet, to_wallet
+            )
+        except HTTPException:
             await _answer_gone(callback)
             return
 
@@ -878,6 +936,17 @@ async def handle_quick_entry_wallet_list(callback: CallbackQuery, bot: Bot) -> N
             await _answer_gone(callback)
             return
 
+        from_wallet, to_wallet = await get_transaction_wallets(
+            session, transaction, user.family_budget_id
+        )
+        try:
+            require_transaction_modify_permission(
+                user, transaction, from_wallet, to_wallet
+            )
+        except HTTPException:
+            await _answer_gone(callback)
+            return
+
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
         await callback.message.edit_reply_markup(
             reply_markup=wallet_picker_keyboard(transaction.id, wallets)
@@ -905,6 +974,17 @@ async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> No
             session, txn_id, user.family_budget_id
         )
         if transaction is None:
+            await _answer_gone(callback)
+            return
+
+        from_wallet, to_wallet = await get_transaction_wallets(
+            session, transaction, user.family_budget_id
+        )
+        try:
+            require_transaction_modify_permission(
+                user, transaction, from_wallet, to_wallet
+            )
+        except HTTPException:
             await _answer_gone(callback)
             return
 
@@ -967,18 +1047,24 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
             return
 
         today = tashkent_today_for_counters()
-        ensure_counters_day(budget, today)
-        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
-            await callback.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
-            return
+        await ensure_counters_day(session, budget, today)
+
+        if pending.charge_on_confirm:
+            granted = await try_spend_model_call(
+                session, budget, DAILY_MODEL_CALL_LIMIT
+            )
+            await session.commit()
+            if not granted:
+                await callback.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+                return
 
         consumed = await consume_pending(session, pending_id)
         if consumed is None:
+            if pending.charge_on_confirm:
+                await refund_model_call(session, budget)
+                await session.commit()
             await _answer_gone(callback)
             return
-
-        if consumed.charge_on_confirm:
-            spend_model_call(budget)
 
         txn_datetime = _operation_date_to_datetime(consumed.operation_date)
         category_id = await resolve_category_id(

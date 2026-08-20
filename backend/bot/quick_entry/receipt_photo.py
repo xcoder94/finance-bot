@@ -37,12 +37,12 @@ from app.services.goals import check_goal_achievement
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.quick_entry_counters import (
-    can_model_call,
     can_unparsed,
     ensure_counters_day,
-    spend_model_call,
+    refund_model_call,
     spend_unparsed,
     tashkent_today_for_counters,
+    try_spend_model_call,
 )
 from app.services.quick_entry_create import (
     create_quick_entry_expense,
@@ -68,6 +68,7 @@ from bot.quick_entry.texts import (
 router = Router()
 logger = logging.getLogger(__name__)
 TASHKENT = ZoneInfo("Asia/Tashkent")
+MAX_PHOTO_BYTES = 5 * 1024 * 1024
 
 _parser_override: MessageParser | None = None
 
@@ -101,9 +102,17 @@ def _operation_date_to_datetime(op_date: date) -> datetime:
     )
 
 
+MAX_COMMENT_LEN = 200
+MAX_AMOUNT = 2_000_000_000
+
+
+def _is_usable_amount(amount: int | None) -> bool:
+    return amount is not None and 0 < amount <= MAX_AMOUNT
+
+
 def _first_expense_op(ops: list[ParsedOperation]) -> ParsedOperation | None:
     for op in ops:
-        if op.type == "expense" and op.amount is not None:
+        if op.type == "expense" and _is_usable_amount(op.amount):
             return op
     return None
 
@@ -127,7 +136,10 @@ def _caption_wallet_hint(caption: str | None, op_hint: str | None) -> str | None
 
 def _strip_op_comment(op: ParsedOperation, caption: str | None) -> str | None:
     strip_source = caption if caption else (op.comment or "")
-    return strip_date_words(op.comment, strip_source)
+    comment = strip_date_words(op.comment, strip_source)
+    if comment is None:
+        return None
+    return comment[:MAX_COMMENT_LEN]
 
 
 async def _list_expense_category_names(
@@ -175,7 +187,7 @@ async def _reply_unreadable(
     if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
         await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
         return
-    spend_unparsed(budget)
+    await spend_unparsed(session, budget)
     await session.commit()
     await message.answer(MSG_RECEIPT_UNREADABLE)
 
@@ -183,23 +195,6 @@ async def _reply_unreadable(
 async def handle_receipt_photo(message: Message, bot: Bot) -> None:
     if message.from_user is None or not message.photo:
         return
-
-    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
-
-    largest = message.photo[-1]
-    file = await bot.get_file(largest.file_id)
-    if file.file_path is None:
-        await message.answer(MSG_MODEL_FAIL)
-        return
-    buffer = await bot.download_file(file.file_path)
-    image_bytes = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
-
-    if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
-        await message.answer(MSG_MODEL_FAIL)
-        return
-
-    image_b64 = base64.b64encode(image_bytes).decode()
-    caption = message.caption
 
     telegram_id = message.from_user.id
     async with async_session_factory() as session:
@@ -214,16 +209,41 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             return
 
         today = tashkent_today_for_counters()
-        ensure_counters_day(budget, today)
-        if not can_model_call(budget, DAILY_MODEL_CALL_LIMIT):
-            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
-            await session.commit()
-            return
+        await ensure_counters_day(session, budget, today)
 
         default_wallet = await _get_default_wallet(session, user)
         if default_wallet is None:
             await message.answer(MSG_NO_AMOUNT)
             return
+
+        await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+        largest = message.photo[-1]
+        file = await bot.get_file(largest.file_id)
+        if file.file_path is None:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+        if file.file_size is not None and file.file_size > MAX_PHOTO_BYTES:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+        buffer = await bot.download_file(file.file_path)
+        image_bytes = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
+        if len(image_bytes) > MAX_PHOTO_BYTES:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+
+        if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
+            await message.answer(MSG_MODEL_FAIL)
+            return
+
+        granted = await try_spend_model_call(session, budget, DAILY_MODEL_CALL_LIMIT)
+        await session.commit()
+        if not granted:
+            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+            return
+
+        image_b64 = base64.b64encode(image_bytes).decode()
+        caption = message.caption
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
         parse_request = ParseRequest(
@@ -249,17 +269,16 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
                 message.from_user.id,
                 exc,
             )
+            await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return
 
         if response.receipt_status is None:
+            await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
             return
-
-        spend_model_call(budget)
-        await session.commit()
 
         if response.receipt_status == "unreadable":
             await _reply_unreadable(message, session, budget)
@@ -287,7 +306,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 return
-            spend_unparsed(budget)
+            await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(currency_missing_text(resolved.currency))
             return

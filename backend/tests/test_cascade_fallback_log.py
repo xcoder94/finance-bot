@@ -160,9 +160,13 @@ def reset_parser_override() -> AsyncIterator[None]:
 
 
 class TestCascadeFallbackHandlerLogging:
-    async def test_prefilter_miss_logs_even_when_model_limit_exhausted(
+    async def test_prefilter_miss_writes_no_log_row_when_model_limit_exhausted(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """A message that never reaches the parser because the daily model-call
+        limit is already exhausted must not grow cascade_fallback_log — see the
+        "unbounded table growth" fix: the log write moved to after the limit
+        check, so a refused message is never logged."""
         async with rollback_session() as session:
             user, budget = await create_user(session, telegram_id=9_201_001)
             wallet, _ = await seed_taxi_setup(session, user, budget)
@@ -188,13 +192,7 @@ class TestCascadeFallbackHandlerLogging:
             message = make_message(telegram_id=user.telegram_id, text="такси")
             await handle_quick_entry_text(message, SimpleNamespace())
 
-            assert await _count_fallback_logs(session) == 1
-            row = await session.scalar(select(CascadeFallbackLog))
-            assert row is not None
-            assert row.text == "такси"
-            assert row.reason == "amount_not_singular"
-            assert row.family_budget_id == budget.id
-            assert row.telegram_user_id == user.telegram_id
+            assert await _count_fallback_logs(session) == 0
             message.answer.assert_awaited_once()
             assert message.answer.await_args.args[0] == model_limit_text(
                 DAILY_MODEL_CALL_LIMIT
@@ -233,11 +231,14 @@ class TestCascadeFallbackHandlerLogging:
     async def test_logging_failure_does_not_block_reply(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """The message is under the model-call limit here (unlike the
+        "exhausted" test above), so the fallback-log write is actually
+        attempted and fails — the handler must swallow that and still reply
+        normally instead of the limit message."""
         async with rollback_session() as session:
             user, budget = await create_user(session, telegram_id=9_201_003)
             wallet, _ = await seed_taxi_setup(session, user, budget)
             user.default_wallet_id = wallet.id
-            _exhaust_model_limit(budget)
             await session.flush()
 
             set_parser_override(StubParser())
@@ -258,8 +259,9 @@ class TestCascadeFallbackHandlerLogging:
             message = make_message(telegram_id=user.telegram_id, text="такси")
             await handle_quick_entry_text(message, SimpleNamespace())
 
+            assert await _count_fallback_logs(session) == 0
             message.answer.assert_awaited_once()
-            assert message.answer.await_args.args[0] == model_limit_text(
+            assert message.answer.await_args.args[0] != model_limit_text(
                 DAILY_MODEL_CALL_LIMIT
             )
 
@@ -270,7 +272,6 @@ class TestCascadeFallbackHandlerLogging:
             user, budget = await create_user(session, telegram_id=9_201_004)
             wallet, _ = await seed_taxi_setup(session, user, budget)
             user.default_wallet_id = wallet.id
-            _exhaust_model_limit(budget)
             await session.flush()
 
             set_parser_override(StubParser())

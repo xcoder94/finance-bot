@@ -48,7 +48,8 @@ from app.services.membership_lifecycle import (
     count_all_wallets_for_user_budget,
     evaluate_join_from_own_budget,
 )
-from app.services.entity_limits import MEMBER_LIMIT
+from app.services.entity_limits import MEMBER_LIMIT, lock_family_budget
+from bot.quick_entry.cards import escape_markdown
 
 router = Router()
 
@@ -283,6 +284,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                     await state.clear()
                     await callback.answer()
                     return
+                await lock_family_budget(session, budget_id)
                 if await count_active_members(session, budget_id) >= MEMBER_LIMIT:
                     existing_language = language
                     await callback.message.edit_text(invite_family_full_chat())
@@ -310,7 +312,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
     if flow == "owner":
         welcome = welcome_solo()
     else:
-        welcome = welcome_invited(member_budget_name)
+        welcome = welcome_invited(escape_markdown(member_budget_name))
 
     await callback.message.answer(
         welcome,

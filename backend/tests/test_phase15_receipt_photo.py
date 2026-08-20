@@ -163,7 +163,7 @@ def make_photo_message(
 def make_photo_bot(*, image: bytes = b"jpeg-bytes") -> AsyncMock:
     bot = AsyncMock()
     bot.send_chat_action = AsyncMock()
-    bot.get_file = AsyncMock(return_value=SimpleNamespace(file_path="photo.jpg"))
+    bot.get_file = AsyncMock(return_value=SimpleNamespace(file_path="photo.jpg", file_size=None))
     bio = io.BytesIO(image)
     bot.download_file = AsyncMock(return_value=bio)
     return bot

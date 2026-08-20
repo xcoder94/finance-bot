@@ -25,6 +25,8 @@ RATE_MARKER_RE = re.compile(
     re.IGNORECASE | re.UNICODE,
 )
 
+MAX_RATE = 2_000_000_000
+
 
 @dataclass(frozen=True, slots=True)
 class ExchangeRateRequired:
@@ -43,7 +45,11 @@ def text_has_rate_marker(text: str) -> bool:
 
 def effective_rate(op: ParsedOperation, source_text: str) -> int | None:
     rate = op.rate
-    if rate is not None and rate > 0 and text_has_rate_marker(source_text):
+    if (
+        rate is not None
+        and 0 < rate <= MAX_RATE
+        and text_has_rate_marker(source_text)
+    ):
         return rate
     return None
 

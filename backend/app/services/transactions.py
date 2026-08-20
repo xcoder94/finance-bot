@@ -11,6 +11,9 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.transactions import (
+    MAX_AMOUNT as MAX_STORED_AMOUNT,
+)
+from app.schemas.transactions import (
     ExpenseCreate,
     ExpenseUpdate,
     IncomeCreate,
@@ -65,13 +68,6 @@ async def get_active_transaction(
         Transaction.is_deleted.is_(False),
     )
     return await session.scalar(stmt)
-
-
-def require_modify_permission(user: User, transaction: Transaction) -> None:
-    if user.role == "owner":
-        return
-    if transaction.created_by_user_id != user.id:
-        raise HTTPException(status_code=403)
 
 
 async def get_transaction_wallets(
@@ -207,6 +203,14 @@ def compute_transfer_amounts(
         to_amount = round(amount * rate)
     else:
         raise HTTPException(status_code=422, detail="Unsupported currency pair for transfer")
+
+    # amount/rate are individually bounded by the request schema, but their
+    # product/quotient can still exceed the 32-bit database column; reject
+    # here with a 422 instead of letting the INSERT fail with a 500. (A
+    # legitimate division can round down to 0, e.g. a small UZS amount
+    # converted at a high rate, so only the upper bound is enforced.)
+    if to_amount > MAX_STORED_AMOUNT:
+        raise HTTPException(status_code=422, detail="computed to_amount is out of range")
 
     return to_amount, rate
 

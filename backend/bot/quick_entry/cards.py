@@ -25,6 +25,20 @@ _MONTH_GENITIVE = (
 )
 
 
+_MARKDOWN_SPECIAL_CHARS = ("_", "*", "`", "[", "]")
+
+
+def escape_markdown(text: str) -> str:
+    """Escape characters aiogram's legacy Markdown parse_mode treats as
+    formatting, so user-controlled values (wallet names, category labels,
+    comments...) cannot break the parser or inject formatting/links into a
+    message that otherwise reads as coming from the bot."""
+    escaped = text
+    for char in _MARKDOWN_SPECIAL_CHARS:
+        escaped = escaped.replace(char, f"\\{char}")
+    return escaped
+
+
 def format_number(amount: int) -> str:
     negative = amount < 0
     digits = str(abs(amount))
@@ -62,11 +76,11 @@ def format_card(
     balance: int,
 ) -> str:
     lines = [
-        f"{sign} **{format_amount(amount, currency)}** · {category_label}",
+        f"{sign} **{format_amount(amount, currency)}** · {escape_markdown(category_label)}",
     ]
     if comment:
-        lines.append(comment)
-    lines.append(f"{wallet_name} · {_format_date(op_date)}")
+        lines.append(escape_markdown(comment))
+    lines.append(f"{escape_markdown(wallet_name)} · {_format_date(op_date)}")
     lines.append(f"Осталось: {format_amount(balance, currency)}")
     return "\n".join(lines)
 
@@ -83,11 +97,13 @@ def format_transfer_card(
 ) -> str:
     from_bal = _format_number(from_balance)
     to_bal = _format_number(to_balance)
+    from_name = escape_markdown(from_wallet_name)
+    to_name = escape_markdown(to_wallet_name)
     return "\n".join(
         [
             f"↔️ **{format_amount(amount, currency)}** · Перевод",
-            f"{from_wallet_name} → {to_wallet_name} · {_format_date(op_date)}",
-            f"{from_wallet_name}: {from_bal} · {to_wallet_name}: {to_bal}",
+            f"{from_name} → {to_name} · {_format_date(op_date)}",
+            f"{from_name}: {from_bal} · {to_name}: {to_bal}",
         ]
     )
 
@@ -107,13 +123,15 @@ def format_exchange_card(
 ) -> str:
     amount_from = format_amount(amount, from_currency)
     amount_to = format_amount(to_amount, to_currency)
+    from_name = escape_markdown(from_wallet_name)
+    to_name = escape_markdown(to_wallet_name)
     return "\n".join(
         [
             f"🔄 **{amount_from} → {amount_to}** · Обмен",
             f"Курс {_format_number(rate)} · {_format_date(op_date)}",
             (
-                f"{from_wallet_name}: {format_amount(from_balance, from_currency)}"
-                f" · {to_wallet_name}: {format_amount(to_balance, to_currency)}"
+                f"{from_name}: {format_amount(from_balance, from_currency)}"
+                f" · {to_name}: {format_amount(to_balance, to_currency)}"
             ),
         ]
     )

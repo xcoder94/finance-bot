@@ -294,7 +294,7 @@ def make_voice_message(*, telegram_id: int, chat_id: int = 42) -> SimpleNamespac
 def make_voice_bot(*, audio: bytes = b"ogg-bytes") -> AsyncMock:
     bot = AsyncMock()
     bot.send_chat_action = AsyncMock()
-    bot.get_file = AsyncMock(return_value=SimpleNamespace(file_path="voice.oga"))
+    bot.get_file = AsyncMock(return_value=SimpleNamespace(file_path="voice.oga", file_size=len(audio)))
     bio = io.BytesIO(audio)
     bot.download_file = AsyncMock(return_value=bio)
     return bot

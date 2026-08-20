@@ -20,7 +20,7 @@ from app.services.membership_lifecycle import (
     count_all_wallets_for_user_budget,
     evaluate_join_from_own_budget,
 )
-from app.services.entity_limits import MEMBER_LIMIT
+from app.services.entity_limits import MEMBER_LIMIT, lock_family_budget
 from app.services.ownership_transfer import (
     TransferActorError,
     TransferNotFoundError,
@@ -29,6 +29,7 @@ from app.services.ownership_transfer import (
     accept_ownership_transfer,
     refuse_ownership_transfer,
 )
+from bot.quick_entry.cards import escape_markdown
 from bot.onboarding import (
     get_active_user_by_telegram_id,
     get_family_budget_by_invite_token,
@@ -81,6 +82,7 @@ async def join_accept(callback: CallbackQuery) -> None:
                 await callback.answer()
                 return
 
+            await lock_family_budget(session, budget.id)
             if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
                 await callback.message.edit_text(invite_family_full_chat())
                 await callback.answer()
@@ -104,7 +106,7 @@ async def join_accept(callback: CallbackQuery) -> None:
                 return
 
     await callback.message.answer(
-        welcome_invited(budget_name),
+        welcome_invited(escape_markdown(budget_name)),
         reply_markup=open_app_keyboard(user.language),
         parse_mode="Markdown",
     )
