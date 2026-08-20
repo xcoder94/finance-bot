@@ -20,7 +20,8 @@ from app.api.v1.me import router as me_router
 from app.api.v1.transactions import router as transactions_router
 from app.api.v1.goals import router as goals_router
 from app.api.v1.wallets import router as wallets_router
-from app.config import CORS_ALLOWED_ORIGINS, RATE_LIMIT_DEFAULT, asyncpg_dsn
+from app.auth.pass_tokens import AppPassError, decode_app_pass
+from app.config import APP_PASS_SECRET, CORS_ALLOWED_ORIGINS, RATE_LIMIT_DEFAULT, asyncpg_dsn, redact_dsn
 from app.db import dispose_engine
 from app.logging_setup import setup_logging
 
@@ -40,13 +41,13 @@ async def verify_postgres_connection() -> None:
     except TimeoutError as exc:
         msg = (
             f"PostgreSQL connection timed out after "
-            f"{DB_CONNECT_TIMEOUT_SECONDS}s ({dsn!r}). "
+            f"{DB_CONNECT_TIMEOUT_SECONDS}s ({redact_dsn(dsn)}). "
             "Is the database running? Try: docker compose up -d"
         )
         raise RuntimeError(msg) from exc
     except Exception as exc:
         msg = (
-            f"Failed to connect to PostgreSQL ({dsn!r}): {exc}. "
+            f"Failed to connect to PostgreSQL ({redact_dsn(dsn)}): {exc}. "
             "Is the database running? Try: docker compose up -d"
         )
         raise RuntimeError(msg) from exc
@@ -63,7 +64,34 @@ async def lifespan(_app: FastAPI):
     await dispose_engine()
 
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT_DEFAULT])
+def rate_limit_key(request: Request) -> str:
+    """Key the rate limiter on the authenticated user when possible.
+
+    `request.client.host` is the same for every user behind a reverse proxy
+    (Traefik) that we do not configure as a trusted proxy, so it must not be
+    the sole key. When a request carries a valid signed app pass, key on the
+    `sub` claim instead — unspoofable because the signature is verified.
+    Never raises and never performs I/O; any failure falls back to the
+    remote address.
+    """
+    authorization = request.headers.get("Authorization")
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ").strip()
+        if token:
+            try:
+                claims = decode_app_pass(token, APP_PASS_SECRET)
+            except AppPassError:
+                pass
+            except Exception:
+                pass
+            else:
+                sub = claims.get("sub")
+                if sub:
+                    return f"user:{sub}"
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=rate_limit_key, default_limits=[RATE_LIMIT_DEFAULT])
 
 app = FastAPI(lifespan=lifespan)
 app.state.limiter = limiter

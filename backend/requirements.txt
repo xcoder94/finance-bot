@@ -31,6 +31,7 @@ typing_extensions==4.16.0
 uvicorn==0.51.0
 yarl==1.24.2
 pytest==8.4.1
+aiosqlite==0.22.1
 httpx==0.28.1
 PyJWT==2.10.1
 gunicorn==26.0.0

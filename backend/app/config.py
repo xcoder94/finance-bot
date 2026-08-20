@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
@@ -25,6 +26,22 @@ else:
     CORS_ALLOWED_ORIGINS = [MINI_APP_URL] if MINI_APP_URL else []
 
 RATE_LIMIT_DEFAULT = os.environ.get("RATE_LIMIT_DEFAULT") or "120/minute"
+
+_raw_pass_lifetime = os.environ.get("APP_PASS_LIFETIME_SECONDS") or ""
+try:
+    APP_PASS_LIFETIME_SECONDS = int(_raw_pass_lifetime or 7 * 24 * 60 * 60)
+except ValueError:
+    raise RuntimeError(
+        "APP_PASS_LIFETIME_SECONDS must be a whole number of seconds, "
+        f"got {_raw_pass_lifetime!r}"
+    ) from None
+if APP_PASS_LIFETIME_SECONDS <= 0:
+    # A non-positive lifetime issues passes that are already expired, which
+    # locks every user out of the mini app with no visible cause.
+    raise RuntimeError(
+        "APP_PASS_LIFETIME_SECONDS must be greater than zero, "
+        f"got {APP_PASS_LIFETIME_SECONDS}"
+    )
 
 PARSER_PROVIDER = os.environ.get("PARSER_PROVIDER") or None
 PARSER_API_KEY = os.environ.get("PARSER_API_KEY") or None
@@ -52,3 +69,27 @@ def asyncpg_dsn() -> str:
     if url.startswith("postgresql+asyncpg://"):
         return "postgresql://" + url.removeprefix("postgresql+asyncpg://")
     return url
+
+
+def redact_dsn(dsn: str) -> str:
+    """Return a form of a DSN safe to log or raise: no password, no credentials.
+
+    Keeps scheme, host, port and database name (useful for diagnosis).
+    Falls back to a fixed marker if the DSN cannot be parsed.
+    """
+    try:
+        parsed = urlsplit(dsn)
+        if not parsed.scheme or not parsed.netloc:
+            # Not a URL (e.g. libpq keyword form "host=... password=..."):
+            # there is no safe way to strip a secret we cannot locate.
+            return "<redacted>"
+        host = parsed.hostname or "?"
+        port = parsed.port
+        netloc = f"{host}:{port}" if port is not None else host
+        user = parsed.username
+        if user:
+            netloc = f"{user}:***@{netloc}"
+        path = parsed.path or ""
+        return urlunsplit((parsed.scheme, netloc, path, "", ""))
+    except Exception:
+        return "<redacted>"

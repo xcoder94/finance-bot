@@ -4,7 +4,9 @@ from typing import Any
 
 import jwt
 
-PASS_LIFETIME_SECONDS = 2_592_000
+from app.config import APP_PASS_LIFETIME_SECONDS
+
+PASS_LIFETIME_SECONDS = APP_PASS_LIFETIME_SECONDS
 
 
 class AppPassError(Exception):
