@@ -648,10 +648,9 @@ at all:
 
 The selected parser was validated on 101 text phrases. **It has never been
 measured on images.** Quality on Uzbek thermal-paper receipts, latency, and the
-cost of one call with an image attached are all unknown. An image travels in
-the variable part of the prompt and therefore **does not benefit from the
-prompt cache**, so the per-call cost is certainly higher than for text — by how
-much is not known.
+cost of one call with an image attached are all unknown. An image is billed as
+input tokens on top of the instructions and the text tail, so the per-call cost
+is certainly higher than for text — by how much is not known.
 
 **Acceptance test before release: 20 real receipts photographed by the
 customer, threshold 18 of 20 on the total amount.** The amount is the critical
@@ -1615,53 +1614,59 @@ Message length:
 
 ---
 
-## 20. Prompt caching
+## 20. Prompt caching — removed
 
-A cost requirement, not a functional one. The person never sees any of this.
+**The parsing prompt is NOT cached on the provider side.** Every call sends
+the static instructions in full as `systemInstruction`. Nothing in the
+product may create, extend or reference a Google `cachedContent` resource.
 
-**The static part of the parsing prompt is cached explicitly.**
+This section previously mandated one permanent explicit cache and estimated
+its cost at about $1.73 per month. **That estimate was wrong by more than an
+order of magnitude**, and the mistake was paid for in real money: the August
+2026 bill shows $18.14 of a $20.53 total consumed by the SKU
+`Generate content cached content storage token hours` — 18,142,224 token
+hours at $1 per million. Storage is billed **per hour of existence,
+regardless of traffic**; a cache that no one queries costs exactly as much as
+a busy one.
 
-Four requirements, all mandatory:
+The cause was structural, not accidental. Gemini enforces a minimum cache
+size (~4096 tokens); the static instructions are about 1,100 tokens, so the
+implementation padded them with roughly 68,000 tokens of inert filler purely
+to clear the minimum. The installation then paid to store that filler around
+the clock, with a 7-day TTL extended on every successful call — a cache that
+never expired.
 
-1. **The static part is fixed text.** Value substitution is allowed only in the
-   variable tail. Assembling the prompt on the fly and conditional fragments
-   ("if the family has a foreign-currency wallet, add a paragraph") are
-   forbidden.
+**The arithmetic that settles it**, derived from the same bill: cached input
+tokens cost $0.025 per million against $0.25 per million for ordinary input,
+so caching saves about $0.00018 per parse. A minimum-size cache costs about
+$3.00 per month to store. Break-even is roughly **17,000 parses per month —
+about 560 messages per day**. At the volume of a family budget bot, caching
+costs several times more than it saves.
+
+**Two requirements survive, unchanged and still mandatory:**
+
+1. **The static part is fixed text.** Value substitution is allowed only in
+   the variable tail. Assembling the prompt on the fly and conditional
+   fragments ("if the family has a foreign-currency wallet, add a paragraph")
+   are forbidden.
 2. **The static part contains no family data** — no wallet names, no date, no
    message text, no person's name.
-3. **There is exactly one cache in the whole installation**, regardless of how
-   many families exist. Storage is billed per cache: one shared cache costs
-   about $1.73 per month, while a per-family cache would cost roughly $1730 at a
-   thousand families — more than not caching at all.
-4. **The cache lives permanently** and is extended in the background. It is
-   recreated only when a new prompt version is deployed.
-
-**Deploying a new prompt version must delete the old cache.** Otherwise the bot
-keeps parsing by the previous version — silently, for an indeterminate time, and
-the cause is not found quickly.
-
-**If the cache is missing, the bot works without it.** Parsing proceeds as an
-ordinary call with the full prompt, the record is created, the person notices
-nothing, and the cache is rebuilt in the background. **The cache is a way to pay
-less, not a condition of the product working.** Without this stated explicitly,
-an expired cache would take down quick entry entirely.
-
-**The verifiable measure: the share of cached tokens in a single request is at
-least 90%.** Verified on one call through the provider's own token counters.
 
 ### Acceptance
 
-1. Make one parse call and read the token counters for that call: cached tokens
-   are at least 90% of input tokens.
-2. Delete the cache manually and send a quick-entry message. A record is created
-   normally and the person sees no difference. Check counters again afterwards:
-   the cache was rebuilt.
-3. Deploy a changed prompt version and confirm the previous cache is gone rather
-   than still serving.
-4. Send messages from two different families and confirm one cache serves both,
-   rather than one existing per family.
-5. Confirm no family-specific value (wallet name, date, member name, message
+1. No request to the provider carries a `cachedContent` field, for text,
+   audio and receipt-image turns alike.
+2. No request is ever made to the provider's cache endpoint
+   (`/cachedContents`).
+3. The static instructions carry no filler: no ballast text, and the static
+   part stays under 8,000 characters.
+4. Confirm no family-specific value (wallet name, date, member name, message
    text) appears in the static part.
+
+**If caching is ever reconsidered**, redo the break-even calculation against
+the then-current prices and the then-current message volume, and set a
+billing budget alert before switching it on. Do not reintroduce it on the
+strength of a remembered price.
 
 ---
 
