@@ -7,7 +7,6 @@ BACKEND_NODE_NAME="financebot-backend"
 
 echo ">>> Pulling latest code..."
 cd "$BASEDIR"
-git checkout -- frontend/package-lock.json 2>/dev/null || true
 git pull
 
 echo ">>> Updating backend..."
@@ -44,7 +43,7 @@ deactivate
 
 echo ">>> Running frontend..."
 cd "$BASEDIR/frontend"
-npm i --legacy-peer-deps
+npm ci --legacy-peer-deps
 
 pm2 delete financebot-frontend 2>/dev/null || true
 

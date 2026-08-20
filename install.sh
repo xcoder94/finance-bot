@@ -5,7 +5,6 @@ BASEDIR=$(dirname $0)
 
 echo ">>> Pulling latest code..."
 cd "$BASEDIR"
-git checkout -- frontend/package-lock.json 2>/dev/null || true
 git pull
 
 echo ">>> Workign with backend..."

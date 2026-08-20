@@ -13,3 +13,5 @@
 *.xls
 *.xlsx
 context/
+server.md
+*.csv
