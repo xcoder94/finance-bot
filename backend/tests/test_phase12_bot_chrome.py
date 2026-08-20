@@ -187,6 +187,7 @@ def test_invited_language_callback_keeps_18_2_and_uses_markdown() -> None:
         session = SimpleNamespace(
             add=lambda _model: None,
             flush=AsyncMock(),
+            execute=AsyncMock(),
             get=AsyncMock(
                 return_value=SimpleNamespace(
                     name="Семья Юсуповых",

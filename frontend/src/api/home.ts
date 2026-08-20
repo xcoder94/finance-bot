@@ -77,7 +77,7 @@ export class HomeApiError extends Error {
   }
 }
 
-const TASHKENT_OFFSET = '+05:00'
+export const TASHKENT_OFFSET = '+05:00'
 
 async function apiGet<T>(url: string): Promise<T> {
   let response: Response

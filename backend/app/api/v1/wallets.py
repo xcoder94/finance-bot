@@ -21,6 +21,7 @@ from app.services.entity_limits import (
     LIMIT_SHARED_WALLETS,
     PERSONAL_WALLET_LIMIT,
     SHARED_WALLET_LIMIT,
+    lock_family_budget,
 )
 from app.services.goals import get_active_goal_for_wallet
 from app.services.quick_entry_balance import wallet_balance
@@ -105,6 +106,7 @@ async def create_wallet(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletResponse:
     if body.is_personal:
+        await lock_family_budget(session, user.family_budget_id)
         personal_count = await session.scalar(
             select(func.count())
             .select_from(Wallet)
@@ -129,6 +131,7 @@ async def create_wallet(
         if user.role != "owner":
             raise HTTPException(status_code=403)
 
+        await lock_family_budget(session, user.family_budget_id)
         shared_count = await session.scalar(
             select(func.count())
             .select_from(Wallet)

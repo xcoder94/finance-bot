@@ -394,6 +394,7 @@ class TestDefaultWalletAssignment:
             session = SimpleNamespace(
                 add=lambda _model: None,
                 flush=AsyncMock(),
+                execute=AsyncMock(),
                 get=AsyncMock(
                     return_value=SimpleNamespace(
                         name="Семья Юсуповых",

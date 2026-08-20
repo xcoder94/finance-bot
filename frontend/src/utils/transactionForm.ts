@@ -1,3 +1,5 @@
+import { TASHKENT_OFFSET } from '../api/home'
+
 import { type Currency, formatCurrency } from './formatCurrency'
 
 export const MAX_AMOUNT_DIGITS = 10
@@ -96,6 +98,25 @@ export function isValidMaskedDate(value: string): boolean {
   return true
 }
 
+// Minutes/milliseconds of TASHKENT_OFFSET, derived from the same constant the ISO
+// strings are built from, so the two representations of the offset cannot drift apart.
+function tashkentOffsetMs(): number {
+  const match = /^([+-])(\d{2}):(\d{2})$/.exec(TASHKENT_OFFSET)
+  if (!match) {
+    throw new Error(`unsupported TASHKENT_OFFSET: ${TASHKENT_OFFSET}`)
+  }
+  const sign = match[1] === '-' ? -1 : 1
+  return sign * (Number(match[2]) * 60 + Number(match[3])) * 60 * 1000
+}
+
+
+// NOTE: these two functions no longer produce a UTC (`Z`) instant — they produce the
+// Tashkent calendar boundary of the given day, in the same `+05:00`-offset ISO format
+// as `monthDateRange` in `../api/home`, so the manual range and the monthly range can
+// never drift apart (docs/PRD.md:180-181: every daily boundary is Tashkent-local).
+// The `Utc` in the names is now misleading; left as-is because renaming would require
+// touching `HistoryPage.tsx`, which is outside this task's allowed file list — flagged
+// to the architect in the report.
 export function maskedDateToUtcStartIso(value: string): string | null {
   if (!isValidMaskedDate(value)) {
     return null
@@ -106,7 +127,7 @@ export function maskedDateToUtcStartIso(value: string): string | null {
   const month = Number(digits.slice(2, 4))
   const year = Number(digits.slice(4, 8))
 
-  return new Date(Date.UTC(year, month - 1, day)).toISOString()
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00.000${TASHKENT_OFFSET}`
 }
 
 export function maskedDateToUtcEndIso(value: string): string | null {
@@ -119,15 +140,22 @@ export function maskedDateToUtcEndIso(value: string): string | null {
   const month = Number(digits.slice(2, 4))
   const year = Number(digits.slice(4, 8))
 
-  return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString()
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T23:59:59.999${TASHKENT_OFFSET}`
 }
 
+// Extracts the Tashkent calendar date from an ISO instant.
+// Previously used `getUTCDate()` etc. directly on the parsed instant, which reads the
+// UTC calendar day, not the Tashkent one: for the `+05:00` strings `monthDateRange`
+// produces, `2026-08-01T00:00:00.000+05:00` came back as 31.07. That was wrong on every
+// machine — `getUTCDate()` never consults the host time zone — so switching from the
+// month tab to a manual range always pre-filled the previous day.
 export function isoDateToMaskedDate(iso: string): string {
-  const date = new Date(iso)
+  const instant = new Date(iso)
+  const tashkentShifted = new Date(instant.getTime() + tashkentOffsetMs())
   const digits = [
-    String(date.getUTCDate()).padStart(2, '0'),
-    String(date.getUTCMonth() + 1).padStart(2, '0'),
-    String(date.getUTCFullYear()),
+    String(tashkentShifted.getUTCDate()).padStart(2, '0'),
+    String(tashkentShifted.getUTCMonth() + 1).padStart(2, '0'),
+    String(tashkentShifted.getUTCFullYear()),
   ].join('')
 
   return formatDateDigits(digits)

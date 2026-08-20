@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Literal
 
 from aiogram import Bot
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.family_budget import FamilyBudget
@@ -18,7 +18,7 @@ from app.services.budget_seed import (
     copy_seed_categories_only,
     copy_seed_wallets_only,
 )
-from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT
+from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT, lock_family_budget
 from app.services.goal_notify import resolve_bot
 from app.services.member_texts import left_notice, removed_notice
 from app.services.ownership_transfer import cancel_pending_transfers_for_user
@@ -27,6 +27,21 @@ from app.services.transaction_category_remap import remap_transaction_categories
 
 class OwnerCannotDetachError(Exception):
     pass
+
+
+def personal_wallet_transaction_clause(personal_wallet_ids: list[uuid.UUID]):
+    """Match any transaction touching one of the given personal wallet ids on
+    either side (wallet_id or to_wallet_id).
+
+    A transfer into or out of a personal wallet must move with that wallet
+    when its holder leaves — otherwise the wallet moves to the new budget
+    while the transaction stays behind, orphaning it (see membership_lifecycle
+    detach flow / docs PRD 892-895).
+    """
+    return or_(
+        Transaction.wallet_id.in_(personal_wallet_ids),
+        Transaction.to_wallet_id.in_(personal_wallet_ids),
+    )
 
 
 class JoinBlockReason(str, Enum):
@@ -85,6 +100,7 @@ async def convert_join_with_own_budget(
     user: User,
     target: FamilyBudget,
 ) -> None:
+    await lock_family_budget(session, target.id)
     if await count_active_members(session, target.id) >= MEMBER_LIMIT:
         raise FamilyFullError()
 
@@ -172,10 +188,25 @@ async def detach_member_to_own_budget(
     personal_txns: list[Transaction] = []
     if personal_wallets:
         personal_wallet_ids = [wallet.id for wallet in personal_wallets]
+        # A transaction moves with the departing user's personal wallet whenever
+        # that wallet is on either side (wallet_id or to_wallet_id) — a transfer
+        # into or out of a personal wallet is still "an operation of that
+        # wallet" per PRD 892-895 ("Personal wallets always follow the person,
+        # together with their operations"). This includes the mixed case where
+        # the other side is a SHARED wallet of the old family: that leg then
+        # disappears from the old family's history feed, but the old family's
+        # wallet balance stays correct regardless, because
+        # quick_entry_balance.wallet_balance computes balance from
+        # Transaction.wallet_id/to_wallet_id directly and does not filter by
+        # family_budget_id. We accept losing that one shared-wallet leg from
+        # the old family's audit trail in exchange for the departing user
+        # never losing visibility of their own personal-wallet operations —
+        # the alternative (leaving the row behind) is exactly the orphaning
+        # bug this fix removes.
         personal_txns = list(
             await session.scalars(
                 select(Transaction).where(
-                    Transaction.wallet_id.in_(personal_wallet_ids),
+                    personal_wallet_transaction_clause(personal_wallet_ids),
                     Transaction.is_deleted.is_(False),
                 )
             )

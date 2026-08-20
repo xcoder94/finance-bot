@@ -10,6 +10,7 @@ from app.db import get_session
 from app.models.expense_category import ExpenseCategory
 from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
+from app.models.wallet import Wallet
 from app.schemas.wallets_categories import (
     ExpenseCategoryCreate,
     ExpenseCategoryDeleteResponse,
@@ -27,15 +28,43 @@ from app.services.entity_limits import (
     PARENT_CATEGORY_LIMIT,
     SUBCATEGORY_LIMIT,
     limit_subcategories,
+    lock_family_budget,
 )
+from app.services.wallet_visibility import visible_wallets_clause
 from app.services.wallets_categories import (
-    count_expense_category_transactions,
-    count_income_category_transactions,
     get_active_expense_category,
     get_active_expense_parent,
     get_active_income_category,
     soft_delete,
 )
+
+
+async def _count_visible_category_transactions(
+    session: AsyncSession,
+    *,
+    category_column,
+    category_id: uuid.UUID,
+    user,
+) -> int:
+    """Count non-deleted transactions for a category, excluding personal-wallet
+    operations that belong to someone other than the requesting user.
+
+    Category transactions are always single-wallet (income/expense, never
+    transfers), so filtering on Transaction.wallet_id via visible_wallets_clause
+    is sufficient — see app/services/wallet_visibility.py.
+    """
+    stmt = (
+        select(func.count())
+        .select_from(Transaction)
+        .join(Wallet, Transaction.wallet_id == Wallet.id)
+        .where(
+            category_column == category_id,
+            Transaction.is_deleted.is_(False),
+            visible_wallets_clause(user),
+        )
+    )
+    return int(await session.scalar(stmt) or 0)
+
 
 router = APIRouter(prefix="/api/v1")
 
@@ -50,10 +79,12 @@ async def list_income_categories(
             Transaction.income_category_id.label("category_id"),
             func.count().label("transaction_count"),
         )
+        .join(Wallet, Transaction.wallet_id == Wallet.id)
         .where(
             Transaction.family_budget_id == user.family_budget_id,
             Transaction.is_deleted.is_(False),
             Transaction.income_category_id.is_not(None),
+            visible_wallets_clause(user),
         )
         .group_by(Transaction.income_category_id)
         .subquery()
@@ -94,6 +125,7 @@ async def create_income_category(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> IncomeCategoryResponse:
+    await lock_family_budget(session, user.family_budget_id)
     income_count = await session.scalar(
         select(func.count())
         .select_from(IncomeCategory)
@@ -143,7 +175,12 @@ async def update_income_category(
         name=category.name,
         translation_key=category.translation_key,
         color_index=category.color_index,
-        transaction_count=await count_income_category_transactions(session, category.id),
+        transaction_count=await _count_visible_category_transactions(
+            session,
+            category_column=Transaction.income_category_id,
+            category_id=category.id,
+            user=user,
+        ),
     )
 
 
@@ -157,7 +194,12 @@ async def delete_income_category(
     if category is None:
         raise HTTPException(status_code=404)
 
-    affected_transactions_count = await count_income_category_transactions(session, category.id)
+    affected_transactions_count = await _count_visible_category_transactions(
+        session,
+        category_column=Transaction.income_category_id,
+        category_id=category.id,
+        user=user,
+    )
     soft_delete(category)
     await session.commit()
     return IncomeCategoryDeleteResponse(
@@ -177,10 +219,12 @@ async def list_expense_categories(
             Transaction.expense_category_id.label("category_id"),
             func.count().label("transaction_count"),
         )
+        .join(Wallet, Transaction.wallet_id == Wallet.id)
         .where(
             Transaction.family_budget_id == user.family_budget_id,
             Transaction.is_deleted.is_(False),
             Transaction.expense_category_id.is_not(None),
+            visible_wallets_clause(user),
         )
         .group_by(Transaction.expense_category_id)
         .subquery()
@@ -223,6 +267,7 @@ async def create_expense_category(
     user: OwnerUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ExpenseCategoryResponse:
+    await lock_family_budget(session, user.family_budget_id)
     if body.parent_id is None:
         parent_count = await session.scalar(
             select(func.count())
@@ -305,7 +350,12 @@ async def update_expense_category(
         parent_id=category.parent_id,
         color_index=category.color_index,
         is_protected=category.is_protected,
-        transaction_count=await count_expense_category_transactions(session, category.id),
+        transaction_count=await _count_visible_category_transactions(
+            session,
+            category_column=Transaction.expense_category_id,
+            category_id=category.id,
+            user=user,
+        ),
     )
 
 
@@ -321,7 +371,12 @@ async def delete_expense_category(
     if category.is_protected:
         raise HTTPException(status_code=403)
 
-    affected_transactions_count = await count_expense_category_transactions(session, category.id)
+    affected_transactions_count = await _count_visible_category_transactions(
+        session,
+        category_column=Transaction.expense_category_id,
+        category_id=category.id,
+        user=user,
+    )
     soft_delete(category)
 
     if category.parent_id is None:
