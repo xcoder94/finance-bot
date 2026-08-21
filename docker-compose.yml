@@ -42,6 +42,12 @@ services:
     image: chontak-backend:latest
     restart: unless-stopped
     command: ["python", "-m", "bot.main"]
+    # The bot inherits the API image, and with it the image HEALTHCHECK that
+    # curls /health on the HTTP port. This process is an aiogram poller and
+    # serves no HTTP, so that probe can only fail. Off until the bot has a
+    # liveness signal of its own.
+    healthcheck:
+      disable: true
     environment:
       DATABASE_URL: ${DATABASE_URL}
       BOT_TOKEN: ${BOT_TOKEN}
