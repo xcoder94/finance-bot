@@ -12,6 +12,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
     ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     WebAppInfo,
 )
 from sqlalchemy import select
@@ -114,7 +115,9 @@ def language_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def open_app_keyboard(language: str = "ru") -> ReplyKeyboardMarkup | None:
+def open_app_keyboard(
+    language: str = "ru",
+) -> ReplyKeyboardMarkup | ReplyKeyboardRemove:
     from bot.support import build_main_reply_keyboard
 
     return build_main_reply_keyboard(language)

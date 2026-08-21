@@ -9,6 +9,7 @@ from app.config import BOT_TOKEN, receipt_photo_enabled, SUPPORT_CHAT_ID
 from app.logging_setup import setup_logging
 from app.services.invite import cache_bot_username
 from app.services.notification_scheduler import notification_loop
+from bot.keyboard_hygiene import ClearStaleReplyKeyboardMiddleware
 from bot.onboarding import router as onboarding_router
 from bot.membership import router as membership_router
 from bot.goals import router as goals_router
@@ -64,6 +65,7 @@ async def _run_notification_loop(bot: Bot) -> None:
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
+    bot.session.middleware(ClearStaleReplyKeyboardMiddleware())
     dp = Dispatcher(storage=MemoryStorage())
     register_global_error_handler(dp)
     dp.startup.register(cache_bot_username)

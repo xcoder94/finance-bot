@@ -17,6 +17,8 @@ from app.db import engine
 from app.models.family_budget import FamilyBudget
 from app.models.support_message import SupportMessage
 from app.models.user import User
+from aiogram.types import ReplyKeyboardRemove
+
 from bot.support import (
     CALLBACK_QUICK_PREFIX,
     STRINGS,
@@ -146,9 +148,9 @@ def test_build_support_header_with_and_without_username() -> None:
     )
 
 
-def test_keyboard_none_when_support_unset(monkeypatch) -> None:
+def test_keyboard_removed_when_support_unset(monkeypatch) -> None:
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
-    assert build_main_reply_keyboard("ru") is None
+    assert isinstance(build_main_reply_keyboard("ru"), ReplyKeyboardRemove)
 
 
 def test_keyboard_has_support_when_set(monkeypatch) -> None:
@@ -170,9 +172,9 @@ def test_keyboard_never_carries_web_app_launcher(monkeypatch) -> None:
     )
 
 
-def test_keyboard_none_when_both_unset(monkeypatch) -> None:
+def test_keyboard_removed_when_both_unset(monkeypatch) -> None:
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
-    assert build_main_reply_keyboard() is None
+    assert isinstance(build_main_reply_keyboard(), ReplyKeyboardRemove)
 
 
 def test_support_options_keyboard_ru() -> None:

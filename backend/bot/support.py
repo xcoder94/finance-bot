@@ -12,6 +12,7 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,12 +83,17 @@ def support_entry_label(language: str) -> str:
     return STRINGS["entry"][_lang(language)]
 
 
-def build_main_reply_keyboard(language: str = "ru") -> ReplyKeyboardMarkup | None:
+def build_main_reply_keyboard(
+    language: str = "ru",
+) -> ReplyKeyboardMarkup | ReplyKeyboardRemove:
     rows: list[list[KeyboardButton]] = []
     if SUPPORT_CHAT_ID:
         rows.append([KeyboardButton(text=support_entry_label(language))])
     if not rows:
-        return None
+        # Telegram keeps the last reply keyboard shown in a chat until the
+        # bot explicitly clears it — returning None here would leave a
+        # stale keyboard from an earlier version in place forever.
+        return ReplyKeyboardRemove()
     return ReplyKeyboardMarkup(
         keyboard=rows,
         resize_keyboard=True,

@@ -20,6 +20,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     WebAppInfo,
 )
 
@@ -99,7 +100,7 @@ def test_greeting_inline_keyboard_absent_when_url_missing(monkeypatch) -> None:
 
 def test_open_app_keyboard_never_carries_web_app_launcher(monkeypatch) -> None:
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
-    assert open_app_keyboard() is None
+    assert isinstance(open_app_keyboard(), ReplyKeyboardRemove)
 
 
 def test_menu_command_not_registered() -> None:
