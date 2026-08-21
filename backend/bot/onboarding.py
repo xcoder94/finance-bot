@@ -12,10 +12,12 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import MINI_APP_URL
 from app.db import async_session_factory
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
@@ -116,6 +118,21 @@ def open_app_keyboard(language: str = "ru") -> ReplyKeyboardMarkup | None:
     from bot.support import build_main_reply_keyboard
 
     return build_main_reply_keyboard(language)
+
+
+def greeting_inline_keyboard() -> InlineKeyboardMarkup | None:
+    if not MINI_APP_URL:
+        return None
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=OPEN_APP_BUTTON_LABEL,
+                    web_app=WebAppInfo(url=MINI_APP_URL),
+                )
+            ]
+        ]
+    )
 
 
 def join_confirm_keyboard(token: str) -> InlineKeyboardMarkup:
@@ -316,7 +333,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
 
     await callback.message.answer(
         welcome,
-        reply_markup=open_app_keyboard(language),
+        reply_markup=greeting_inline_keyboard(),
         parse_mode="Markdown",
     )
     await callback.message.delete()

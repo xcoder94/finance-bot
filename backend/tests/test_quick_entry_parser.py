@@ -200,6 +200,28 @@ def test_prompt_bare_direction_words_rule():
     assert "never default to expense" in lowered
 
 
+def test_prompt_salary_words_are_income_markers():
+    lowered = IMMUTABLE_PARSER_INSTRUCTIONS.lower()
+    for keyword in (
+        "oylik",
+        "oyli",
+        "maosh",
+        "ish haqi",
+        "ойлик",
+        "маош",
+        "зарплата",
+        "зп",
+        "аванс",
+        "оклад",
+    ):
+        assert keyword in lowered
+
+
+def test_prompt_income_category_name_match_rule():
+    lowered = IMMUTABLE_PARSER_INSTRUCTIONS.lower()
+    assert "income_category_names" in lowered
+
+
 @pytest.mark.anyio
 async def test_stub_bare_kirim_income_no_category():
     parser = StubParser()
@@ -252,6 +274,23 @@ async def test_stub_bare_chiqim_expense():
     assert op.amount == 500_000
     assert op.currency == "UZS"
     assert op.category is None
+
+
+@pytest.mark.anyio
+async def test_stub_bare_oylik_income():
+    parser = StubParser()
+    response = await parser.parse(
+        ParseRequest(
+            text="ойлик 500000",
+            wallet_names=[],
+            expense_category_names=[],
+            income_category_names=[],
+        )
+    )
+    assert len(response.operations) == 1
+    op = response.operations[0]
+    assert op.type == "income"
+    assert op.amount == 500_000
 
 
 def test_prompt_immutable_then_mutable_order():

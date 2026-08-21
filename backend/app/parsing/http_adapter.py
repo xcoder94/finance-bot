@@ -288,8 +288,10 @@ class HttpParser:
         }
         return await client.post(
             url,
-            params={"key": self._api_key},
-            headers={"Content-Type": "application/json"},
+            headers={
+                "x-goog-api-key": self._api_key,
+                "Content-Type": "application/json",
+            },
             json=body,
         )
 

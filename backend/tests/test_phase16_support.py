@@ -17,7 +17,6 @@ from app.db import engine
 from app.models.family_budget import FamilyBudget
 from app.models.support_message import SupportMessage
 from app.models.user import User
-from bot.onboarding import OPEN_APP_BUTTON_LABEL, open_app_keyboard
 from bot.support import (
     CALLBACK_QUICK_PREFIX,
     STRINGS,
@@ -147,17 +146,12 @@ def test_build_support_header_with_and_without_username() -> None:
     )
 
 
-def test_keyboard_no_support_when_unset(monkeypatch) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", "https://example.test/app")
+def test_keyboard_none_when_support_unset(monkeypatch) -> None:
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
-    kb = build_main_reply_keyboard("ru")
-    assert kb is not None
-    assert len(kb.keyboard) == 1
-    assert kb.keyboard[0][0].text == OPEN_APP_BUTTON_LABEL
+    assert build_main_reply_keyboard("ru") is None
 
 
 def test_keyboard_has_support_when_set(monkeypatch) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", None)
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", "-100123")
     kb = build_main_reply_keyboard("uz")
     assert kb is not None
@@ -165,18 +159,18 @@ def test_keyboard_has_support_when_set(monkeypatch) -> None:
     assert kb.keyboard[0][0].text == support_entry_label("uz")
 
 
-def test_keyboard_both_buttons(monkeypatch) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", "https://example.test/app")
+def test_keyboard_never_carries_web_app_launcher(monkeypatch) -> None:
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", "-100123")
-    kb = open_app_keyboard("ru")
+    kb = build_main_reply_keyboard("ru")
     assert kb is not None
-    assert len(kb.keyboard) == 2
-    assert kb.keyboard[0][0].text == OPEN_APP_BUTTON_LABEL
-    assert kb.keyboard[1][0].text == support_entry_label("ru")
+    assert len(kb.keyboard) == 1
+    assert kb.keyboard[0][0].text == support_entry_label("ru")
+    assert all(
+        button.web_app is None for row in kb.keyboard for button in row
+    )
 
 
 def test_keyboard_none_when_both_unset(monkeypatch) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", None)
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
     assert build_main_reply_keyboard() is None
 

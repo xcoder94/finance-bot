@@ -125,7 +125,7 @@ async def test_google_full_prompt_parse_succeeds():
     assert response.operations[0].amount == 25000
     assert "generateContent" in seen["url"]
     assert "test-model-from-env" in seen["url"]
-    assert "key=test-key" in seen["url"]
+    assert "test-key" not in seen["url"]
     assert "cachedContent" not in seen["body"]
     assert seen["body"]["systemInstruction"]["parts"][0]["text"] == (
         IMMUTABLE_PARSER_INSTRUCTIONS
@@ -209,3 +209,24 @@ async def test_stub_parser_path_still_creates_transaction():
             transaction_date=datetime(2026, 8, 4, 12, 0, tzinfo=UTC),
         )
         assert txn.amount == 25000
+
+
+@pytest.mark.anyio
+async def test_google_api_key_sent_as_header_not_url_query():
+    """Regression: httpx logs the full request URL at INFO level. The API
+    key must never appear there — it belongs in the x-goog-api-key header.
+    """
+    api_key = "AQ.Ab8RN6-super-secret-value"
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["headers"] = dict(request.headers)
+        return httpx.Response(200, json=_google_ok_body(_OPS_JSON))
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    parser = HttpParser("google", api_key, "test-model", client=client)
+    await parser.parse(_sample_request())
+
+    assert api_key not in seen["url"]
+    assert seen["headers"]["x-goog-api-key"] == api_key

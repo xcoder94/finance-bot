@@ -12,17 +12,16 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
-    WebAppInfo,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import MINI_APP_URL, SUPPORT_CHAT_ID
+from app.config import SUPPORT_CHAT_ID
 from app.db import async_session_factory
 from app.models.family_budget import FamilyBudget
 from app.models.support_message import SupportMessage
 from app.models.user import User
-from bot.onboarding import OPEN_APP_BUTTON_LABEL, get_active_user_by_telegram_id
+from bot.onboarding import get_active_user_by_telegram_id
 
 router = Router()
 
@@ -85,15 +84,6 @@ def support_entry_label(language: str) -> str:
 
 def build_main_reply_keyboard(language: str = "ru") -> ReplyKeyboardMarkup | None:
     rows: list[list[KeyboardButton]] = []
-    if MINI_APP_URL:
-        rows.append(
-            [
-                KeyboardButton(
-                    text=OPEN_APP_BUTTON_LABEL,
-                    web_app=WebAppInfo(url=MINI_APP_URL),
-                )
-            ]
-        )
     if SUPPORT_CHAT_ID:
         rows.append([KeyboardButton(text=support_entry_label(language))])
     if not rows:

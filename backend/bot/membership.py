@@ -33,7 +33,7 @@ from bot.quick_entry.cards import escape_markdown
 from bot.onboarding import (
     get_active_user_by_telegram_id,
     get_family_budget_by_invite_token,
-    open_app_keyboard,
+    greeting_inline_keyboard,
 )
 
 router = Router()
@@ -107,7 +107,7 @@ async def join_accept(callback: CallbackQuery) -> None:
 
     await callback.message.answer(
         welcome_invited(escape_markdown(budget_name)),
-        reply_markup=open_app_keyboard(user.language),
+        reply_markup=greeting_inline_keyboard(),
         parse_mode="Markdown",
     )
     await callback.message.delete()

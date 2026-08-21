@@ -124,6 +124,18 @@ _DEFAULT_RESPONSES: dict[str, ParseResponse] = {
             )
         ]
     ),
+    "ойлик 500000": ParseResponse(
+        operations=[
+            ParsedOperation(
+                type="income",
+                amount=500_000,
+                currency="UZS",
+                wallet_hint=None,
+                category=None,
+                comment=None,
+            )
+        ]
+    ),
 }
 
 

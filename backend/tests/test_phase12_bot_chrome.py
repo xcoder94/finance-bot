@@ -15,7 +15,13 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiogram.filters import Command
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    WebAppInfo,
+)
 
 from app.models.user import User
 from app.services.member_texts import welcome_invited, welcome_solo
@@ -28,6 +34,7 @@ from bot.goals import router as goals_router
 from bot.membership import router as membership_router
 from bot.onboarding import (
     OPEN_APP_BUTTON_LABEL,
+    greeting_inline_keyboard,
     language_callback,
     open_app_keyboard,
     router as onboarding_router,
@@ -73,23 +80,24 @@ def test_open_app_button_label_exact() -> None:
     assert OPEN_APP_BUTTON_LABEL == "Открыть приложение"
 
 
-def test_open_app_keyboard_single_button(monkeypatch) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", "https://example.test/app")
-    monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
-    kb = open_app_keyboard()
-    assert isinstance(kb, ReplyKeyboardMarkup)
-    assert len(kb.keyboard) == 1
-    assert len(kb.keyboard[0]) == 1
-    btn = kb.keyboard[0][0]
-    assert isinstance(btn, KeyboardButton)
+def test_greeting_inline_keyboard_single_button(monkeypatch) -> None:
+    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", "https://example.test/app")
+    kb = greeting_inline_keyboard()
+    assert isinstance(kb, InlineKeyboardMarkup)
+    assert len(kb.inline_keyboard) == 1
+    assert len(kb.inline_keyboard[0]) == 1
+    btn = kb.inline_keyboard[0][0]
+    assert isinstance(btn, InlineKeyboardButton)
     assert btn.text == "Открыть приложение"
     assert btn.web_app == WebAppInfo(url="https://example.test/app")
-    assert kb.resize_keyboard is True
-    assert kb.is_persistent is True
 
 
-def test_open_app_keyboard_absent_when_url_missing(monkeypatch) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", None)
+def test_greeting_inline_keyboard_absent_when_url_missing(monkeypatch) -> None:
+    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", None)
+    assert greeting_inline_keyboard() is None
+
+
+def test_open_app_keyboard_never_carries_web_app_launcher(monkeypatch) -> None:
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
     assert open_app_keyboard() is None
 
@@ -152,10 +160,8 @@ def test_owner_language_callback_sends_18_1_with_markdown_and_keyboard() -> None
             clear=AsyncMock(),
         )
         bot = SimpleNamespace(get_me=AsyncMock())
-        fake_kb = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="Открыть приложение")]],
-            resize_keyboard=True,
-            is_persistent=True,
+        fake_kb = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Открыть приложение", callback_data="noop")]],
         )
 
         with (
@@ -169,7 +175,7 @@ def test_owner_language_callback_sends_18_1_with_markdown_and_keyboard() -> None
             ),
             patch("bot.onboarding.copy_seed_data", new=AsyncMock()),
             patch("bot.onboarding.assign_default_card_uzs", new=AsyncMock()),
-            patch("bot.onboarding.open_app_keyboard", return_value=fake_kb),
+            patch("bot.onboarding.greeting_inline_keyboard", return_value=fake_kb),
         ):
             await language_callback(callback, state, bot)
 
@@ -247,7 +253,7 @@ def test_invited_language_callback_keeps_18_2_and_uses_markdown() -> None:
                 new=AsyncMock(return_value=1),
             ),
             patch("bot.onboarding.assign_default_card_uzs", new=AsyncMock()),
-            patch("bot.onboarding.open_app_keyboard", return_value=None),
+            patch("bot.onboarding.greeting_inline_keyboard", return_value=None),
         ):
             await language_callback(callback, state, bot)
 
@@ -298,8 +304,8 @@ async def test_announcement_sent_once_then_skipped(
     api_client: tuple[object, AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("bot.support.MINI_APP_URL", "https://example.test/app")
     monkeypatch.setattr("bot.support.SUPPORT_CHAT_ID", None)
+    monkeypatch.setattr("bot.onboarding.MINI_APP_URL", "https://example.test/app")
     _, session = api_client
     await _mark_prior_users_delivered(session)
     tid = _tid()
@@ -318,11 +324,12 @@ async def test_announcement_sent_once_then_skipped(
     assert call.args[1] == ANNOUNCEMENT_TEXT
     assert call.kwargs.get("parse_mode") == "Markdown"
     markup = call.kwargs.get("reply_markup")
-    assert markup is not None
-    assert isinstance(markup, ReplyKeyboardMarkup)
-    assert len(markup.keyboard) == 1
-    assert len(markup.keyboard[0]) == 1
-    assert markup.keyboard[0][0].text == OPEN_APP_BUTTON_LABEL
+    assert isinstance(markup, InlineKeyboardMarkup)
+    assert len(markup.inline_keyboard) == 1
+    assert len(markup.inline_keyboard[0]) == 1
+    btn = markup.inline_keyboard[0][0]
+    assert btn.text == OPEN_APP_BUTTON_LABEL
+    assert btn.web_app == WebAppInfo(url="https://example.test/app")
     await session.refresh(user)
     assert user.release_announcement_delivered_at is not None
 
