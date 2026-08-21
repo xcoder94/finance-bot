@@ -66,6 +66,9 @@ from bot.quick_entry.texts import (
 )
 
 router = Router()
+# Registered instead of `router` while the receipt feature is off, so a photo
+# never falls through unanswered.
+disabled_router = Router()
 logger = logging.getLogger(__name__)
 TASHKENT = ZoneInfo("Asia/Tashkent")
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
@@ -354,3 +357,8 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
 @router.message(F.photo)
 async def receipt_photo_handler(message: Message, bot: Bot) -> None:
     await handle_receipt_photo(message, bot)
+
+
+@disabled_router.message(F.photo)
+async def receipt_photo_disabled_handler(message: Message) -> None:
+    await message.answer(MSG_MODEL_FAIL)

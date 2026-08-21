@@ -57,6 +57,10 @@ def register_bot_routers(dp: Dispatcher) -> None:
         from bot.quick_entry.receipt_photo import router as receipt_photo_router
 
         dp.include_router(receipt_photo_router)
+    else:
+        from bot.quick_entry.receipt_photo import disabled_router
+
+        dp.include_router(disabled_router)
 
 
 async def _run_notification_loop(bot: Bot) -> None:

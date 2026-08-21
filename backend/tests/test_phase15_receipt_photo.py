@@ -386,6 +386,55 @@ def test_register_bot_routers_skips_receipt_when_flag_off(
     assert receipt_router not in included
 
 
+def test_register_bot_routers_answers_photo_when_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("bot.main.receipt_photo_enabled", lambda: False)
+    included: list[object] = []
+
+    class FakeDispatcher:
+        def include_router(self, router: object) -> None:
+            included.append(router)
+
+    from bot.main import register_bot_routers
+    from bot.quick_entry.receipt_photo import disabled_router
+
+    register_bot_routers(FakeDispatcher())
+    assert disabled_router in included
+
+
+def test_register_bot_routers_omits_disabled_router_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("bot.main.receipt_photo_enabled", lambda: True)
+    included: list[object] = []
+
+    class FakeDispatcher:
+        def include_router(self, router: object) -> None:
+            included.append(router)
+
+    from bot.main import register_bot_routers
+    from bot.quick_entry.receipt_photo import disabled_router
+
+    register_bot_routers(FakeDispatcher())
+    assert disabled_router not in included
+
+
+@pytest.mark.anyio
+async def test_photo_gets_an_answer_when_flag_off() -> None:
+    from bot.quick_entry.receipt_photo import receipt_photo_disabled_handler
+    from bot.quick_entry.texts import MSG_MODEL_FAIL
+
+    answers: list[str] = []
+
+    class FakeMessage:
+        async def answer(self, text: str, **kwargs: object) -> None:
+            answers.append(text)
+
+    await receipt_photo_disabled_handler(FakeMessage())  # type: ignore[arg-type]
+    assert answers == [MSG_MODEL_FAIL]
+
+
 def test_register_bot_routers_includes_receipt_when_flag_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
