@@ -43,4 +43,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
 
 # Migrations run here, in the API container only.
-CMD ["sh", "-c", "alembic upgrade head && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -"]
+# Bound on [::], which on Linux accepts IPv4 too. nginx resolves the service
+# name to both families, and an IPv4-only listener cost every caller a refused
+# connection and a retry. Binding both explicitly does not work: the second
+# bind collides with the first and gunicorn refuses to start.
+CMD ["sh", "-c", "alembic upgrade head && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind [::]:${PORT} --access-logfile - --error-logfile -"]
