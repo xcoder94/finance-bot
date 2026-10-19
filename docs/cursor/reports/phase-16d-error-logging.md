@@ -67,7 +67,7 @@ Orchestrator review note: worker initially used `logger.exception` in both catch
 
 ## Local log file evidence
 
-Path: `/home/xon/Documents/finance-bot/backend/logs/app.log`  
+Path: `/home/xon/projects/finance-bot/backend/logs/app.log`  
 (created during app/test runs; gitignored)
 
 ```

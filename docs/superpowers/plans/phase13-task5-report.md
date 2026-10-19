@@ -51,7 +51,7 @@ cd backend && ./venv/bin/pytest -q
 ....................................
 =============================== warnings summary ===============================
 venv/lib/python3.14/site-packages/fastapi/testclient.py:1
-  /home/xon/Documents/finance-bot/backend/venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  /home/xon/projects/finance-bot/backend/venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
@@ -65,7 +65,7 @@ cd frontend && npx vitest run --reporter=dot
 ```
 
 ```
- RUN  v4.1.10 /home/xon/Documents/finance-bot/frontend
+ RUN  v4.1.10 /home/xon/projects/finance-bot/frontend
 
 ·············································································································································································································
 

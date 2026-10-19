@@ -124,4 +124,4 @@ Load expense categories with name, translation_key, parent_id (extend existing `
 
 - [ ] Full `./venv/bin/pytest -q` ≥ 428
 - [ ] `npx vitest run --reporter=dot` ≥ 206
-- [ ] Report `/home/xon/Documents/finance-bot/.superpowers/sdd/task-c-report.md`: structure, amount util new vs reused, fail-safe walkthrough, acceptance 8.3 checklist.
+- [ ] Report `/home/xon/projects/finance-bot/.superpowers/sdd/task-c-report.md`: structure, amount util new vs reused, fail-safe walkthrough, acceptance 8.3 checklist.

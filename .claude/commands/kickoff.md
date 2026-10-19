@@ -2,8 +2,15 @@
 description: Load architect/context-manager context after /clear
 ---
 
-Read `docs/context/handoff.md` in full, then `AGENTS.md`. Do not read the
-PRD or any phase spec files yet — wait for my instruction.
+Read `docs/context/handoff.md` — that file alone. `AGENTS.md` is already in
+your context via `CLAUDE.md`; do not read it again. Do not open the PRD, any
+phase spec, or any source file yet.
 
-Confirm in one line: current phase, branch, and what's happening right now
-(per `handoff.md`). Then wait — do nothing else until I give a command.
+Then report, in three short lines and nothing more:
+
+- **State** — branch, commit, whether it is deployed and serving.
+- **Now** — the one thing `handoff.md` names as next.
+- **Watch** — anything it flags as unverified or misleading.
+
+Then stop and wait. Do not investigate, do not open files, do not propose a
+plan until I give a command.

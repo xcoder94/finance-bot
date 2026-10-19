@@ -152,4 +152,4 @@ Do not render the control at all otherwise.
 
 - [ ] `./venv/bin/pytest -q` ≥ 422 (+ new tests)
 - [ ] `npx vitest run --reporter=dot` ≥ 206
-- [ ] Report: `/home/xon/Documents/finance-bot/.superpowers/sdd/task-b-report.md` with hook-site confirmation and acceptance checklist.
+- [ ] Report: `/home/xon/projects/finance-bot/.superpowers/sdd/task-b-report.md` with hook-site confirmation and acceptance checklist.

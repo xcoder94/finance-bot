@@ -115,4 +115,4 @@ async def relay_to_support(bot, *, header: str, text: str) -> int:
 ### Task 3: Verify Task D
 
 - [ ] Full pytest ≥ 443; vitest ≥ 206
-- [ ] Report `/home/xon/Documents/finance-bot/.superpowers/sdd/task-d-report.md`: language reuse, table shape, bot-not-mini-app confirmation, live E2E blocked-on-PM, acceptance 9.3 checklist.
+- [ ] Report `/home/xon/projects/finance-bot/.superpowers/sdd/task-d-report.md`: language reuse, table shape, bot-not-mini-app confirmation, live E2E blocked-on-PM, acceptance 9.3 checklist.
