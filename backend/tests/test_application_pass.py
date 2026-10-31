@@ -1,4 +1,5 @@
 import json
+from app.config import receipt_photo_enabled
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -134,7 +135,7 @@ async def _patched_api_client(
                 app.dependency_overrides.clear()
 
 
-@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432")
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port")
 @pytest.mark.anyio
 async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
     """Phase 0 gate: Bearer pass works; raw tma is rejected on /me."""
@@ -181,6 +182,7 @@ async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
                 "default_wallet_id": None,
                 "evening_reminder_enabled": True,
                 "weekly_digest_enabled": True,
+                "receipt_photo_enabled": receipt_photo_enabled(),
             }
 
             me_tma = await client.get(
@@ -202,7 +204,7 @@ async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
     await _reset_engine()
 
 
-@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432")
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port")
 @pytest.mark.anyio
 async def test_issue_pass_rejects_auth_date_older_than_24h() -> None:
     stale_auth_date = int(time.time()) - PASS_ISSUE_MAX_AGE_SECONDS - 1
@@ -215,7 +217,7 @@ async def test_issue_pass_rejects_auth_date_older_than_24h() -> None:
     assert response.status_code == 401
 
 
-@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432")
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port")
 @pytest.mark.anyio
 async def test_issue_pass_accepts_fresh_init_data() -> None:
     init_data = build_fresh_init_data()

@@ -78,7 +78,8 @@ from app.services.quick_entry_wallets import (
     list_wallets_for_parse,
     resolve_wallet,
 )
-from bot.onboarding import MESSAGES, get_active_user_by_telegram_id
+from app.services.shopping import add_shopping_items, find_open_purchase
+from bot.onboarding import MESSAGES, get_active_user_by_telegram_id, greeting_inline_keyboard
 from bot.quick_entry.cards import (
     card_keyboard,
     escape_markdown,
@@ -91,6 +92,14 @@ from bot.quick_entry.cards import (
     parse_wallet_set_callback,
     wallet_picker_keyboard,
 )
+from bot.quick_entry.shopping_pending import (
+    bare_response_amount,
+    is_malformed_number,
+    bare_text_amount,
+    finish_unrecognized,
+    finish_with_amount,
+    op_sum,
+)
 from bot.quick_entry.pending import consume_pending, create_pending, get_pending
 from bot.quick_entry.texts import (
     MSG_EXCHANGE_RATE_REQUIRED,
@@ -101,8 +110,10 @@ from bot.quick_entry.texts import (
     MSG_TOO_MANY_OPS,
     MSG_TYPE_QUESTION,
     MSG_VOICE_NOT_RECOGNIZED,
+    SHOPPING_ITEMS_PER_MESSAGE,
     currency_missing_text,
     model_limit_text,
+    shopping_reply_text,
     unparsed_limit_text,
 )
 
@@ -336,6 +347,36 @@ async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | Non
             return wallet
     wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
     return wallets[0] if wallets else None
+
+
+async def _try_add_shopping_items(
+    message: Message,
+    session: AsyncSession,
+    user: User,
+    budget: FamilyBudget,
+    response: ParseResponse,
+) -> bool:
+    """A parsed message without an amount that is a list of goods goes to the
+    family shopping list. Returns True when the message was handled here.
+    Messages that also carry a usable operation stay expenses/income."""
+    if _filter_countable(response.operations) or not response.shopping_items:
+        return False
+    names = response.shopping_items[:SHOPPING_ITEMS_PER_MESSAGE]
+    result = await add_shopping_items(session, user, names)
+    added = [i.name for i in result.added]
+    existing = [i.name for i in result.existing]
+    if not added and not existing and not result.over_limit:
+        return False  # nothing usable (blank names): fall through to "not parsed"
+    text = shopping_reply_text(
+        user.language,
+        added=[escape_markdown(n) for n in added],
+        existing=[escape_markdown(n) for n in existing],
+        over_limit=bool(result.over_limit),
+    )
+    await message.answer(
+        text, parse_mode="Markdown", reply_markup=greeting_inline_keyboard()
+    )
+    return True
 
 
 async def _process_parsed_response(
@@ -630,10 +671,23 @@ async def process_quick_entry_text(
         today = tashkent_today_for_counters()
         await ensure_counters_day(session, budget, today)
 
+        # The app is waiting for a purchase sum from this user: a bare amount
+        # ("412000") is that sum, not a quick entry.
+        open_purchase = await find_open_purchase(session, user.id)
+        if open_purchase is not None:
+            bare = bare_text_amount(text)
+            if bare is not None:
+                await finish_with_amount(message, session, user, open_purchase, bare)
+                return
+            if is_malformed_number(text):
+                await finish_unrecognized(
+                    message, session, user, budget, open_purchase, DAILY_UNPARSED_LIMIT
+                )
+                return
+
+        # No wallet: money operations are impossible, but a shopping list still
+        # works, so the message goes to the parser and is judged afterwards.
         default_wallet = await _get_default_wallet(session, user)
-        if default_wallet is None:
-            await message.answer(MSG_NO_AMOUNT)
-            return
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
         wallet_names = [w.name for w in wallets]
@@ -661,6 +715,9 @@ async def process_quick_entry_text(
                 fallback_reason = prefilter_result.reason or "prefilter_disabled"
 
         if prefilter_hit:
+            if default_wallet is None:
+                await message.answer(MSG_NO_AMOUNT)
+                return
             response = ParseResponse(operations=[prefilter_op])
         else:
             granted = await try_spend_model_call(
@@ -722,6 +779,20 @@ async def process_quick_entry_text(
                 await session.commit()
                 return
 
+        if open_purchase is not None and not prefilter_hit:
+            bare = bare_response_amount(response)
+            if bare is not None:
+                await finish_with_amount(message, session, user, open_purchase, bare)
+                return
+
+        if await _try_add_shopping_items(message, session, user, budget, response):
+            return
+        if default_wallet is None:
+            await refund_model_call(session, budget)
+            await session.commit()
+            await message.answer(MSG_NO_AMOUNT)
+            return
+
         await _process_parsed_response(
             message,
             bot,
@@ -772,9 +843,8 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
         await ensure_counters_day(session, budget, today)
 
         default_wallet = await _get_default_wallet(session, user)
-        if default_wallet is None:
-            await message.answer(MSG_NO_AMOUNT)
-            return
+        open_purchase = await find_open_purchase(session, user.id)
+        pending = open_purchase if open_purchase and open_purchase.method == "voice" else None
 
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
@@ -840,6 +910,11 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
 
         if response.speech_status == "not_recognized":
             await refund_model_call(session, budget)
+            if pending is not None:
+                await finish_unrecognized(
+                    message, session, user, budget, pending, DAILY_UNPARSED_LIMIT
+                )
+                return
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
                 await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
                 await session.commit()
@@ -847,6 +922,24 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             await spend_unparsed(session, budget)
             await session.commit()
             await message.answer(MSG_VOICE_NOT_RECOGNIZED)
+            return
+
+        if pending is not None:
+            amount = op_sum(response.operations)
+            if amount is None:
+                await finish_unrecognized(
+                    message, session, user, budget, pending, DAILY_UNPARSED_LIMIT
+                )
+            else:
+                await finish_with_amount(message, session, user, pending, amount)
+            return
+
+        if await _try_add_shopping_items(message, session, user, budget, response):
+            return
+        if default_wallet is None:
+            await refund_model_call(session, budget)
+            await session.commit()
+            await message.answer(MSG_NO_AMOUNT)
             return
 
         await _process_parsed_response(

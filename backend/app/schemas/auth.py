@@ -19,6 +19,7 @@ class MeResponse(BaseModel):
     default_wallet_id: uuid.UUID | None
     evening_reminder_enabled: bool
     weekly_digest_enabled: bool
+    receipt_photo_enabled: bool
 
 
 class MeUpdate(BaseModel):
@@ -28,3 +29,18 @@ class MeUpdate(BaseModel):
     language: Literal["ru", "uz"] | None = None
     evening_reminder_enabled: bool | None = None
     weekly_digest_enabled: bool | None = None
+
+
+class OnboardingSteps(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    first_operation: bool
+    default_wallet_checked: bool
+    family_invited: bool
+
+
+class OnboardingResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    show: bool
+    steps: OnboardingSteps

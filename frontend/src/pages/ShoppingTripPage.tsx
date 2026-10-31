@@ -1,0 +1,365 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate } from 'react-router-dom'
+
+import type { ExpenseCategory, Wallet } from '../api/transactions'
+import { fetchExpenseCategories, fetchWallets } from '../api/transactions'
+import type { PendingMethod, ShoppingPurchase } from '../api/shopping'
+import {
+  createPendingPurchase,
+  fetchPendingPurchase,
+  fetchPurchase,
+  submitPendingAmount,
+} from '../api/shopping'
+import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
+import { ShoppingAmountView } from '../components/shopping/ShoppingAmountView'
+import { ShoppingManualView } from '../components/shopping/ShoppingManualView'
+import { ShoppingResultView } from '../components/shopping/ShoppingResultView'
+import { ShoppingTripView } from '../components/shopping/ShoppingTripView'
+import { closeMiniApp } from '../telegram/closeMiniApp'
+import { useAuthStore } from '../store/authStore'
+import { useHideTabbar } from '../store/chromeStore'
+import {
+  getCachedExpenseCategories,
+  getCachedWallets,
+  invalidateHomeData,
+  invalidateWalletData,
+} from '../store/dataCacheStore'
+import { useShoppingStore } from '../store/shoppingStore'
+import { getDisplayName } from '../utils/getDisplayName'
+import {
+  canFinishTrip,
+  newClientToken,
+  checkedIdsInListOrder,
+  createTripSubmitter,
+  finishTrip,
+  pickTripWallet,
+  resultWalletLabel,
+  toggleChecked,
+} from '../utils/shoppingTrip'
+import {
+  browserStorage,
+  createBotStarter,
+  parseLaunchParam,
+  readPending,
+  rememberPending,
+  resolveLaunch,
+  submitManualAmount,
+} from '../utils/shoppingPending'
+import { parsePositiveInt } from '../utils/transactionForm'
+import { walletCurrencySuffix } from '../utils/transactionFormFields'
+
+type Stage = 'launch' | 'trip' | 'amount' | 'manual' | 'result'
+
+/** Best guess of what the backend picks: «Еда · Продукты», else «Еда», else none. */
+function guessCategoryLabel(
+  categories: ExpenseCategory[],
+  t: (key: string) => string,
+): string | null {
+  const groceries = categories.find((c) => c.translation_key === 'groceries')
+  const food = categories.find((c) => c.translation_key === 'food')
+  if (groceries && food) {
+    return `${getDisplayName(food, t as never)} · ${getDisplayName(groceries, t as never)}`
+  }
+  return food ? getDisplayName(food, t as never) : null
+}
+
+export function ShoppingTripPage() {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { search } = useLocation()
+  const launchId = parseLaunchParam(search)
+  useHideTabbar()
+
+  const scope = useAuthStore((state) => state.user?.familyBudgetId ?? '')
+  const defaultWalletId = useAuthStore((state) => state.user?.defaultWalletId ?? null)
+  const photoEnabled = useAuthStore((state) => state.user?.receiptPhotoEnabled ?? false)
+  const items = useShoppingStore((state) => state.items)
+  const load = useShoppingStore((state) => state.load)
+  const purchaseAction = useShoppingStore((state) => state.purchase)
+
+  const [stage, setStage] = useState<Stage>(launchId ? 'launch' : 'trip')
+  const [checked, setChecked] = useState<ReadonlySet<string>>(() => new Set())
+  const [popId, setPopId] = useState<string | null>(null)
+  const [amount, setAmount] = useState('')
+  const [overLimit, setOverLimit] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [noWallet, setNoWallet] = useState(false)
+  const [result, setResult] = useState<{ purchase: ShoppingPurchase; requested: number } | null>(
+    null,
+  )
+  const [botMethod, setBotMethod] = useState<PendingMethod | null>(null)
+  const [manual, setManual] = useState<{
+    id: string
+    method: PendingMethod
+    status: 'awaiting' | 'unrecognized'
+  } | null>(null)
+  const [launchFailed, setLaunchFailed] = useState(false)
+  const [launchTry, setLaunchTry] = useState(0)
+  const [wallets, setWallets] = useState<Wallet[] | null>(null)
+  const [categories, setCategories] = useState<ExpenseCategory[] | null>(null)
+
+  // One client_token per trip, kept until a definite answer (decision 17).
+  const submitter = useRef<ReturnType<typeof createTripSubmitter> | null>(null)
+  if (submitter.current === null) {
+    submitter.current = createTripSubmitter((body) => purchaseAction(body))
+  }
+  const botStarter = useRef<ReturnType<typeof createBotStarter> | null>(null)
+  if (botStarter.current === null) {
+    botStarter.current = createBotStarter(
+      {
+        create: createPendingPurchase,
+        remember: (value) => rememberPending(browserStorage(), value),
+        close: closeMiniApp,
+      },
+      newClientToken,
+    )
+  }
+  const submitting = useRef(false)
+
+  useEffect(() => {
+    void load(scope, { silent: true })
+  }, [load, scope])
+
+  // Opened from the bot's button: show the result, or the manual entry when the bot did not get it.
+  useEffect(() => {
+    if (!launchId) return
+    let alive = true
+    setLaunchFailed(false)
+    void resolveLaunch(launchId, { fetchPending: fetchPendingPurchase, fetchPurchase }).then((r) => {
+      if (!alive) return
+      if (r.kind === 'result') {
+        invalidateWalletData(scope)
+        invalidateHomeData(scope)
+        setResult({ purchase: r.purchase, requested: r.purchase.items_recorded })
+        setStage('result')
+      } else if (r.kind === 'manual') {
+        setManual({ id: r.id, method: r.method, status: r.status })
+        setStage('manual')
+      } else if (r.kind === 'gone') {
+        navigate('/shopping', { replace: true })
+      } else {
+        setLaunchFailed(true)
+      }
+    })
+    return () => {
+      alive = false
+    }
+  }, [launchId, launchTry, navigate, scope])
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const [w, c] = await Promise.all([
+          getCachedWallets(scope, fetchWallets),
+          getCachedExpenseCategories(scope, fetchExpenseCategories),
+        ])
+        if (alive) {
+          setWallets(w)
+          setCategories(c)
+        }
+      } catch {
+        // The summary rows fall back to the API text on the result screen.
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [scope])
+
+  const wallet = useMemo(
+    () => (wallets ? pickTripWallet(wallets, defaultWalletId) : null),
+    [wallets, defaultWalletId],
+  )
+  const walletLabel = wallet ? getDisplayName(wallet, t) : null
+  const categoryLabel = useMemo(
+    () => (categories ? guessCategoryLabel(categories, t as never) : null),
+    [categories, t],
+  )
+
+  const leave = useCallback(() => {
+    if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
+      navigate(-1)
+      return
+    }
+    navigate('/shopping', { replace: true })
+  }, [navigate])
+
+  const leaveToList = useCallback(() => {
+    if (!busy) navigate('/shopping', { replace: true })
+  }, [busy, navigate])
+
+  const done = useCallback(() => {
+    finishTrip({ load, navigate, scope })
+  }, [load, navigate, scope])
+
+  const backToTrip = useCallback(() => {
+    if (!busy) setStage('trip')
+  }, [busy])
+  const backFromStage = stage === 'amount' ? backToTrip : stage === 'manual' || stage === 'launch' ? leaveToList : done
+  useNativeBackButtonOverlay(stage !== 'trip', backFromStage)
+
+  const onToggle = (id: string) => {
+    if (!checked.has(id)) setPopId(id)
+    setChecked((prev) => toggleChecked(prev, id))
+  }
+
+  const ids = checkedIdsInListOrder(items, checked)
+
+  const onSubmit = async () => {
+    const parsed = parsePositiveInt(amount)
+    if (submitting.current || parsed === null || ids.length === 0) return
+    submitting.current = true
+    setBusy(true)
+    setFailed(false)
+    setNoWallet(false)
+    const outcome = await submitter.current!.submit(ids, parsed)
+    submitting.current = false
+    setBusy(false)
+    if (outcome.kind === 'ok') {
+      invalidateWalletData(scope)
+      invalidateHomeData(scope)
+      setResult({ purchase: outcome.purchase, requested: outcome.requested })
+      setStage('result')
+    } else if (outcome.kind === 'no_wallet') {
+      setNoWallet(true)
+    } else {
+      setFailed(true)
+    }
+  }
+
+  const startBot = async (method: PendingMethod, ids: string[]) => {
+    if (submitting.current || ids.length === 0) return
+    submitting.current = true
+    setBusy(true)
+    setFailed(false)
+    setBotMethod(method)
+    const outcome = await botStarter.current!.start(method, ids)
+    submitting.current = false
+    setBusy(false)
+    if (outcome !== 'closed') {
+      setBotMethod(null)
+      setFailed(true)
+    }
+  }
+
+  const onManualSubmit = async () => {
+    const parsed = parsePositiveInt(amount)
+    if (submitting.current || parsed === null || !manual) return
+    submitting.current = true
+    setBusy(true)
+    setFailed(false)
+    const outcome = await submitManualAmount(browserStorage(), submitPendingAmount, manual.id, parsed)
+    submitting.current = false
+    setBusy(false)
+    if (outcome.kind === 'ok') {
+      invalidateWalletData(scope)
+      invalidateHomeData(scope)
+      void load(scope, { silent: true })
+      setResult({ purchase: outcome.purchase, requested: outcome.purchase.items_recorded })
+      setStage('result')
+    } else {
+      setFailed(true)
+    }
+  }
+
+  const remembered = manual ? readPending(browserStorage()) : null
+  const retryIds = remembered && manual && remembered.id === manual.id ? remembered.ids : []
+
+  let body
+  if (stage === 'launch') {
+    body = (
+      <div className="shopping-page">
+        <div className="shopping-page__header">
+          <h1 className="shopping-page__title">{t('shopping.tripTitle')}</h1>
+        </div>
+        {launchFailed ? (
+          <div className="shopping-page__fail" role="alert">
+            <div className="shopping-page__fail-title">{t('home.loadError')}</div>
+            <div className="shopping-page__fail-hint">{t('home.failHint')}</div>
+            <button
+              type="button"
+              className="shopping-page__retry"
+              onClick={() => setLaunchTry((n) => n + 1)}
+            >
+              {t('home.retry')}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
+  } else if (stage === 'manual' && manual) {
+    body = (
+      <ShoppingManualView
+        method={manual.method}
+        status={manual.status}
+        amount={amount}
+        overLimit={overLimit}
+        currencySuffix={walletCurrencySuffix(wallet?.currency ?? 'UZS')}
+        busy={busy}
+        failed={failed}
+        canRetry={retryIds.length > 0}
+        onAmount={(v) => {
+          setAmount(v)
+          setFailed(false)
+        }}
+        onOverLimit={setOverLimit}
+        onSubmit={() => void onManualSubmit()}
+        onRetry={() => void startBot(manual.method, retryIds)}
+        onCancel={leaveToList}
+      />
+    )
+  } else if (stage === 'result' && result) {
+    body = (
+      <ShoppingResultView
+        purchase={result.purchase}
+        requested={result.requested}
+        categoryLabel={categoryLabel}
+        walletLabel={resultWalletLabel(result.purchase.wallet_name, wallets, t)}
+        onDone={done}
+      />
+    )
+  } else if (stage === 'amount') {
+    body = (
+      <ShoppingAmountView
+        count={ids.length}
+        amount={amount}
+        overLimit={overLimit}
+        currencySuffix={walletCurrencySuffix(wallet?.currency ?? 'UZS')}
+        categoryLabel={categoryLabel ?? t('shopping.noCategory')}
+        walletLabel={walletLabel ?? t('shopping.walletAuto')}
+        busy={busy}
+        failed={failed}
+        noWallet={noWallet}
+        photoEnabled={photoEnabled}
+        botMethod={botMethod}
+        onBotMethod={(method) => void startBot(method, ids)}
+        onAmount={(v) => {
+          setAmount(v)
+          setFailed(false)
+          setNoWallet(false)
+        }}
+        onOverLimit={setOverLimit}
+        onSubmit={() => void onSubmit()}
+        onBack={backToTrip}
+      />
+    )
+  } else {
+    body = (
+      <ShoppingTripView
+        items={items}
+        checked={checked}
+        popId={popId}
+        onToggle={onToggle}
+        onCancel={leave}
+        onFinish={() => {
+          if (canFinishTrip(new Set(ids))) setStage('amount')
+        }}
+      />
+    )
+  }
+
+  return <div className="page-content">{body}</div>
+}

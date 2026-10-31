@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -9,6 +9,8 @@ import {
   type IncomeCategoryResponse,
 } from '../api/categories'
 import { getWallets, type WalletResponse } from '../api/wallets'
+import { UserAvatar } from '../components/UserAvatar'
+import { ThemeSwitch } from '../components/settings/ThemeSwitch'
 import { SETTINGS_TOC_ICONS } from '../components/settings/settingsTocIcons'
 import i18n from '../i18n'
 import { useAuthStore } from '../store/authStore'
@@ -20,6 +22,7 @@ import {
   peekIncomeCategories,
   peekWallets,
 } from '../store/dataCacheStore'
+import { settingsBackTarget } from '../utils/userAvatar'
 import { buildDisplayNameById } from '../utils/getDisplayName'
 import {
   countExpenseParents,
@@ -67,6 +70,7 @@ function SettingsTocIcon({ path }: { path: string }) {
 export function SettingsPage() {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.user)
+  const location = useLocation()
   const familyId = user?.familyBudgetId ?? ''
 
   const [loadState, setLoadState] = useState<TocLoadState>(() => {
@@ -203,9 +207,13 @@ export function SettingsPage() {
 
   return (
     <div className="page-content settings-page">
+      <Link to={settingsBackTarget(location.state)} replace className="settings-sub-page__back">
+        {t('settings.backHome')}
+      </Link>
       <h1 className="settings-page__title">{t('nav.settings')}</h1>
 
       <div className="settings-profile-card">
+        <UserAvatar className="user-avatar--lg" />
         <div className="settings-profile-card__info">
           <div className="settings-profile-card__name">{profileName}</div>
           <div className="settings-profile-card__subtitle">{profileSubtitle}</div>
@@ -224,6 +232,13 @@ export function SettingsPage() {
             <span className="settings-toc-row__chevron" aria-hidden="true">›</span>
           </Link>
         ))}
+        <div className="settings-toc-row settings-toc-row--static">
+          <SettingsTocIcon path={SETTINGS_TOC_ICONS.theme} />
+          <span className="settings-toc-row__content">
+            <span className="settings-toc-row__title">{t('settings.theme')}</span>
+          </span>
+          <ThemeSwitch />
+        </div>
       </div>
 
       <p className="settings-page__footer-hint">{t('settings.toc.footerHint')}</p>

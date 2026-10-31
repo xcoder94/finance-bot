@@ -84,8 +84,6 @@ PROTECTED_EXPENSE_PARENT_KEYS = frozenset({"food", "home", "health"})
 SEED_WALLETS: list[tuple[str, str, str]] = [
     ("Наличный сум", "UZS", "cash_uzs"),
     ("Карта сум", "UZS", "card_uzs"),
-    ("Наличный USD", "USD", "cash_usd"),
-    ("Карта USD", "USD", "card_usd"),
 ]
 
 

@@ -1,3 +1,4 @@
+import { sumUnit } from './currencyUnit'
 export type FormConfirmCurrency = 'UZS' | 'USD'
 
 type BuildDeleteConfirmBodyArgs = {
@@ -13,7 +14,7 @@ function formatSheetAmount(amount: number): string {
 }
 
 function currencyWord(currency: FormConfirmCurrency): string {
-  return currency === 'USD' ? '$' : 'сум'
+  return currency === 'USD' ? '$' : sumUnit()
 }
 
 function resolveDeleteLabel(

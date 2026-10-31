@@ -1,3 +1,4 @@
+import { sumUnit } from './currencyUnit'
 export type WalletSubtitleInput = {
   is_personal?: boolean
 }
@@ -35,7 +36,7 @@ function formatWalletSettingsAmount(balance: number, currency: string): string {
   if (currency === 'USD') {
     return `${sign}$${grouped}`
   }
-  return `${sign}${grouped} сум`
+  return `${sign}${grouped} ${sumUnit()}`
 }
 
 export function formatWalletSettingsSubtitle(

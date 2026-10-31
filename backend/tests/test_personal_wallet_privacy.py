@@ -25,6 +25,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock
 
+from tests.db_helpers import db_address
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +47,7 @@ from app.services.quick_entry_balance import wallet_balance
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False
@@ -118,7 +119,7 @@ def make_wallet(
 
 
 @pytest.mark.skipif(
-    not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432"
+    not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port"
 )
 @pytest.mark.anyio
 async def test_expense_category_count_hides_other_members_personal_ops() -> None:
@@ -169,7 +170,7 @@ async def test_expense_category_count_hides_other_members_personal_ops() -> None
 
 
 @pytest.mark.skipif(
-    not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432"
+    not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port"
 )
 @pytest.mark.anyio
 async def test_income_category_count_hides_other_members_personal_ops() -> None:
@@ -276,7 +277,7 @@ async def test_count_visible_category_transactions_query_shape() -> None:
 
 
 @pytest.mark.skipif(
-    not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432"
+    not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port"
 )
 @pytest.mark.anyio
 async def test_transfer_into_personal_wallet_moves_with_departing_member() -> None:
@@ -340,7 +341,7 @@ async def test_transfer_into_personal_wallet_moves_with_departing_member() -> No
 
 
 @pytest.mark.skipif(
-    not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432"
+    not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port"
 )
 @pytest.mark.anyio
 async def test_transfer_out_of_personal_wallet_moves_with_departing_member() -> None:

@@ -22,6 +22,7 @@ from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT, lock
 from app.services.goal_notify import resolve_bot
 from app.services.member_texts import left_notice, removed_notice
 from app.services.ownership_transfer import cancel_pending_transfers_for_user
+from app.services.shopping import cancel_open_purchase_for_user, clear_family_shopping_list
 from app.services.transaction_category_remap import remap_transaction_categories_to_budget
 
 
@@ -142,6 +143,9 @@ async def convert_join_with_own_budget(
             txn.family_budget_id = target.id
         await remap_transaction_categories_to_budget(session, moved_txns, target.id)
 
+    await clear_family_shopping_list(session, old_budget_id)
+    await cancel_open_purchase_for_user(session, user.id)
+
     old_budget.is_deleted = True
     old_budget.deleted_at = datetime.now(UTC)
 
@@ -161,6 +165,7 @@ async def detach_member_to_own_budget(
         raise OwnerCannotDetachError()
 
     await cancel_pending_transfers_for_user(session, departing_user.id)
+    await cancel_open_purchase_for_user(session, departing_user.id)
 
     old_budget_name = old_budget.name
 

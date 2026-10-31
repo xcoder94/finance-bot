@@ -14,6 +14,7 @@ from app.services.evening_reminder import (
     family_had_activity_on,
     send_evening_reminders_for_family,
 )
+from app.services.shopping import expire_open_purchases, purge_closed_purchases
 from app.services.weekly_digest import send_weekly_digest_for_family
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
@@ -35,9 +36,19 @@ def is_weekly_digest_slot(now: datetime) -> bool:
     return local.weekday() == 0 and local.hour == 10 and local.minute == 0
 
 
+def is_purge_slot(now: datetime) -> bool:
+    local = now.astimezone(TASHKENT)
+    return local.hour == 4 and local.minute == 0
+
+
 async def tick(session: AsyncSession, now: datetime, bot: Bot) -> None:
     local = now.astimezone(TASHKENT)
     today = local.date()
+
+    # Every minute: purchases waiting for a sum past their TTL (m3-4b).
+    await expire_open_purchases(session)
+    if is_purge_slot(now):
+        await purge_closed_purchases(session)
 
     if is_evening_reminder_slot(now):
         stmt = select(FamilyBudget).where(FamilyBudget.is_deleted.is_(False))

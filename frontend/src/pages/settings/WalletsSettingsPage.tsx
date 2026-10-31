@@ -49,7 +49,6 @@ export function WalletsSettingsPage() {
   })
   const [reloadCount, setReloadCount] = useState(0)
   const [sheetState, setSheetState] = useState<SheetState>({ kind: 'closed' })
-  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false)
   const [walletTypePickerOpen, setWalletTypePickerOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
@@ -103,20 +102,17 @@ export function WalletsSettingsPage() {
       (formWallet !== null && (formWallet.is_personal || isOwner)))
 
   const openCreateForm = () => {
-    setCurrencyPickerOpen(false)
     setWalletTypePickerOpen(false)
     setSheetState({ kind: 'form', mode: 'create', walletId: null })
   }
 
   const openEditForm = (walletId: string) => {
-    setCurrencyPickerOpen(false)
     setWalletTypePickerOpen(false)
     setSheetState({ kind: 'form', mode: 'edit', walletId })
   }
 
   const closeSheets = () => {
     setSheetState({ kind: 'closed' })
-    setCurrencyPickerOpen(false)
     setWalletTypePickerOpen(false)
     setDeleteError(false)
   }
@@ -244,8 +240,6 @@ export function WalletsSettingsPage() {
           editable={formEditable}
           onClose={closeSheets}
           onSave={handleSave}
-          currencyPickerOpen={currencyPickerOpen}
-          onCurrencyPickerOpenChange={setCurrencyPickerOpen}
           walletTypePickerOpen={walletTypePickerOpen}
           onWalletTypePickerOpenChange={setWalletTypePickerOpen}
           onDelete={

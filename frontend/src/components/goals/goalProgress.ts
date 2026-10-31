@@ -1,3 +1,4 @@
+import { sumUnit } from '../../utils/currencyUnit'
 export type GoalCurrency = 'UZS' | 'USD'
 
 function formatGroupedAmount(amount: number): string {
@@ -9,7 +10,7 @@ export function formatGoalMoney(amount: number, currency: GoalCurrency): string 
   if (currency === 'USD') {
     return `${formatted} $`
   }
-  return `${formatted} сум`
+  return `${formatted} ${sumUnit()}`
 }
 
 function formatGoalDate(isoOrDate: string): string {

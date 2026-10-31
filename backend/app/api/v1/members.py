@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from aiogram import Bot
@@ -85,6 +86,15 @@ async def build_invite_link_for_budget(
     return build_invite_link(bot_username, budget.invite_token)
 
 
+async def mark_invite_link_opened(
+    session: AsyncSession, family_budget_id: uuid.UUID
+) -> None:
+    budget = await get_active_family_budget(session, family_budget_id)
+    if budget is not None and budget.invite_link_opened_at is None:
+        budget.invite_link_opened_at = datetime.now(UTC)
+        await session.commit()
+
+
 @router.get("/members")
 async def list_members(
     user: CurrentUserDep,
@@ -108,6 +118,7 @@ async def get_invite_link(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> InviteLinkResponse:
     invite_link = await build_invite_link_for_budget(session, user.family_budget_id)
+    await mark_invite_link_opened(session, user.family_budget_id)
     return InviteLinkResponse(invite_link=invite_link)
 
 
@@ -121,6 +132,8 @@ async def regenerate_invite_link(
         raise HTTPException(status_code=404)
 
     budget.invite_token = secrets.token_urlsafe(16)
+    if budget.invite_link_opened_at is None:
+        budget.invite_link_opened_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(budget)
 

@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.user_deps import CurrentUserDep
@@ -99,17 +100,23 @@ async def update_transaction(
     require_transaction_modify_permission(user, transaction, from_wallet, to_wallet)
 
     body = await request.json()
+    try:
+        if transaction.type == "income":
+            parsed = IncomeUpdate.model_validate(body)
+        elif transaction.type == "expense":
+            parsed = ExpenseUpdate.model_validate(body)
+        elif transaction.type == "transfer":
+            parsed = TransferUpdate.model_validate(body)
+        else:
+            raise HTTPException(status_code=422, detail="Unknown transaction type")
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors(include_context=False, include_url=False)) from exc
     if transaction.type == "income":
-        parsed = IncomeUpdate.model_validate(body)
         updated = await update_income_transaction(session, transaction, parsed, user)
     elif transaction.type == "expense":
-        parsed = ExpenseUpdate.model_validate(body)
         updated = await update_expense_transaction(session, transaction, parsed, user)
-    elif transaction.type == "transfer":
-        parsed = TransferUpdate.model_validate(body)
-        updated = await update_transfer_transaction(session, transaction, parsed, user)
     else:
-        raise HTTPException(status_code=422, detail="Unknown transaction type")
+        updated = await update_transfer_transaction(session, transaction, parsed, user)
 
     changes = await list_change_lines(session, updated.id)
     return transaction_to_response(updated, changes=changes)

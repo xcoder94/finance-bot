@@ -24,8 +24,6 @@ import type { Currency } from '../../utils/formatCurrency'
 import { AnalyticsChartsTab } from './AnalyticsChartsTab'
 import { AnalyticsHistoryTab } from './AnalyticsHistoryTab'
 
-const CURRENCIES = ['UZS', 'USD'] as const
-
 function hydrateShellState(persisted: AnalyticsShellState | null): AnalyticsShellState {
   if (!persisted) {
     return createDefaultAnalyticsShellState()
@@ -51,7 +49,7 @@ export function AnalyticsLayout() {
   const [rangeTo, setRangeTo] = useState(initialShell.rangeTo)
   const [rangeFromTouched, setRangeFromTouched] = useState(initialShell.rangeFromTouched)
   const [rangeToTouched, setRangeToTouched] = useState(initialShell.rangeToTouched)
-  const [currency, setCurrencyState] = useState<Currency>(initialShell.currency)
+  const currency: Currency = 'UZS'
 
   const buildShellState = useCallback(
     (): AnalyticsShellState => ({
@@ -93,8 +91,6 @@ export function AnalyticsLayout() {
     [buildShellState],
   )
 
-  const setCurrency = setCurrencyState
-
   const { range, rangeOrderInvalid } = useResolvedRange(
     periodTab,
     selectedMonth,
@@ -126,7 +122,6 @@ export function AnalyticsLayout() {
       rangeToTouched,
       setRangeToTouched,
       currency,
-      setCurrency,
       range,
       rangeOrderInvalid,
       rangeFetchEnabled,
@@ -159,22 +154,6 @@ export function AnalyticsLayout() {
         <div className="home-header">
           <div className="home-header__info">
             <h1 className="home-header__title">{t('analytics.title')}</h1>
-          </div>
-          <div className="home-currency-chip" role="group" aria-label={t('home.summary')}>
-            {CURRENCIES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={
-                  currency === item
-                    ? 'home-currency-chip__btn home-currency-chip__btn--active'
-                    : 'home-currency-chip__btn'
-                }
-                onClick={() => setCurrency(item)}
-              >
-                {item}
-              </button>
-            ))}
           </div>
         </div>
 

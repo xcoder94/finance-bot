@@ -2,6 +2,7 @@ import socket
 import uuid
 from datetime import UTC, datetime
 
+from tests.db_helpers import db_address
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +41,7 @@ async def _create_owner_and_member(
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False

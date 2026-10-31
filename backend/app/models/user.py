@@ -33,3 +33,6 @@ class User(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
     release_announcement_delivered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    default_wallet_screen_opened_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

@@ -13,8 +13,12 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     '"category":string_or_null,"comment":string_or_null}],'
     '"speech_status":"recognized|not_recognized"|null,'
     '"date_hint":"YYYY-MM-DD"|null,'
-    '"receipt_status":"ok|unreadable"|null}\n'
+    '"receipt_status":"ok|unreadable"|null,'
+    '"shopping_items":[string]}\n'
     "Rules:\n"
+    "- A text or audio message with NO amount that is just a list of goods to buy (e.g. milk, bread, eggs) → "
+    "operations empty and shopping_items = the goods, one short name each, in the user's words, at most 20. "
+    "If the message has an amount, shopping_items must be empty. shopping_items is empty in every other case.\n"
     "- Same-currency move between two wallets → type transfer; set from_wallet_hint and to_wallet_hint; rate null.\n"
     "- Different-currency move → type exchange; set from_wallet_hint, to_wallet_hint, and rate only when the text "
     "or speech contains an explicit rate marker word («по» or «по курсу»). If no marker, rate must be null.\n"

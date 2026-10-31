@@ -1,3 +1,4 @@
+import { sumUnit } from './currencyUnit'
 export const MAX_COMMENT_LENGTH = 200
 export const UNCATEGORIZED_CATEGORY_NAME = 'Без категории'
 
@@ -69,7 +70,7 @@ export function buildExpenseCategoryDisplayLabel(
 }
 
 export function walletCurrencySuffix(currency: string): string {
-  return currency === 'USD' ? '$' : 'сум'
+  return currency === 'USD' ? '$' : sumUnit()
 }
 
 export function resolveDefaultWalletId(
@@ -144,7 +145,7 @@ function formatTransferSideAmount(amount: number, currency: string): string {
   if (currency === 'USD') {
     return `${formatted} $`
   }
-  return `${formatted} сум`
+  return `${formatted} ${sumUnit()}`
 }
 
 export function formatTransferResultLine(
@@ -157,7 +158,7 @@ export function formatTransferResultLine(
 }
 
 export function transferRateFieldSuffix(): string {
-  return 'сум за $1'
+  return `${sumUnit()} за $1`
 }
 
 export function buildEditSheetTitle(label: string): string {

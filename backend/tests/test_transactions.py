@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
+from tests.db_helpers import db_address
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,7 @@ from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False
@@ -822,3 +823,30 @@ class TestSoftDelete:
         assert (
             await client.get(f"/api/v1/transactions/{txn.id}", headers=headers)
         ).status_code == 404
+
+
+async def test_patch_transaction_with_extra_field_is_422_not_500(
+    api_client: tuple[AsyncClient, AsyncSession],
+) -> None:
+    client, session = api_client
+    tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    owner, budget = await create_user_with_budget(session, telegram_id=tid, role="owner")
+    wallet, category = await seed_income_fixtures(session, budget, owner)
+    txn = Transaction(
+        family_budget_id=budget.id,
+        type="income",
+        wallet_id=wallet.id,
+        amount=100,
+        income_category_id=category.id,
+        created_by_user_id=owner.id,
+        transaction_date=datetime.now(UTC),
+    )
+    session.add(txn)
+    await session.flush()
+    body = txn_payload(
+        wallet_id=str(wallet.id), income_category_id=str(category.id), bogus_field=1
+    )
+    resp = await client.patch(
+        f"/api/v1/transactions/{txn.id}", headers=auth_headers(tid), json=body
+    )
+    assert resp.status_code == 422, (resp.status_code, resp.text)

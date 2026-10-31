@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
+from tests.db_helpers import db_address
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +19,7 @@ from app.services.history_analytics import get_wallet_balances
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False

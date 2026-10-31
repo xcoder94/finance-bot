@@ -1,3 +1,4 @@
+import { sumUnit } from '../../utils/currencyUnit'
 import { useCallback, useMemo } from 'react'
 import { Spinner, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
@@ -40,11 +41,6 @@ import {
 } from '../../utils/analyticsChartsTab'
 import { OTHER_CATEGORY_COLOR_INDEX, mergeStoredCategoryColorIndices } from '../../utils/chartColors'
 import { dayWordRu } from '../../utils/dayCountLabel'
-import {
-  formatCurrency,
-  formatUsdTrendAxisAmount,
-  type Currency,
-} from '../../utils/formatCurrency'
 import { buildDisplayNameById } from '../../utils/getDisplayName'
 import { formatMonthLabel, formatShortMonthKey } from '../../utils/periodFilter'
 
@@ -65,11 +61,8 @@ function getSummaryEntry(
   }
 }
 
-function formatMostExpensiveAmount(amount: number, currency: Currency): string {
-  if (currency === 'USD') {
-    return formatCurrency(amount, 'USD')
-  }
-  return `${formatAnalyticsAmountDigits(amount)} сум`
+function formatMostExpensiveAmount(amount: number): string {
+  return `${formatAnalyticsAmountDigits(amount)} ${sumUnit()}`
 }
 
 function ChartsSkeleton() {
@@ -404,8 +397,7 @@ export function AnalyticsChartsTab() {
       ? '—'
       : weekdayLabels[summaryEntry.most_expensive_weekday] ?? '—'
 
-  const avgDailyCaptionKey =
-    currency === 'USD' ? 'analytics.avgDailyCaptionUsd' : 'analytics.avgDailyCaption'
+  const avgDailyCaptionKey = 'analytics.avgDailyCaption'
 
   const drillHint = drillParent ? t('analytics.drillHintSubcategory') : t('analytics.drillHintRoot')
 
@@ -475,10 +467,7 @@ export function AnalyticsChartsTab() {
             incomeLabel={t('home.income')}
             expenseLabel={t('home.expense')}
             title={t('analytics.trendTitle')}
-            unit={currency === 'USD' ? t('analytics.trendUnitUsd') : t('analytics.trendUnitUzs')}
-            yAxisTickFormatter={
-              currency === 'USD' ? formatUsdTrendAxisAmount : undefined
-            }
+            unit={t('analytics.trendUnitUzs')}
           />
         )}
       </section>
@@ -514,10 +503,7 @@ export function AnalyticsChartsTab() {
               </Text>
               <Text className="analytics-charts-tile__caption">
                 {t('analytics.mostExpensiveCaption', {
-                  amount: formatMostExpensiveAmount(
-                    summaryEntry.most_expensive_weekday_average,
-                    currency,
-                  ),
+                  amount: formatMostExpensiveAmount(summaryEntry.most_expensive_weekday_average),
                 })}
               </Text>
             </>

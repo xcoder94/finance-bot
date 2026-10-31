@@ -23,6 +23,8 @@ export type AuthUser = {
   defaultWalletId: string | null
   eveningReminderEnabled: boolean
   weeklyDigestEnabled: boolean
+  /** Bot can read receipt photos (server flag); the photo way is shown only if true. */
+  receiptPhotoEnabled: boolean
 }
 
 type AuthState = {

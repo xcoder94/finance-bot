@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { patchMe } from '../../api/me'
+import { markDefaultWalletChecked, patchMe } from '../../api/me'
 import { getWallets, type WalletResponse } from '../../api/wallets'
 import { SettingsEntityGroup } from '../../components/settings/SettingsEntityGroup'
 import { SettingsSectionLoadError, SettingsSectionLoading } from '../../components/settings/EditableEntityList'
@@ -41,6 +41,11 @@ export function DefaultWalletSettingsPage() {
       setLoadState((current) => (current.status === 'success' ? current : { status: 'error' }))
     }
   }, [familyId, reloadCount])
+
+  useEffect(() => {
+    // Onboarding step 2: opening this screen counts as "checked".
+    void markDefaultWalletChecked().catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     void loadWallets()

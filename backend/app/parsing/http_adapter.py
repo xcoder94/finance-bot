@@ -109,11 +109,21 @@ def _parse_response_payload(data: Any) -> ParseResponse:
         if receipt_status not in ("ok", "unreadable"):
             raise ParserMalformed(f"invalid receipt_status: {receipt_status!r}")
 
+    raw_items = data.get("shopping_items")
+    shopping_items: list[str] = []
+    if raw_items is not None:
+        if not isinstance(raw_items, list) or not all(
+            isinstance(name, str) for name in raw_items
+        ):
+            raise ParserMalformed("shopping_items must be a list of strings")
+        shopping_items = list(raw_items)
+
     return ParseResponse(
         operations=operations,
         speech_status=speech_status,
         date_hint=date_hint,
         receipt_status=receipt_status,
+        shopping_items=shopping_items,
     )
 
 

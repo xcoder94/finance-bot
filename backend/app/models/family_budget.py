@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, Integer, String
+from sqlalchemy import Date, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -29,3 +29,6 @@ class FamilyBudget(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
     counters_day: Mapped[date | None] = mapped_column(Date, nullable=True)
     last_evening_reminder_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     last_weekly_digest_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    invite_link_opened_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

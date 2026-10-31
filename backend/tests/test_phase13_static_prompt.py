@@ -12,6 +12,7 @@ import socket
 from datetime import UTC, datetime
 
 import httpx
+from tests.db_helpers import db_address
 import pytest
 
 from app.parsing.http_adapter import HttpParser
@@ -28,7 +29,7 @@ from tests.test_quick_entry_create import create_user, rollback_session, seed_ex
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False

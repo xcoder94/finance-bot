@@ -124,6 +124,7 @@ describe('NotificationsSettingsBody', () => {
       defaultWalletId: null,
       eveningReminderEnabled: true,
       weeklyDigestEnabled: false,
+      receiptPhotoEnabled: false,
     })
   })
 

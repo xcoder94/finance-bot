@@ -25,7 +25,6 @@ export type AnalyticsContextValue = {
   rangeToTouched: boolean
   setRangeToTouched: (value: boolean) => void
   currency: Currency
-  setCurrency: (currency: Currency) => void
   range: ResolvedRange | null
   rangeOrderInvalid: boolean
   rangeFetchEnabled: boolean

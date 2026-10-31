@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { Spinner, Tabbar } from '@telegram-apps/telegram-ui'
 import { useSignal, viewport } from '@tma.js/sdk-react'
 import { useTranslation } from 'react-i18next'
@@ -22,6 +22,8 @@ import { EditTransferPage } from '../pages/EditTransferPage'
 import { GoalsPage } from '../pages/GoalsPage'
 import { HistoryPage } from '../pages/HistoryPage'
 import { HomePage } from '../pages/HomePage'
+import { ShoppingPage } from '../pages/ShoppingPage'
+import { ShoppingTripPage } from '../pages/ShoppingTripPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { TransactionGonePage } from '../pages/TransactionGonePage'
 import { DefaultWalletSettingsPage } from '../pages/settings/DefaultWalletSettingsPage'
@@ -36,6 +38,7 @@ import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
 import { useTxDeepLink } from '../hooks/useTxDeepLink'
+import { useChromeStore } from '../store/chromeStore'
 
 export { MAIN_TABS } from './mainTabs'
 
@@ -71,6 +74,9 @@ function AppLayout() {
   const { t } = useTranslation()
   const tabbarHostRef = useRef<HTMLDivElement>(null)
   const [tabbarHeight, setTabbarHeight] = useState(0)
+  const tabbarHidden = useChromeStore((s) => s.tabbarHidden)
+  const location = useLocation()
+  const pageKey = location.pathname.split('/')[1] ?? ''
   const viewportHeight = useSignal(viewport.height)
   const safeAreaBottom = useSignal(viewport.safeAreaInsetBottom)
   const contentSafeAreaBottom = useSignal(viewport.contentSafeAreaInsetBottom)
@@ -86,6 +92,10 @@ function AppLayout() {
   }, [])
 
   useLayoutEffect(() => {
+    if (tabbarHidden) {
+      setTabbarHeight(0)
+      return
+    }
     const host = tabbarHostRef.current
     const renderedTabbar = host?.firstElementChild
     if (!host || !renderedTabbar) {
@@ -107,7 +117,7 @@ function AppLayout() {
       window.removeEventListener('resize', updateHeight)
       window.visualViewport?.removeEventListener('resize', updateHeight)
     }
-  }, [])
+  }, [tabbarHidden])
 
   const tabs = MAIN_TABS.map((tab) => ({
     ...tab,
@@ -129,9 +139,12 @@ function AppLayout() {
       }
     >
       <main className="app-shell__main">
-        <Outlet />
+        <div key={pageKey} className="app-shell__page">
+          <Outlet />
+        </div>
       </main>
 
+      {tabbarHidden ? null : (
       <div ref={tabbarHostRef} className="app-shell__tabbar">
         <Tabbar>
           {tabs.map((tab) => (
@@ -150,6 +163,7 @@ function AppLayout() {
           ))}
         </Tabbar>
       </div>
+      )}
     </div>
   )
 }
@@ -213,6 +227,8 @@ export function AppShell() {
         <Route path="transaction-gone" element={<TransactionGonePage />} />
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
+          <Route path="shopping" element={<ShoppingPage />} />
+          <Route path="shopping/trip" element={<ShoppingTripPage />} />
           <Route path="analytics/*" element={<AnalyticsRoute />} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="history" element={<HistoryPage />} />

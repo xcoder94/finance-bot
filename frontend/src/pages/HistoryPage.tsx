@@ -26,7 +26,7 @@ import {
 } from '../utils/transactionForm'
 import type { HistoryItem } from '../api/history'
 
-const CURRENCIES = ['UZS', 'USD'] as const
+const CURRENCIES = ['UZS'] as const
 const HISTORY_PAGE_SIZE = 50
 
 type PeriodTab = 'month' | 'range'

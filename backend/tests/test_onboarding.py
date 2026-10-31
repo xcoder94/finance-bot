@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+from tests.db_helpers import db_address
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +38,7 @@ EXPECTED_EXPENSE_SUBCATEGORY_COUNT = sum(
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False
@@ -264,7 +265,7 @@ class TestSeedDataCopy:
                 await copy_seed_data(session, budget_id)
 
                 counts = await count_seed_rows(session, budget_id)
-                assert counts["wallets"] == 4
+                assert counts["wallets"] == 2
                 assert counts["income_categories"] == 5
                 assert counts["expense_top_level"] == 7
                 assert counts["expense_subcategories"] == 23
@@ -282,6 +283,7 @@ class TestSeedDataCopy:
                     key for _, _, key in SEED_WALLETS
                 }
                 assert all(not w.is_personal for w in wallets)
+                assert all(w.currency == "UZS" for w in wallets)
 
                 events_parent = await session.scalar(
                     select(ExpenseCategory).where(

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,10 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import AppPassClaimsDep
 from app.auth.user_deps import CurrentUserDep
+from app.config import receipt_photo_enabled
 from app.db import async_session_factory, get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
-from app.schemas.auth import MeResponse, MeUpdate
+from app.models.transaction import Transaction
+from app.schemas.auth import MeResponse, MeUpdate, OnboardingResponse, OnboardingSteps
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import get_active_wallet
 
@@ -41,6 +44,7 @@ async def _build_me_response(session: AsyncSession, db_user: User) -> MeResponse
         default_wallet_id=db_user.default_wallet_id,
         evening_reminder_enabled=db_user.evening_reminder_enabled,
         weekly_digest_enabled=db_user.weekly_digest_enabled,
+        receipt_photo_enabled=receipt_photo_enabled(),
     )
 
 
@@ -91,3 +95,55 @@ async def patch_me(
     await session.commit()
     await session.refresh(user)
     return await _build_me_response(session, user)
+
+
+async def _build_onboarding(session: AsyncSession, user: User) -> OnboardingResponse:
+    budget_id = user.family_budget_id
+    has_operation = await session.scalar(
+        select(
+            select(Transaction.id)
+            .where(
+                Transaction.family_budget_id == budget_id,
+                Transaction.is_deleted.is_(False),
+                Transaction.is_demo.is_(False),
+            )
+            .limit(1)
+            .exists()
+        )
+    )
+    member_count = await session.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.family_budget_id == budget_id, User.is_deleted.is_(False))
+    )
+    link_opened_at = await session.scalar(
+        select(FamilyBudget.invite_link_opened_at).where(FamilyBudget.id == budget_id)
+    )
+    steps = OnboardingSteps(
+        first_operation=bool(has_operation),
+        default_wallet_checked=user.default_wallet_screen_opened_at is not None,
+        family_invited=(member_count or 0) > 1 or link_opened_at is not None,
+    )
+    show = user.role == "owner" and not all(
+        (steps.first_operation, steps.default_wallet_checked, steps.family_invited)
+    )
+    return OnboardingResponse(show=show, steps=steps)
+
+
+@router.get("/me/onboarding")
+async def get_onboarding(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> OnboardingResponse:
+    return await _build_onboarding(session, user)
+
+
+@router.post("/me/onboarding/default-wallet-checked")
+async def mark_default_wallet_checked(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> OnboardingResponse:
+    if user.default_wallet_screen_opened_at is None:
+        user.default_wallet_screen_opened_at = datetime.now(UTC)
+        await session.commit()
+    return await _build_onboarding(session, user)

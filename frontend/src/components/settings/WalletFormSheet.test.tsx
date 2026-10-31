@@ -56,8 +56,6 @@ function renderWalletForm(props: Partial<ComponentProps<typeof WalletFormSheet>>
         editable
         onClose={() => undefined}
         onSave={async () => undefined}
-        currencyPickerOpen={false}
-        onCurrencyPickerOpenChange={() => undefined}
         walletTypePickerOpen={false}
         onWalletTypePickerOpenChange={() => undefined}
         {...props}
@@ -151,5 +149,22 @@ describe('WalletFormSheet edit delete', () => {
     })
     invokeDangerClick(getCapturedDanger())
     expect(onDelete).toHaveBeenCalledOnce()
+  })
+})
+
+describe('WalletFormSheet currency', () => {
+  it('has no currency picker or UZS/USD choice when creating a wallet', () => {
+    const html = renderWalletForm({ mode: 'create', canPickWalletType: true, personalWalletCount: 0 })
+    expect(html).not.toContain('Валюта')
+    expect(html).not.toContain('USD')
+  })
+
+  it('labels an existing USD wallet with its currency', () => {
+    const html = renderWalletForm({
+      mode: 'edit',
+      wallet: { ...editWallet, currency: 'USD' },
+    })
+    expect(html).toContain('Валюта')
+    expect(html).toContain('USD')
   })
 })

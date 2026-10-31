@@ -34,6 +34,7 @@ from app.parsing.types import (
     ParserUnavailable,
 )
 from app.services.goals import check_goal_achievement
+from app.services.shopping import find_open_purchase
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.quick_entry_counters import (
@@ -55,6 +56,7 @@ from app.services.quick_entry_wallets import (
     resolve_wallet,
 )
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id
+from bot.quick_entry.shopping_pending import finish_unrecognized, finish_with_amount, op_sum
 from bot.quick_entry.cards import card_keyboard, format_card
 from bot.quick_entry.texts import (
     MSG_MODEL_FAIL,
@@ -215,7 +217,9 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         await ensure_counters_day(session, budget, today)
 
         default_wallet = await _get_default_wallet(session, user)
-        if default_wallet is None:
+        open_purchase = await find_open_purchase(session, user.id)
+        pending = open_purchase if open_purchase and open_purchase.method == "photo" else None
+        if default_wallet is None and pending is None:
             await message.answer(MSG_NO_AMOUNT)
             return
 
@@ -283,10 +287,26 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             await session.commit()
             return
 
+        if pending is not None:
+            # The app waits for the purchase total: one sum, no categories/wallets.
+            total = (
+                None
+                if response.receipt_status == "unreadable"
+                else op_sum(response.operations)
+            )
+            if total is None:
+                await finish_unrecognized(
+                    message, session, user, budget, pending, DAILY_UNPARSED_LIMIT
+                )
+            else:
+                await finish_with_amount(message, session, user, pending, total)
+            return
+
         if response.receipt_status == "unreadable":
             await _reply_unreadable(message, session, budget)
             return
 
+        assert default_wallet is not None  # pending purchases returned above
         expense_op = _first_expense_op(response.operations)
         if expense_op is None:
             await _reply_unreadable(message, session, budget)

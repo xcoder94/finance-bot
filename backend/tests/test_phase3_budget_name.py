@@ -31,7 +31,7 @@ async def test_family_budget_name_column_exists():
         await conn.run_sync(check)
 
 
-@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432")
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port")
 @pytest.mark.anyio
 async def test_me_returns_default_budget_name_and_solo_member_count() -> None:
     async with rollback_session() as session:
@@ -71,7 +71,7 @@ async def test_me_returns_default_budget_name_and_solo_member_count() -> None:
     assert body["default_wallet_id"] is None
 
 
-@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432")
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port")
 @pytest.mark.anyio
 async def test_me_member_count_excludes_deleted_users() -> None:
     async with rollback_session() as session:
@@ -124,7 +124,7 @@ async def test_me_member_count_excludes_deleted_users() -> None:
     assert me_response.json()["member_count"] == 2
 
 
-@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable on 127.0.0.1:5432")
+@pytest.mark.skipif(not _db_available(), reason="PostgreSQL is not reachable at the DATABASE_URL host and port")
 @pytest.mark.anyio
 async def test_me_returns_default_wallet_id_when_set() -> None:
     async with rollback_session() as session:

@@ -1,4 +1,5 @@
 import i18n from '../i18n'
+import { sumUnit } from './currencyUnit'
 
 export type Currency = 'UZS' | 'USD'
 
@@ -11,7 +12,7 @@ export function formatCurrency(amount: number, currency: Currency): string {
     return `${sign}$${formatted}`
   }
 
-  return `${sign}${formatted} UZS`
+  return `${sign}${formatted} ${sumUnit()}`
 }
 
 export function formatUsdTrendAxisAmount(value: number): string {

@@ -54,3 +54,43 @@ def unparsed_limit_text(limit: int) -> str:
         f"Сегодня не удалось разобрать {limit} сообщений — это дневной предел. "
         "Записи можно добавить в приложении."
     )
+
+
+# --- Shopping list replies (MVP 3). Source: work/design/mvp3-strings.md, "Бот". ---
+SHOPPING_ITEMS_PER_MESSAGE = 20
+
+_SHOPPING_ADDED = {
+    "ru": "Добавил в список покупок: {names}.",
+    "uz": "Xarid ro‘yxatiga qo‘shdim: {names}.",
+}
+_SHOPPING_EXISTING = {
+    "ru": "Уже были в списке: {names}.",
+    "uz": "Ro‘yxatda bor edi: {names}.",
+}
+_SHOPPING_FULL = {
+    "ru": "В списке уже 100 позиций — остальное не добавил.",
+    "uz": "Ro‘yxatda allaqachon 100 ta pozitsiya — qolganini qo‘shmadim.",
+}
+
+
+def _lang(language: str | None) -> str:
+    return language if language in ("ru", "uz") else "ru"
+
+
+def shopping_reply_text(
+    language: str | None,
+    *,
+    added: list[str],
+    existing: list[str],
+    over_limit: bool,
+) -> str:
+    """Names must already be Markdown-escaped by the caller."""
+    lang = _lang(language)
+    lines: list[str] = []
+    if added:
+        lines.append(_SHOPPING_ADDED[lang].format(names=", ".join(added)))
+    if existing:
+        lines.append(_SHOPPING_EXISTING[lang].format(names=", ".join(existing)))
+    if over_limit:
+        lines.append(_SHOPPING_FULL[lang])
+    return "\n".join(lines)

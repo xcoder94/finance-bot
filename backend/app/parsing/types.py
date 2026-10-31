@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 OpType = Literal["expense", "income", "ambiguous", "transfer", "exchange"]
@@ -35,6 +35,9 @@ class ParseResponse:
     speech_status: Literal["recognized", "not_recognized"] | None = None
     date_hint: str | None = None
     receipt_status: Literal["ok", "unreadable"] | None = None
+    # Names for the family shopping list: a message without an amount that is a
+    # list of goods. Empty for expenses/income/transfers.
+    shopping_items: list[str] = field(default_factory=list)
 
 
 class ParserUnavailable(Exception):

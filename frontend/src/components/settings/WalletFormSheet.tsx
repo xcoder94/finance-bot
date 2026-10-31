@@ -30,8 +30,6 @@ type WalletFormSheetProps = {
     currency: 'UZS' | 'USD'
     is_personal: boolean
   }) => Promise<void>
-  currencyPickerOpen: boolean
-  onCurrencyPickerOpenChange: (open: boolean) => void
   walletTypePickerOpen: boolean
   onWalletTypePickerOpenChange: (open: boolean) => void
   onDelete?: () => void
@@ -63,20 +61,20 @@ export function WalletFormSheet({
   editable,
   onClose,
   onSave,
-  currencyPickerOpen,
-  onCurrencyPickerOpenChange,
   walletTypePickerOpen,
   onWalletTypePickerOpenChange,
   onDelete,
 }: WalletFormSheetProps) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
-  const [currency, setCurrency] = useState<'UZS' | 'USD'>('UZS')
   const [walletType, setWalletType] = useState<WalletFormType>('shared')
   const [nameTouched, setNameTouched] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
 
+  // New wallets are always UZS; an existing wallet keeps its own currency.
+  const currency: 'UZS' | 'USD' =
+    mode === 'edit' && wallet?.currency === 'USD' ? 'USD' : 'UZS'
   const currencyLocked = mode === 'edit' && wallet !== null && wallet.transaction_count > 0
   const createWalletType: WalletFormType = canPickWalletType ? walletType : 'personal'
   const atLimit =
@@ -92,7 +90,6 @@ export function WalletFormSheet({
       return
     }
     setName(wallet?.name ?? '')
-    setCurrency((wallet?.currency as 'UZS' | 'USD') ?? 'UZS')
     setWalletType(wallet?.is_personal ? 'personal' : 'shared')
     setNameTouched(false)
     setSaving(false)
@@ -100,7 +97,7 @@ export function WalletFormSheet({
   }, [open, wallet])
 
   useNativeBackButtonOverlay(
-    open && !currencyPickerOpen && !walletTypePickerOpen,
+    open && !walletTypePickerOpen,
     onClose,
   )
 
@@ -207,47 +204,6 @@ export function WalletFormSheet({
     )
   }
 
-  if (currencyPickerOpen) {
-    return (
-      <FormSheet
-        open={open}
-        title={t('settings.currencyLabel')}
-        onClose={() => onCurrencyPickerOpenChange(false)}
-        showPrimary={false}
-      >
-        <div className="category-picker">
-          {(['UZS', 'USD'] as const).map((option) => {
-            const selected = currency === option
-            return (
-              <button
-                key={option}
-                type="button"
-                className="category-picker__row"
-                onClick={() => {
-                  setCurrency(option)
-                  onCurrencyPickerOpenChange(false)
-                }}
-              >
-                <span
-                  className={[
-                    'category-picker__radio',
-                    selected ? 'category-picker__radio--selected' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  aria-hidden="true"
-                >
-                  <span className="category-picker__radio-dot" />
-                </span>
-                <span className="category-picker__name">{option}</span>
-              </button>
-            )
-          })}
-        </div>
-      </FormSheet>
-    )
-  }
-
   return (
     <FormSheet
       open={open}
@@ -292,20 +248,14 @@ export function WalletFormSheet({
         />
       </FormSheetField>
 
-      <FormSheetField
-        label="Валюта"
-        right="›"
-        hint={
-          currencyLocked ? 'После первой операции валюта не меняется' : undefined
-        }
-        onClick={
-          editable && mode === 'create' && !currencyLocked
-            ? () => onCurrencyPickerOpenChange(true)
-            : undefined
-        }
-      >
-        <span className="form-sheet-field__value">{currency}</span>
-      </FormSheetField>
+      {mode === 'edit' && wallet?.currency === 'USD' ? (
+        <FormSheetField
+          label={t('settings.currencyLabel')}
+          hint={currencyLocked ? 'После первой операции валюта не меняется' : undefined}
+        >
+          <span className="form-sheet-field__value wallet-currency-tag">{currency}</span>
+        </FormSheetField>
+      ) : null}
 
       {mode === 'create' ? (
         <FormSheetField

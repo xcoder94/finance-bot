@@ -4,6 +4,7 @@ from datetime import date, datetime
 from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
+from tests.db_helpers import db_address
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +31,7 @@ TEST_DAY = date(2026, 8, 4)
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False

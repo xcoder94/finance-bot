@@ -14,6 +14,7 @@ type MeResponseJson = {
   default_wallet_id: string | null
   evening_reminder_enabled?: boolean
   weekly_digest_enabled?: boolean
+  receipt_photo_enabled?: boolean
 }
 
 export type MeErrorType = 'unauthorized' | 'not_onboarded' | 'removed_from_family' | 'network'
@@ -41,6 +42,7 @@ export function mapMeResponse(data: MeResponseJson): AuthUser {
     defaultWalletId: data.default_wallet_id,
     eveningReminderEnabled: data.evening_reminder_enabled ?? true,
     weeklyDigestEnabled: data.weekly_digest_enabled ?? true,
+    receiptPhotoEnabled: data.receipt_photo_enabled ?? false,
   }
 }
 
@@ -118,4 +120,51 @@ export async function patchMe(payload: MeUpdatePayload): Promise<AuthUser> {
 
   const data = (await response.json()) as MeResponseJson
   return mapMeResponse(data)
+}
+
+export type OnboardingState = {
+  show: boolean
+  steps: { firstOperation: boolean; defaultWalletChecked: boolean; familyInvited: boolean }
+}
+
+type OnboardingJson = {
+  show: boolean
+  steps: { first_operation: boolean; default_wallet_checked: boolean; family_invited: boolean }
+}
+
+function mapOnboarding(data: OnboardingJson): OnboardingState {
+  return {
+    show: data.show,
+    steps: {
+      firstOperation: data.steps.first_operation,
+      defaultWalletChecked: data.steps.default_wallet_checked,
+      familyInvited: data.steps.family_invited,
+    },
+  }
+}
+
+async function onboardingRequest(url: string, method: 'GET' | 'POST'): Promise<OnboardingState> {
+  let response: Response
+  try {
+    response = await fetch(
+      url,
+      method === 'GET'
+        ? { headers: { Authorization: getAuthHeader() } }
+        : { method, headers: { Authorization: getAuthHeader() } },
+    )
+  } catch {
+    throw new MeRequestError('network')
+  }
+  if (!response.ok) {
+    throw new MeRequestError('network')
+  }
+  return mapOnboarding((await response.json()) as OnboardingJson)
+}
+
+export function fetchOnboarding(): Promise<OnboardingState> {
+  return onboardingRequest('/api/v1/me/onboarding', 'GET')
+}
+
+export function markDefaultWalletChecked(): Promise<OnboardingState> {
+  return onboardingRequest('/api/v1/me/onboarding/default-wallet-checked', 'POST')
 }

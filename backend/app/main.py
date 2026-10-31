@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import asyncpg
@@ -17,6 +18,7 @@ from app.api.v1.categories import router as categories_router
 from app.api.v1.history import router as history_router
 from app.api.v1.members import init_bot_username, router as members_router
 from app.api.v1.me import router as me_router
+from app.api.v1.shopping import router as shopping_router
 from app.api.v1.transactions import router as transactions_router
 from app.api.v1.goals import router as goals_router
 from app.api.v1.wallets import router as wallets_router
@@ -56,10 +58,28 @@ async def verify_postgres_connection() -> None:
         logger.info("PostgreSQL connection verified")
 
 
+async def _init_bot_username_safely() -> None:
+    """Resolve the bot username; in dev/tests a missing token must not stop the API.
+
+    Set SKIP_BOT_INIT=1 to skip the Telegram call entirely. Otherwise a failure
+    (empty token, no network) is logged as a warning and startup continues.
+    """
+    if os.environ.get("SKIP_BOT_INIT", "").strip().lower() in {"1", "true", "yes"}:
+        logger.warning("SKIP_BOT_INIT is set: bot username not resolved")
+        return
+    try:
+        await init_bot_username()
+    except Exception as exc:
+        logger.warning(
+            "Could not resolve bot username at startup (%s); continuing without it",
+            type(exc).__name__,
+        )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await verify_postgres_connection()
-    await init_bot_username()
+    await _init_bot_username_safely()
     yield
     await dispose_engine()
 
@@ -113,6 +133,7 @@ app.include_router(history_router)
 app.include_router(transactions_router)
 app.include_router(analytics_router)
 app.include_router(members_router)
+app.include_router(shopping_router)
 
 
 @app.exception_handler(Exception)

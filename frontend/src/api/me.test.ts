@@ -82,6 +82,20 @@ describe('mapMeResponse', () => {
   })
 })
 
+describe('receipt photo flag (m3-4)', () => {
+  const base = {
+    id: 'u', telegram_id: 1, family_budget_id: 'f', role: 'owner', first_name: null,
+    username: null, language: 'ru', budget_name: 'B', member_count: 1, default_wallet_id: null,
+  }
+  it('maps receipt_photo_enabled', () => {
+    expect(mapMeResponse({ ...base, receipt_photo_enabled: true }).receiptPhotoEnabled).toBe(true)
+    expect(mapMeResponse({ ...base, receipt_photo_enabled: false }).receiptPhotoEnabled).toBe(false)
+  })
+  it('missing flag means off (never show a button the bot cannot serve)', () => {
+    expect(mapMeResponse(base).receiptPhotoEnabled).toBe(false)
+  })
+})
+
 describe('patchMe', () => {
   afterEach(() => {
     vi.unstubAllGlobals()

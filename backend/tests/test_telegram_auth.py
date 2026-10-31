@@ -1,4 +1,5 @@
 import hashlib
+from app.config import receipt_photo_enabled
 import hmac
 import json
 import socket
@@ -10,6 +11,7 @@ from datetime import UTC, datetime
 from operator import itemgetter
 from unittest.mock import AsyncMock, patch
 
+from tests.db_helpers import db_address
 import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
@@ -89,7 +91,7 @@ def build_fresh_init_data(
 
 def _db_available() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+        with socket.create_connection(db_address(), timeout=1):
             return True
     except OSError:
         return False
@@ -137,8 +139,9 @@ def _random_telegram_id() -> int:
 @pytest.fixture
 def client() -> TestClient:
     with patch("app.main.verify_postgres_connection", new=AsyncMock()):
-        with TestClient(app) as test_client:
-            yield test_client
+        with patch("app.main.init_bot_username", new=AsyncMock()):
+            with TestClient(app) as test_client:
+                yield test_client
 
 
 class TestValidateInitData:
@@ -386,4 +389,5 @@ class TestMeEndpointUserLookup:
             "default_wallet_id": None,
             "evening_reminder_enabled": True,
             "weekly_digest_enabled": True,
+            "receipt_photo_enabled": receipt_photo_enabled(),
         }
