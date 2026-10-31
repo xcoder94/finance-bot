@@ -20,6 +20,7 @@ class MeResponse(BaseModel):
     evening_reminder_enabled: bool
     weekly_digest_enabled: bool
     receipt_photo_enabled: bool
+    is_admin: bool
 
 
 class MeUpdate(BaseModel):

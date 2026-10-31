@@ -51,3 +51,16 @@ describe('HomeLeftBlock layout (B2, B6)', () => {
     expect(html(-123_456_789, 1)).toContain('home-left__value--xlong')
   })
 })
+
+describe('HomeLeftBlock amounts use NBSP digit groups', () => {
+  it('per-day and total amounts never break on a plain space', () => {
+    const html = renderToStaticMarkup(
+      <I18nextProvider i18n={make('uz')}>
+        <HomeLeftBlock remaining={1234567} perDay={41100} days={30} />
+      </I18nextProvider>,
+    )
+    expect(html).toContain('1\u00a0234\u00a0567')
+    expect(html).toContain('41\u00a0100')
+    expect(html).not.toMatch(/\d \d{3}/)
+  })
+})

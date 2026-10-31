@@ -390,4 +390,5 @@ class TestMeEndpointUserLookup:
             "evening_reminder_enabled": True,
             "weekly_digest_enabled": True,
             "receipt_photo_enabled": receipt_photo_enabled(),
+            "is_admin": False,
         }

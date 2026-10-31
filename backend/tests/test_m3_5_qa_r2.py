@@ -86,3 +86,25 @@ def test_bot_uz_texts_use_ascii_apostrophe():
             if re.search("[‘’ʻʼ]", line):
                 bad.append(f"{path.relative_to(root)}:{n}")
     assert bad == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["12 3 тыс", "12 3 тыс.", "12 3 тысяч", "12 3 сумов", "12 3 soʻm", "12 3 so’m", "41 2000 тыс", "12 3 СУМОВ"],
+)
+def test_any_unit_keeps_thousands_separator_rule(text):
+    from bot.quick_entry.shopping_pending import bare_text_amount, is_malformed_number
+
+    assert bare_text_amount(text) is None
+    assert is_malformed_number(text) is True
+
+
+@pytest.mark.parametrize(
+    "text,value",
+    [("412 тыс", 412_000), ("412 тысяч", 412_000), ("1 500 сумов", 1500),
+     ("1 500 soʻm", 1500), ("412000", 412_000)],
+)
+def test_valid_sums_with_units_still_parse(text, value):
+    from bot.quick_entry.shopping_pending import bare_text_amount
+
+    assert bare_text_amount(text) == value

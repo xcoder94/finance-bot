@@ -25,6 +25,8 @@ export type AuthUser = {
   weeklyDigestEnabled: boolean
   /** Bot can read receipt photos (server flag); the photo way is shown only if true. */
   receiptPhotoEnabled: boolean
+  /** Server decides (ADMIN_TELEGRAM_IDS); the client only hides the entry, the API enforces 404. */
+  isAdmin: boolean
 }
 
 type AuthState = {

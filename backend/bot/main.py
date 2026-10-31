@@ -9,8 +9,10 @@ from app.config import BOT_TOKEN, receipt_photo_enabled, SUPPORT_CHAT_ID
 from app.logging_setup import setup_logging
 from app.services.invite import cache_bot_username
 from app.services.notification_scheduler import notification_loop
+from bot.activity_middleware import register_activity_middleware
 from bot.keyboard_hygiene import ClearStaleReplyKeyboardMiddleware
 from bot.onboarding import router as onboarding_router
+from bot.phone_prompt import router as phone_prompt_router
 from bot.membership import router as membership_router
 from bot.goals import router as goals_router
 from bot.support import router as support_router
@@ -47,6 +49,7 @@ def register_global_error_handler(dp: Dispatcher) -> None:
 
 
 def register_bot_routers(dp: Dispatcher) -> None:
+    dp.include_router(phone_prompt_router)
     dp.include_router(onboarding_router)
     dp.include_router(membership_router)
     dp.include_router(goals_router)
@@ -72,6 +75,7 @@ async def main() -> None:
     bot.session.middleware(ClearStaleReplyKeyboardMiddleware())
     dp = Dispatcher(storage=MemoryStorage())
     register_global_error_handler(dp)
+    register_activity_middleware(dp)
     dp.startup.register(cache_bot_username)
     register_bot_routers(dp)
     loop_task = asyncio.create_task(_run_notification_loop(bot))

@@ -1,3 +1,4 @@
+from app.models.admin_tracking import AiCostAlert, AiUsageDaily, UserDailyActivity
 from app.models.base import Base
 from app.models.cascade_fallback_log import CascadeFallbackLog
 from app.models.expense_category import ExpenseCategory
@@ -15,6 +16,9 @@ from app.models.user import User
 from app.models.wallet import Wallet
 
 __all__ = [
+    "AiCostAlert",
+    "AiUsageDaily",
+    "UserDailyActivity",
     "Base",
     "CascadeFallbackLog",
     "ExpenseCategory",

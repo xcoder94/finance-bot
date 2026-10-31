@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
@@ -134,6 +135,7 @@ app.include_router(transactions_router)
 app.include_router(analytics_router)
 app.include_router(members_router)
 app.include_router(shopping_router)
+app.include_router(admin_router)
 
 
 @app.exception_handler(Exception)

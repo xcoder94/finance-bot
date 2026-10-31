@@ -42,13 +42,24 @@ _PLAIN_NUMBER_RE = re.compile(r"^(?:\d+|\d{1,3}(?:[\s.,]\d{3})+)$")
 _ONLY_DIGITS_AND_SEPARATORS_RE = re.compile(r"^\d[\d\s.,]*$")
 
 
-# a trailing unit does not change the separator rule: "12 3 сум" is as broken as "12 3"
-_TRAILING_UNIT_RE = re.compile(r"^(?P<num>\d[\d\s.,]*?)\s*(?:сум|сўм|so'm|som|sum|uzs)\.?$", re.IGNORECASE)
+# a trailing unit does not change the separator rule: "12 3 сум" is as broken as "12 3".
+# Apostrophe in "so'm" may be ASCII, U+02BB, U+02BC, U+2018, U+2019 or a backtick.
+_APOS = "['`\u02bb\u02bc\u2018\u2019]"
+_CURRENCY_UNIT = rf"(?:сумов|сум|сўм|so{_APOS}m|som|sum|uzs)"
+_TRAILING_UNIT_RE = re.compile(rf"^(?P<num>\d[\d\s.,]*?)\s*{_CURRENCY_UNIT}\.?$", re.IGNORECASE)
+# "тыс" multiplies, so "412 тыс" is a valid sum; but "12 3 тыс" (digit groups split by a space, not
+# groups of 3) is broken exactly like "12 3".
+_TRAILING_THOUSAND_RE = re.compile(r"^(?P<num>\d+(?:\s+\d+)+)\s*(?:тысяч[аиу]?|тыс)\.?$", re.IGNORECASE)
 
 
 def _digits_part(stripped: str) -> str | None:
     match = _TRAILING_UNIT_RE.match(stripped)
-    return match.group("num") if match else None
+    if match:
+        return match.group("num")
+    match = _TRAILING_THOUSAND_RE.match(stripped)
+    if match and not _PLAIN_NUMBER_RE.match(match.group("num").strip()):
+        return match.group("num")
+    return None
 
 
 def _usable(amount: int | None) -> bool:

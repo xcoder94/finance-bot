@@ -183,6 +183,7 @@ async def test_application_pass_allows_api_when_init_data_is_stale() -> None:
                 "evening_reminder_enabled": True,
                 "weekly_digest_enabled": True,
                 "receipt_photo_enabled": receipt_photo_enabled(),
+                "is_admin": False,
             }
 
             me_tma = await client.get(

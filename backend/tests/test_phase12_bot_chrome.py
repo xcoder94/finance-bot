@@ -181,8 +181,8 @@ def test_owner_language_callback_sends_18_1_with_markdown_and_keyboard() -> None
         ):
             await language_callback(callback, state, bot)
 
-        message.answer.assert_awaited_once()
-        args, kwargs = message.answer.await_args
+        assert message.answer.await_count == 2  # 18.1 text, then the phone request
+        args, kwargs = message.answer.await_args_list[0]
         assert args[0] == START_SOLO_TEXT
         assert kwargs.get("parse_mode") == "Markdown"
         assert kwargs.get("reply_markup") is fake_kb
@@ -259,7 +259,7 @@ def test_invited_language_callback_keeps_18_2_and_uses_markdown() -> None:
         ):
             await language_callback(callback, state, bot)
 
-        args, kwargs = message.answer.await_args
+        args, kwargs = message.answer.await_args_list[0]
         assert args[0] == welcome_invited("Семья Юсуповых")
         assert kwargs.get("parse_mode") == "Markdown"
 

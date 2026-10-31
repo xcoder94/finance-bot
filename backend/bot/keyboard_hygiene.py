@@ -37,6 +37,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import app.config
+from bot.phone_prompt import pending_keyboard_restore
 from aiogram.client.session.middlewares.base import (
     BaseRequestMiddleware,
     NextRequestMiddlewareType,
@@ -56,6 +57,18 @@ class ClearStaleReplyKeyboardMiddleware(BaseRequestMiddleware):
         bot: Bot,
         method: TelegramMethod[TelegramType],
     ) -> Response[TelegramType]:
+        chat_id = getattr(method, "chat_id", None)
+        if (
+            type(method).__name__.startswith("Send")
+            and getattr(method, "reply_markup", 1) is None
+            and chat_id in pending_keyboard_restore
+        ):
+            # the phone prompt was closed by an ordinary message: bring the ordinary keyboard back
+            from bot.support import build_main_reply_keyboard
+
+            method.reply_markup = build_main_reply_keyboard(pending_keyboard_restore.pop(chat_id))
+            return await make_request(bot, method)
+
         if app.config.SUPPORT_CHAT_ID:
             # A legitimate reply keyboard (the support entry) can now exist.
             # Leave every reply_markup exactly as the handler set it.

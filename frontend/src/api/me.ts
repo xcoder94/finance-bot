@@ -15,6 +15,7 @@ type MeResponseJson = {
   evening_reminder_enabled?: boolean
   weekly_digest_enabled?: boolean
   receipt_photo_enabled?: boolean
+  is_admin?: boolean
 }
 
 export type MeErrorType = 'unauthorized' | 'not_onboarded' | 'removed_from_family' | 'network'
@@ -43,6 +44,7 @@ export function mapMeResponse(data: MeResponseJson): AuthUser {
     eveningReminderEnabled: data.evening_reminder_enabled ?? true,
     weeklyDigestEnabled: data.weekly_digest_enabled ?? true,
     receiptPhotoEnabled: data.receipt_photo_enabled ?? false,
+    isAdmin: data.is_admin ?? false,
   }
 }
 

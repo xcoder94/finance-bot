@@ -52,6 +52,26 @@ DAILY_UNPARSED_LIMIT = int(os.environ.get("DAILY_UNPARSED_LIMIT", "20"))
 
 RECEIPT_PHOTO_ENABLED = os.environ.get("RECEIPT_PHOTO_ENABLED")
 
+
+def _parse_admin_ids(raw: str | None) -> frozenset[int]:
+    ids: set[int] = set()
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            ids.add(int(part))
+        except ValueError:
+            # Never echo the value: it is an identifier of a privileged account.
+            raise RuntimeError(
+                "ADMIN_TELEGRAM_IDS must be a comma-separated list of integers"
+            ) from None
+    return frozenset(ids)
+
+
+# Empty / unset -> nobody is an admin.
+ADMIN_TELEGRAM_IDS: frozenset[int] = _parse_admin_ids(os.environ.get("ADMIN_TELEGRAM_IDS"))
+
 _default_log_file = _BACKEND_ROOT / "logs" / "app.log"
 LOG_FILE_PATH = os.environ.get("LOG_FILE_PATH") or str(_default_log_file)
 

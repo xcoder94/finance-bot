@@ -28,3 +28,4 @@ class QuickEntryPending(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     charge_on_confirm: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )
+    channel: Mapped[str | None] = mapped_column(String(8), nullable=True)

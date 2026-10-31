@@ -1,0 +1,52 @@
+{
+  "row": "Админка",
+  "rowHint": "Только для вас",
+  "title": "Админка",
+  "back": "‹ Настройки",
+  "tabs": {
+    "growth": "Рост",
+    "ops": "Операции и ИИ",
+    "users": "Пользователи"
+  },
+  "soon": "Скоро",
+  "loading": "Загрузка…",
+  "loadFailed": "Не получилось загрузить",
+  "retry": "Повторить",
+  "empty": "Ничего не найдено",
+  "dash": "—",
+  "growth": {
+    "totals": "Всего",
+    "users": "Пользователей",
+    "families": "Семей",
+    "familiesMulti": "из них семей с 2+ участниками",
+    "newUsers": "Новые пользователи",
+    "newFamilies": "Новые семьи",
+    "today": "Сегодня",
+    "days7": "7 дней",
+    "days30": "30 дней",
+    "active": "Активные",
+    "dau": "За день (DAU)",
+    "wau": "7 дней (WAU)",
+    "mau": "30 дней (MAU)",
+    "retention": "Возвращаемость",
+    "retentionD7": "D7",
+    "retentionD30": "D30",
+    "nOfN": "{{n}} из {{total}}",
+    "activeSeries": "Активных",
+    "chart": "Активные по дням, последние 30 дней",
+    "since": "Активность считается с {{date}}"
+  },
+  "users": {
+    "search": "Поиск: имя, @username, телефон",
+    "total": "Всего: {{count}}",
+    "more": "Показать ещё",
+    "registered": "Рег.: {{date}}",
+    "lastSeen": "Был: {{value}}",
+    "family": "Семья: {{count}} уч., {{role}}",
+    "owner": "владелец",
+    "member": "участник",
+    "operations": "Операций: {{count}}",
+    "langRu": "RU",
+    "langUz": "UZ"
+  }
+}

@@ -41,6 +41,8 @@ class Transaction(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
     is_demo: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # text | voice | photo | app; NULL = created before accounting (CHECK in the DB).
+    channel: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
 
 Index(

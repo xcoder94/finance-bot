@@ -34,6 +34,7 @@ import { LanguageSettingsPage } from '../pages/settings/LanguageSettingsPage'
 import { MembersSettingsPage } from '../pages/settings/MembersSettingsPage'
 import { MemberDetailPage } from '../pages/settings/MemberDetailPage'
 import { NotificationsSettingsShellPage } from '../pages/settings/NotificationsSettingsShellPage'
+import { AdminPage } from '../pages/admin/AdminPage'
 import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
@@ -245,6 +246,7 @@ export function AppShell() {
           <Route path="settings/members/:id" element={<MemberDetailPage />} />
           <Route path="settings/notifications" element={<NotificationsSettingsShellPage />} />
           <Route path="settings/language" element={<LanguageSettingsPage />} />
+          <Route path="admin" element={<AdminPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -69,6 +69,7 @@ function SettingsTocIcon({ path }: { path: string }) {
 
 export function SettingsPage() {
   const { t } = useTranslation()
+  const { t: ta } = useTranslation('admin')
   const user = useAuthStore((state) => state.user)
   const location = useLocation()
   const familyId = user?.familyBudgetId ?? ''
@@ -240,6 +241,19 @@ export function SettingsPage() {
           <ThemeSwitch />
         </div>
       </div>
+
+      {user.isAdmin ? (
+        <div className="settings-toc-list settings-toc-list--group">
+          <Link to="/admin" className="settings-toc-row">
+            <SettingsTocIcon path={SETTINGS_TOC_ICONS.admin} />
+            <span className="settings-toc-row__content">
+              <span className="settings-toc-row__title">{ta('row')}</span>
+              <span className="settings-toc-row__subtitle">{ta('rowHint')}</span>
+            </span>
+            <span className="settings-toc-row__chevron" aria-hidden="true">›</span>
+          </Link>
+        </div>
+      ) : null}
 
       <p className="settings-page__footer-hint">{t('settings.toc.footerHint')}</p>
     </div>

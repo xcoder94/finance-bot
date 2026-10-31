@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
+from fastapi import BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,11 +8,13 @@ from app.auth.deps import AppPassClaimsDep
 from app.db import get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
+from app.services.activity import touch_activity
 
 
 async def get_current_user(
     claims: AppPassClaimsDep,
     session: Annotated[AsyncSession, Depends(get_session)],
+    background_tasks: BackgroundTasks,
 ) -> User:
     telegram_id = int(claims["sub"])
     stmt = (
@@ -29,6 +31,11 @@ async def get_current_user(
     user: User = row[0]
     if row.family_is_deleted:
         raise HTTPException(status_code=403)
+    # After the response, so a second DB connection is never held while this request
+    # still owns one. Throttled and non-raising (see app/services/activity.py).
+    background_tasks.add_task(
+        touch_activity, telegram_id=user.telegram_id, user_id=user.id, app=True
+    )
     return user
 
 

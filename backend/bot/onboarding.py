@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from datetime import UTC, datetime
 from typing import Literal
 
 from aiogram import Bot, F, Router
@@ -52,6 +53,8 @@ from app.services.membership_lifecycle import (
     evaluate_join_from_own_budget,
 )
 from app.services.entity_limits import MEMBER_LIMIT, lock_family_budget
+from bot.phone_prompt import prompt_keyboard as phone_prompt_keyboard
+from bot.phone_prompt import prompt_text as phone_prompt_text
 from bot.quick_entry.cards import escape_markdown
 
 router = Router()
@@ -290,6 +293,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                     first_name=data.get("first_name"),
                     username=data.get("username"),
                     language=language,
+                    phone_prompted_at=datetime.now(UTC),
                 )
                 session.add(user)
                 await session.flush()
@@ -318,6 +322,7 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                     first_name=data.get("first_name"),
                     username=data.get("username"),
                     language=language,
+                    phone_prompted_at=datetime.now(UTC),
                 )
                 session.add(user)
                 await assign_default_card_uzs(session, user)
@@ -338,6 +343,9 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
         welcome,
         reply_markup=greeting_inline_keyboard(),
         parse_mode="Markdown",
+    )
+    await callback.message.answer(
+        phone_prompt_text(language), reply_markup=phone_prompt_keyboard(language)
     )
     await callback.message.delete()
     await state.clear()

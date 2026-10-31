@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.admin import is_admin_telegram_id
 from app.auth.deps import AppPassClaimsDep
 from app.auth.user_deps import CurrentUserDep
 from app.config import receipt_photo_enabled
@@ -13,6 +14,7 @@ from app.models.family_budget import FamilyBudget
 from app.models.user import User
 from app.models.transaction import Transaction
 from app.schemas.auth import MeResponse, MeUpdate, OnboardingResponse, OnboardingSteps
+from app.services.activity import touch_activity
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import get_active_wallet
 
@@ -45,11 +47,14 @@ async def _build_me_response(session: AsyncSession, db_user: User) -> MeResponse
         evening_reminder_enabled=db_user.evening_reminder_enabled,
         weekly_digest_enabled=db_user.weekly_digest_enabled,
         receipt_photo_enabled=receipt_photo_enabled(),
+        is_admin=is_admin_telegram_id(db_user.telegram_id),
     )
 
 
 @router.get("/me")
-async def get_me(claims: AppPassClaimsDep) -> MeResponse:
+async def get_me(
+    claims: AppPassClaimsDep, background_tasks: BackgroundTasks
+) -> MeResponse:
     telegram_id = int(claims["sub"])
     async with async_session_factory() as session:
         db_user = await session.scalar(
@@ -62,6 +67,9 @@ async def get_me(claims: AppPassClaimsDep) -> MeResponse:
         if db_user.is_deleted:
             raise HTTPException(status_code=403, detail="removed_from_family")
 
+        background_tasks.add_task(
+            touch_activity, telegram_id=telegram_id, user_id=db_user.id, app=True
+        )
         return await _build_me_response(session, db_user)
 
 

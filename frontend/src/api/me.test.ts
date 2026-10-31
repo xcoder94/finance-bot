@@ -94,6 +94,12 @@ describe('receipt photo flag (m3-4)', () => {
   it('missing flag means off (never show a button the bot cannot serve)', () => {
     expect(mapMeResponse(base).receiptPhotoEnabled).toBe(false)
   })
+
+  it('maps is_admin; absent means false', () => {
+    expect(mapMeResponse({ ...base, is_admin: true }).isAdmin).toBe(true)
+    expect(mapMeResponse({ ...base, is_admin: false }).isAdmin).toBe(false)
+    expect(mapMeResponse(base).isAdmin).toBe(false)
+  })
 })
 
 describe('patchMe', () => {

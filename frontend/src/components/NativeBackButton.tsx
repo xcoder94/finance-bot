@@ -9,6 +9,7 @@ import {
 import { backButton } from '@tma.js/sdk-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { backFallbackPath } from '../utils/backFallback'
 import { historyBackTarget } from '../utils/historyBackTarget'
 import {
   type BackHandler,
@@ -19,13 +20,6 @@ const ROOT_PATHS = new Set(['/', '/shopping', '/analytics', '/goals'])
 
 function normalizePathname(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
-}
-
-function fallbackPath(pathname: string, locationState: unknown): string {
-  if (pathname.startsWith('/edit-')) {
-    return historyBackTarget(locationState) ?? '/history'
-  }
-  return '/'
 }
 
 function NativeBackButtonController({
@@ -76,7 +70,7 @@ function NativeBackButtonController({
         return
       }
 
-      navigate(fallbackPath(activePathname, locationStateRef.current), { replace: true })
+      navigate(backFallbackPath(activePathname, locationStateRef.current), { replace: true })
     })
 
     return () => {

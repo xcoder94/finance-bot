@@ -125,6 +125,7 @@ describe('NotificationsSettingsBody', () => {
       eveningReminderEnabled: true,
       weeklyDigestEnabled: false,
       receiptPhotoEnabled: false,
+      isAdmin: false,
     })
   })
 

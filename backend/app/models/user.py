@@ -36,3 +36,15 @@ class User(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
     default_wallet_screen_opened_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    phone_shared_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    phone_prompted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    phone_prompt_closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Not indexed on purpose (HOT updates); precision 10 minutes, see work/db/admin-schema.md.
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

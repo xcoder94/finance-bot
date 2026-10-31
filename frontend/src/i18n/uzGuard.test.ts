@@ -97,14 +97,23 @@ function walk(dir: string): string[] {
   })
 }
 
+/** Chars after which a `/` starts a regex literal (not division). */
+const REGEX_PREV = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '<', '>', '~', '^'])
 /**
- * Drops comments with a tiny lexer that knows string/template literals, so a `//` or `/*`
- * INSIDE a string does not hide the rest of the line (the old regex cleaner did).
+ * `//` is a comment only at line start or right after code that ends a statement/argument.
+ * After letters, digits or `>` it may be JSX text or a URL, so it is NOT trusted to hide Cyrillic.
+ */
+const COMMENT_PREV = new Set(['', ';', ',', '{', '}', '(', ')', ']', "'", '"', '`'])
+
+/**
+ * Drops comments with a tiny lexer that knows string/template literals and regex literals,
+ * so a `//` or `/*` INSIDE them (or in JSX text) does not hide the rest of the line.
  */
 export function stripComments(source: string): string {
   let out = ''
   let i = 0
   let quote: string | null = null
+  let prev = '' // last non-space char on the current line
   while (i < source.length) {
     const c = source[i]
     const next = source[i + 1]
@@ -115,18 +124,37 @@ export function stripComments(source: string): string {
         i += 2
         continue
       }
-      if (c === quote || (c === '\n' && quote !== '`')) quote = null
+      if (c === quote || (c === '\n' && quote !== '`')) {
+        quote = null
+        prev = c === '\n' ? '' : c
+      }
       i += 1
-    } else if (c === '/' && next === '/') {
+    } else if (c === '/' && next === '/' && COMMENT_PREV.has(prev)) {
       while (i < source.length && source[i] !== '\n') i += 1
     } else if (c === '/' && next === '*') {
       const end = source.indexOf('*/', i + 2)
       const stop = end === -1 ? source.length : end + 2
       out += source.slice(i, stop).replace(/[^\n]/g, '')
       i = stop
+    } else if (c === '/' && REGEX_PREV.has(prev)) {
+      // regex literal: copy up to the closing unescaped `/` (a `/` inside [...] does not close it)
+      let j = i + 1
+      let inClass = false
+      while (j < source.length && source[j] !== '\n') {
+        if (source[j] === '\\') j += 1
+        else if (source[j] === '[') inClass = true
+        else if (source[j] === ']') inClass = false
+        else if (source[j] === '/' && !inClass) break
+        j += 1
+      }
+      out += source.slice(i, j + 1)
+      i = j + 1
+      prev = '/'
     } else {
       if (c === '"' || c === "'" || c === '`') quote = c
       out += c
+      if (c === '\n') prev = ''
+      else if (c !== ' ' && c !== '\t') prev = c
       i += 1
     }
   }
@@ -172,8 +200,21 @@ describe('no hard-coded Russian in src', () => {
     expect(cyrillicOffenders('components/settings/incomeCategoryIcon.ts', "['новое слово', X],")).toHaveLength(1)
   })
 
+  it('catches Cyrillic after // in a regex literal or JSX text (mutant)', () => {
+    expect(cyrillicOffenders('x.ts', 'const r = /\\/\\/ Привет/')).toHaveLength(1)
+    expect(cyrillicOffenders('x.ts', 'const r = x.replace(/\\/\\//g, "") + \'Привет\'')).toHaveLength(1)
+    expect(cyrillicOffenders('x.tsx', '<p>http://a // Привет</p>')).toHaveLength(1)
+    expect(cyrillicOffenders('x.tsx', '<a href="x">// Привет</a>')).toHaveLength(1)
+  })
+
+  it('still ignores trailing comments after code', () => {
+    expect(cyrillicOffenders('x.ts', 'foo(1) // Привет')).toEqual([])
+    expect(cyrillicOffenders('x.ts', 'const a = 1; // Привет')).toEqual([])
+    expect(cyrillicOffenders('x.ts', '  } // Привет')).toEqual([])
+  })
+
   it('still ignores real comments', () => {
-    const src = '// Кириллица\n/* и тут\n тоже */\nconst a = 1 // и здесь\n'
+    const src = '// Кириллица\n/* и тут\n тоже */\nconst a = 1; // и здесь\n'
     expect(cyrillicOffenders('x.ts', src)).toEqual([])
   })
 })
