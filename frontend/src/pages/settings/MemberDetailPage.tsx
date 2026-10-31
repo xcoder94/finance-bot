@@ -10,8 +10,8 @@ import { SettingsStaticRow } from '../../components/settings/SettingsStaticRow'
 import { SettingsSubPageShell } from '../../components/settings/SettingsSubPageShell'
 import { useAuthStore } from '../../store/authStore'
 import {
-  REMOVE_CONFIRM_ACTION,
-  TRANSFER_CONFIRM_ACTION,
+  removeConfirmAction,
+  transferConfirmAction,
   removeConfirmBody,
   transferConfirmBody,
 } from '../../utils/memberConfirmCopy'
@@ -101,11 +101,11 @@ export function MemberDetailPage() {
       ? sheetState.confirmKind === 'remove'
         ? {
             intro: removeConfirmBody(displayName),
-            confirmLabel: REMOVE_CONFIRM_ACTION,
+            confirmLabel: removeConfirmAction(),
           }
         : {
             intro: transferConfirmBody(displayName),
-            confirmLabel: TRANSFER_CONFIRM_ACTION,
+            confirmLabel: transferConfirmAction(),
           }
       : null
 

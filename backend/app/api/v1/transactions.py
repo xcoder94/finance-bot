@@ -78,7 +78,7 @@ async def get_transaction(
         session, transaction, user.family_budget_id
     )
     require_transaction_visible(from_wallet, to_wallet, user)
-    changes = await list_change_lines(session, transaction.id)
+    changes = await list_change_lines(session, transaction.id, user.language)
     return transaction_to_response(transaction, changes=changes)
 
 
@@ -118,7 +118,7 @@ async def update_transaction(
     else:
         updated = await update_transfer_transaction(session, transaction, parsed, user)
 
-    changes = await list_change_lines(session, updated.id)
+    changes = await list_change_lines(session, updated.id, user.language)
     return transaction_to_response(updated, changes=changes)
 
 

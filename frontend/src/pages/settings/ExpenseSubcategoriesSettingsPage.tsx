@@ -25,9 +25,9 @@ import {
 import {
   buildExpenseParentDeleteIntro,
   buildSubcategoryDeleteIntro,
-  CATEGORY_DELETE_DANGER_LABEL,
+  categoryDeleteDangerLabel,
   formatEntityTransactionSubtitle,
-  SUBCATEGORY_DELETE_DANGER_LABEL,
+  subcategoryDeleteDangerLabel,
 } from '../../utils/entityDeleteConfirmCopy'
 import { getDisplayName } from '../../utils/getDisplayName'
 
@@ -177,7 +177,7 @@ export function ExpenseSubcategoriesSettingsPage() {
         actionLabel={isOwner && parent ? t('settings.addSubcategory') : undefined}
         onAction={isOwner && parent ? openCreateForm : undefined}
         dangerLabel={
-          isOwner && parent && !parent.is_protected ? CATEGORY_DELETE_DANGER_LABEL : undefined
+          isOwner && parent && !parent.is_protected ? categoryDeleteDangerLabel() : undefined
         }
         onDanger={
           isOwner && parent && !parent.is_protected
@@ -257,7 +257,7 @@ export function ExpenseSubcategoriesSettingsPage() {
           entityName={parentDisplayName}
           transactionCount={parent.transaction_count}
           intro={buildExpenseParentDeleteIntro(parent.transaction_count, subcategoryCount)}
-          dangerLabel={CATEGORY_DELETE_DANGER_LABEL}
+          dangerLabel={categoryDeleteDangerLabel()}
           onClose={closeSheets}
           onConfirm={() => void handleConfirmDeleteParent()}
           confirming={deleting}
@@ -276,7 +276,7 @@ export function ExpenseSubcategoriesSettingsPage() {
             deleteSubcategoryTarget.transaction_count,
             parentDisplayName,
           )}
-          dangerLabel={SUBCATEGORY_DELETE_DANGER_LABEL}
+          dangerLabel={subcategoryDeleteDangerLabel()}
           onClose={closeSheets}
           onConfirm={() => void handleConfirmDeleteSubcategory()}
           confirming={deleting}

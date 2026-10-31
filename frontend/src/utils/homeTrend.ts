@@ -1,3 +1,4 @@
+import { t } from '../i18n/t'
 import type { TrendEntry } from '../api/analytics'
 import { shiftHomeMonth, type HomeMonth } from './homeMonth'
 
@@ -40,8 +41,6 @@ export function formatMillions(value: number): string {
   return String(hundredths).replace('.', ',')
 }
 
-const TREND_MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
-
 export function trendMonthLabel(month: number): string {
-  return TREND_MONTHS[month - 1]
+  return t(`months.trend.${month}`)
 }

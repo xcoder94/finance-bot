@@ -24,7 +24,7 @@ _RECORDED = {
 }
 _NOT_RECOGNIZED = {
     "ru": "Не разобрал сумму. Введите её в приложении вручную.",
-    "uz": "Summani tushunmadim. Uni ilovada qo‘lda kiriting.",
+    "uz": "Summani tushunmadim. Uni ilovada qo'lda kiriting.",
 }
 _BUTTON = {"ru": "Вернуться в приложение", "uz": "Ilovaga qaytish"}
 

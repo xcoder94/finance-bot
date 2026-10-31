@@ -16,7 +16,7 @@ type LanguageOption = {
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: 'ru', label: 'Русский' },
-  { code: 'uz', label: 'Oʻzbekcha', subtitle: 'Lotin' },
+  { code: 'uz', label: "O'zbekcha", subtitle: 'Lotin' },
 ]
 
 export function LanguageSettingsPage() {

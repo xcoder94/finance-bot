@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-import { MEMBER_CONFIRM_CANCEL } from '../../utils/memberConfirmCopy'
+import { memberConfirmCancel } from '../../utils/memberConfirmCopy'
 import { FormSheet } from '../forms/FormSheet'
 
 type MemberConfirmSheetProps = {
@@ -39,7 +39,7 @@ export function MemberConfirmSheet({
             onClick={onClose}
             disabled={confirming}
           >
-            {MEMBER_CONFIRM_CANCEL}
+            {memberConfirmCancel()}
           </button>
           <button
             type="button"

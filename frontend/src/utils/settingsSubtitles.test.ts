@@ -29,12 +29,12 @@ describe('settingsSubtitles', () => {
   })
 
   it('formats wallet settings subtitle with balance and active goal mark', () => {
-    expect(formatWalletSettingsSubtitle('UZS', 840_000, false)).toBe('UZS · 840 000 сум')
-    expect(formatWalletSettingsSubtitle('USD', 1_240, false)).toBe('USD · $1 240')
+    expect(formatWalletSettingsSubtitle('UZS', 840_000, false)).toBe('UZS · 840 000 сум')
+    expect(formatWalletSettingsSubtitle('USD', 1_240, false)).toBe('USD · $1 240')
     expect(formatWalletSettingsSubtitle('UZS', 2_350_000, true)).toBe(
-      'UZS · 2 350 000 сум · цель',
+      'UZS · 2 350 000 сум · цель',
     )
-    expect(formatWalletSettingsSubtitle('USD', 1_240, true)).toBe('USD · $1 240 · цель')
+    expect(formatWalletSettingsSubtitle('USD', 1_240, true)).toBe('USD · $1 240 · цель')
     expect(formatWalletSettingsSubtitle('UZS', 0, false)).toBe('UZS · 0 сум')
   })
 
@@ -65,8 +65,8 @@ describe('settingsSubtitles', () => {
 
   it('formats language subtitle', () => {
     expect(languageSubtitle('ru')).toBe('Русский')
-    expect(languageSubtitle('uz')).toBe('Oʻzbekcha')
-    expect(languageSubtitle('uz-Latn')).toBe('Oʻzbekcha')
+    expect(languageSubtitle('uz')).toBe('O\'zbekcha')
+    expect(languageSubtitle('uz-Latn')).toBe('O\'zbekcha')
   })
 
   it('counts wallet types from is_personal', () => {

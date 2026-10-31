@@ -1,4 +1,6 @@
+import { t } from '../i18n/t'
 import { sumUnit } from './currencyUnit'
+import { groupThousands } from './groupThousands'
 export type FormConfirmCurrency = 'UZS' | 'USD'
 
 type BuildDeleteConfirmBodyArgs = {
@@ -10,7 +12,7 @@ type BuildDeleteConfirmBodyArgs = {
 
 function formatSheetAmount(amount: number): string {
   const absolute = Math.abs(amount)
-  return absolute.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return groupThousands(absolute)
 }
 
 function currencyWord(currency: FormConfirmCurrency): string {
@@ -35,5 +37,5 @@ export function buildDeleteConfirmBody({
   const formattedAmount = formatSheetAmount(amount)
   const word = currencyWord(currency)
 
-  return `Запись «${label}» на ${formattedAmount} ${word} удалится из истории и из аналитики. Отменить нельзя.`
+  return t('formSheet.deleteBody', { label, amount: formattedAmount, unit: word })
 }

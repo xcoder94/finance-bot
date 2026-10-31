@@ -1,7 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import {
   buildEntityDeleteTitle,
   buildWalletDeleteIntro,
-  WALLET_DELETE_DANGER_LABEL,
+  walletDeleteDangerLabel,
 } from '../../utils/entityDeleteConfirmCopy'
 import { FormSheet } from '../forms/FormSheet'
 
@@ -24,14 +25,15 @@ export function EntityDeleteConfirmSheet({
   entityName,
   transactionCount,
   intro,
-  dangerLabel = WALLET_DELETE_DANGER_LABEL,
+  dangerLabel,
   onClose,
   onConfirm,
   confirming = false,
   error = false,
-  retryLabel = 'Попробовать снова',
-  errorMessage = 'Не удалось сохранить изменения',
+  retryLabel,
+  errorMessage,
 }: EntityDeleteConfirmSheetProps) {
+  const { t } = useTranslation()
   const title = buildEntityDeleteTitle(entityName)
   const resolvedIntro = intro ?? buildWalletDeleteIntro(transactionCount)
 
@@ -49,15 +51,15 @@ export function EntityDeleteConfirmSheet({
           onClick={onConfirm}
           disabled={confirming}
         >
-          {confirming ? '…' : dangerLabel}
+          {confirming ? '…' : (dangerLabel ?? walletDeleteDangerLabel())}
         </button>
       }
     >
       {error ? (
         <div className="form-sheet-load-error" role="alert">
-          <p>{errorMessage}</p>
+          <p>{errorMessage ?? t('settings.submitError')}</p>
           <button type="button" onClick={onConfirm} disabled={confirming}>
-            {retryLabel}
+            {retryLabel ?? t('auth.retry')}
           </button>
         </div>
       ) : null}

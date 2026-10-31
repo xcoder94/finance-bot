@@ -18,7 +18,7 @@ import { SettingsSubPageShell } from '../../components/settings/SettingsSubPageS
 import { SwipeableSettingsRow } from '../../components/settings/SwipeableSettingsRow'
 import { useAuthStore } from '../../store/authStore'
 import {
-  LEAVE_CONFIRM_ACTION,
+  leaveConfirmAction,
   leaveConfirmBody,
 } from '../../utils/memberConfirmCopy'
 import {
@@ -246,7 +246,7 @@ export function MembersSettingsPage() {
       <MemberConfirmSheet
         open={sheetState.kind === 'leave'}
         intro={leaveConfirmBody(user.budgetName)}
-        confirmLabel={LEAVE_CONFIRM_ACTION}
+        confirmLabel={leaveConfirmAction()}
         onClose={() => {
           setSheetState({ kind: 'closed' })
           setLeaveError(false)

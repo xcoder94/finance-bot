@@ -1,3 +1,4 @@
+import { t } from '../i18n/t'
 import { useMemo } from 'react'
 
 import { monthDateRange } from '../api/home'
@@ -36,10 +37,15 @@ export function getLocale(): string {
 }
 
 export function formatMonthLabel(selected: SelectedMonth): string {
-  return new Intl.DateTimeFormat(getLocale(), {
+  if (i18n.language.startsWith('uz')) {
+    return t('months.title', { month: t(`months.long.${selected.month}`), year: selected.year })
+  }
+  const text = new Intl.DateTimeFormat(getLocale(), {
     month: 'long',
     year: 'numeric',
   }).format(new Date(selected.year, selected.month - 1, 1))
+  // first letter only (CSS `capitalize` would also turn «г.» into «Г.»)
+  return text.charAt(0).toLocaleUpperCase(getLocale()) + text.slice(1)
 }
 
 export function formatShortMonthKey(monthKey: string): string {

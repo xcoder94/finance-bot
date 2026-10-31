@@ -37,7 +37,7 @@ export function DeleteConfirmSheet({
   return (
     <FormSheet
       open={open}
-      title="Удалить запись?"
+      title={t('formSheet.deleteTitle')}
       intro={intro}
       onClose={onClose}
       showPrimary={false}
@@ -48,7 +48,7 @@ export function DeleteConfirmSheet({
           onClick={onConfirm}
           disabled={confirming}
         >
-          {confirming ? '…' : 'Удалить запись'}
+          {confirming ? '…' : t('formSheet.deleteRecord')}
         </button>
       }
     >

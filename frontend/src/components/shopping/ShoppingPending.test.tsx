@@ -78,7 +78,7 @@ describe('ShoppingManualView («Введите сумму вручную»)', ()
       expect(html).not.toContain('Не получилось')
       expect(html).toContain('Сумма нужна одна на всю закупку.')
     }
-    expect(wrap(<ShoppingManualView {...manualProps} status="awaiting" />, 'uz')).not.toContain('aniqlab bo‘lmadi')
+    expect(wrap(<ShoppingManualView {...manualProps} status="awaiting" />, 'uz')).not.toContain('aniqlab bo\'lmadi')
   })
   it('voice: its own caption and «Сказать ещё раз»', () => {
     const html = wrap(<ShoppingManualView {...manualProps} method="voice" />)
@@ -109,7 +109,7 @@ describe('ShoppingWaitingBanner (back in the app while waiting)', () => {
   it('Uzbek', () => {
     const html = wrap(<ShoppingWaitingBanner method="receipt" status="awaiting" onManual={noop} />, 'uz')
     expect(html).toContain('Botda chek rasmini kutyapmiz')
-    expect(html).toContain('Summani qo‘lda kiritish')
+    expect(html).toContain('Summani qo&#x27;lda kiritish')
   })
   it('unrecognized: no «waiting» text, only the manual entry', () => {
     const html = wrap(<ShoppingWaitingBanner method="receipt" status="unrecognized" onManual={noop} />)

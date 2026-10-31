@@ -61,15 +61,15 @@ SHOPPING_ITEMS_PER_MESSAGE = 20
 
 _SHOPPING_ADDED = {
     "ru": "Добавил в список покупок: {names}.",
-    "uz": "Xarid ro‘yxatiga qo‘shdim: {names}.",
+    "uz": "Xarid ro'yxatiga qo'shdim: {names}.",
 }
 _SHOPPING_EXISTING = {
     "ru": "Уже были в списке: {names}.",
-    "uz": "Ro‘yxatda bor edi: {names}.",
+    "uz": "Ro'yxatda bor edi: {names}.",
 }
 _SHOPPING_FULL = {
     "ru": "В списке уже 100 позиций — остальное не добавил.",
-    "uz": "Ro‘yxatda allaqachon 100 ta pozitsiya — qolganini qo‘shmadim.",
+    "uz": "Ro'yxatda allaqachon 100 ta pozitsiya — qolganini qo'shmadim.",
 }
 
 

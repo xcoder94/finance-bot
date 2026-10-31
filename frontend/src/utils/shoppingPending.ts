@@ -81,7 +81,8 @@ export async function startBotAmount(
     const { pending } = await deps.create({ item_ids: ids, method, client_token: clientToken })
     deps.remember({ id: pending.id, method, ids })
   } catch (e) {
-    if (e instanceof ShoppingApiError && e.code === 'token_conflict') return 'conflict'
+    if (e instanceof ShoppingApiError &&
+      (e.code === 'token_conflict' || e.code === 'purchase_closed')) return 'conflict'
     return e instanceof ShoppingApiError && e.code === 'receipt_disabled'
       ? 'receipt_disabled'
       : 'failed'
@@ -94,7 +95,7 @@ type StartDeps = Parameters<typeof startBotAmount>[0]
 
 /**
  * client_token per attempt: a network retry of the same choice keeps it (no double wait),
- * another way / a new choice gets a fresh one; on 409 token_conflict one retry with a fresh token.
+ * another way / a new choice gets a fresh one; on 409 token_conflict / 410 purchase_closed one retry with a fresh token.
  */
 export function createBotStarter(deps: StartDeps, makeToken: () => string) {
   let attempt: { key: string; token: string } | null = null
@@ -107,7 +108,7 @@ export function createBotStarter(deps: StartDeps, makeToken: () => string) {
         attempt = { key, token: makeToken() }
         result = await startBotAmount(deps, method, ids, attempt.token)
       }
-      if (result === 'closed') attempt = null
+      if (result === 'closed' || result === 'conflict') attempt = null // a refused token is never reused
       return result === 'conflict' ? 'failed' : result
     },
   }

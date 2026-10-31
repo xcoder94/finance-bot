@@ -442,6 +442,20 @@ class TestText:
             assert await tx_count(session) == 0
             assert await session.scalar(select(func.count()).select_from(ShoppingItem)) == 2
 
+    @pytest.mark.parametrize("text", ["1.5", "412,50", "12 3", "41 2000"])
+    async def test_malformed_number_is_not_understood_without_model(self, monkeypatch, text) -> None:
+        async with rollback_session() as session:
+            user, budget, ids = await setup_family(session, 9_352_010)
+            purchase = await open_pending(session, user, ids, "voice")
+            parser = FixedParser(ParseResponse(operations=[expense(1_000)]))
+            set_parser_override(parser)
+            bot = await feed(monkeypatch, session, user.telegram_id, text=text)
+            await session.refresh(purchase)
+            assert purchase.status == "unrecognized"
+            assert await tx_count(session) == 0
+            assert bot.sent[0].text == "Не разобрал сумму. Введите её в приложении вручную."
+            assert parser.calls == []
+
     async def test_huge_number_is_not_accepted(self, monkeypatch) -> None:
         async with rollback_session() as session:
             user, budget, ids = await setup_family(session, 9_352_005)

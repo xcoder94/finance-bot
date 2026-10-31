@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { LIMIT_PERSONAL_WALLETS, LIMIT_SHARED_WALLETS } from '../../constants/entityLimits'
+import { limitPersonalWallets, limitSharedWallets } from '../../constants/entityLimits'
 import {
   walletCreateAtLimit,
   walletCreateIsPersonal,
@@ -9,12 +9,12 @@ import {
 
 describe('walletFormLimits', () => {
   it('shows shared limit hint at 10 shared wallets', () => {
-    expect(walletCreateLimitHint('shared', 10, 0)).toBe(LIMIT_SHARED_WALLETS)
+    expect(walletCreateLimitHint('shared', 10, 0)).toBe(limitSharedWallets())
     expect(walletCreateAtLimit('shared', 10, 0)).toBe(true)
   })
 
   it('shows personal limit hint at 5 personal wallets', () => {
-    expect(walletCreateLimitHint('personal', 0, 5)).toBe(LIMIT_PERSONAL_WALLETS)
+    expect(walletCreateLimitHint('personal', 0, 5)).toBe(limitPersonalWallets())
     expect(walletCreateAtLimit('personal', 0, 5)).toBe(true)
   })
 

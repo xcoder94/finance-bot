@@ -1,83 +1,62 @@
-function operationCountPhrase(count: number): string {
-  const abs = count % 100
-  const mod10 = count % 10
+import { t } from '../i18n/t'
 
-  if (mod10 === 1 && abs !== 11) {
-    return `${count} операция`
-  }
-  if (mod10 >= 2 && mod10 <= 4 && (abs < 10 || abs >= 20)) {
-    return `${count} операции`
-  }
-  return `${count} операций`
+function opsPhrase(count: number): string {
+  return t('entityDelete.ops', { count })
 }
 
-function subcategoryCountPhrase(count: number): string {
-  const abs = count % 100
-  const mod10 = count % 10
-
-  if (mod10 === 1 && abs !== 11) {
-    return `${count} подкатегория`
-  }
-  if (mod10 >= 2 && mod10 <= 4 && (abs < 10 || abs >= 20)) {
-    return `${count} подкатегории`
-  }
-  return `${count} подкатегорий`
+function subsPhrase(count: number): string {
+  return t('entityDelete.subs', { count })
 }
 
-function subcategoryDeleteVerb(count: number): string {
-  if (count % 10 === 1 && count % 100 !== 11) {
-    return 'удалится'
-  }
-  return 'удалятся'
+function subDeleteVerb(count: number): string {
+  return t('entityDelete.willDelete', { count })
 }
 
-function subcategoryRemainVerb(count: number): string {
-  if (count % 10 === 1 && count % 100 !== 11) {
-    return 'останется'
-  }
-  return 'останутся'
-}
-
-function operationsRemainVerb(count: number): string {
-  if (count % 10 === 1 && count % 100 !== 11) {
-    return 'останется'
-  }
-  return 'останутся'
+function remainVerb(count: number): string {
+  return t('entityDelete.remain', { count })
 }
 
 export function buildEntityDeleteTitle(entityName: string): string {
-  return `Удалить «${entityName}»?`
+  return t('entityDelete.title', { name: entityName })
 }
 
 export function buildWalletDeleteIntro(transactionCount: number): string {
   if (transactionCount <= 0) {
-    return 'Кошелёк удалится. Отменить нельзя.'
+    return t('entityDelete.walletPlain')
   }
-
-  const phrase = operationCountPhrase(transactionCount)
-  const verb = operationsRemainVerb(transactionCount)
-  return `Кошелёк удалится, а ${phrase} ${verb} в истории и аналитике. Отменить нельзя.`
+  return t('entityDelete.walletOps', {
+    ops: opsPhrase(transactionCount),
+    verb: remainVerb(transactionCount),
+  })
 }
 
-export const WALLET_DELETE_DANGER_LABEL = 'Удалить кошелёк'
-export const CATEGORY_DELETE_DANGER_LABEL = 'Удалить категорию'
-export const SUBCATEGORY_DELETE_DANGER_LABEL = 'Удалить подкатегорию'
+export function walletDeleteDangerLabel(): string {
+  return t('entityDelete.dangerWallet')
+}
+
+export function categoryDeleteDangerLabel(): string {
+  return t('entityDelete.dangerCategory')
+}
+
+export function subcategoryDeleteDangerLabel(): string {
+  return t('entityDelete.dangerSubcategory')
+}
 
 export function formatEntityTransactionSubtitle(transactionCount: number): string {
   if (transactionCount <= 0) {
-    return 'нет операций'
+    return t('entityDelete.noOps')
   }
-  return operationCountPhrase(transactionCount)
+  return opsPhrase(transactionCount)
 }
 
 export function buildIncomeCategoryDeleteIntro(transactionCount: number): string {
   if (transactionCount <= 0) {
-    return 'Категория удалится. Отменить нельзя.'
+    return t('entityDelete.categoryPlain')
   }
-
-  const phrase = operationCountPhrase(transactionCount)
-  const verb = operationsRemainVerb(transactionCount)
-  return `Категория удалится, а ${phrase} ${verb} в истории и аналитике. Отменить нельзя.`
+  return t('entityDelete.categoryOps', {
+    ops: opsPhrase(transactionCount),
+    verb: remainVerb(transactionCount),
+  })
 }
 
 export function buildExpenseParentDeleteIntro(
@@ -85,24 +64,20 @@ export function buildExpenseParentDeleteIntro(
   subcategoryCount: number,
 ): string {
   if (subcategoryCount > 0) {
-    const subPhrase = subcategoryCountPhrase(subcategoryCount)
-    const subVerb = subcategoryDeleteVerb(subcategoryCount)
+    const subs = subsPhrase(subcategoryCount)
+    const subVerb = subDeleteVerb(subcategoryCount)
     if (transactionCount <= 0) {
-      return `Категория и ${subPhrase} ${subVerb}. Отменить нельзя.`
+      return t('entityDelete.categorySubs', { subs, subVerb })
     }
-
-    const phrase = operationCountPhrase(transactionCount)
-    const verb = operationsRemainVerb(transactionCount)
-    return `Категория и ${subPhrase} ${subVerb}, а ${phrase} ${verb} в истории и аналитике. Отменить нельзя.`
+    return t('entityDelete.categorySubsOps', {
+      subs,
+      subVerb,
+      ops: opsPhrase(transactionCount),
+      verb: remainVerb(transactionCount),
+    })
   }
 
-  if (transactionCount <= 0) {
-    return 'Категория удалится. Отменить нельзя.'
-  }
-
-  const phrase = operationCountPhrase(transactionCount)
-  const verb = operationsRemainVerb(transactionCount)
-  return `Категория удалится, а ${phrase} ${verb} в истории и аналитике. Отменить нельзя.`
+  return buildIncomeCategoryDeleteIntro(transactionCount)
 }
 
 export function buildSubcategoryDeleteIntro(
@@ -111,10 +86,12 @@ export function buildSubcategoryDeleteIntro(
   year = new Date().getFullYear(),
 ): string {
   if (transactionCount <= 0) {
-    return 'Подкатегория удалится. Отменить нельзя.'
+    return t('entityDelete.subPlain')
   }
-
-  const phrase = operationCountPhrase(transactionCount)
-  const verb = subcategoryRemainVerb(transactionCount)
-  return `Подкатегория удалится, а ${phrase} за ${year} год ${verb} в родительской категории «${parentName}». Отменить нельзя.`
+  return t('entityDelete.subOps', {
+    ops: opsPhrase(transactionCount),
+    verb: remainVerb(transactionCount),
+    parent: parentName,
+    year,
+  })
 }

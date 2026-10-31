@@ -1,4 +1,6 @@
+import { t } from '../i18n/t'
 import { sumUnit } from './currencyUnit'
+import { groupThousands } from './groupThousands'
 export const MAX_COMMENT_LENGTH = 200
 export const UNCATEGORIZED_CATEGORY_NAME = 'Без категории'
 
@@ -141,7 +143,7 @@ export function shouldShowTransferRateField(
 }
 
 function formatTransferSideAmount(amount: number, currency: string): string {
-  const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const formatted = groupThousands(amount)
   if (currency === 'USD') {
     return `${formatted} $`
   }
@@ -158,11 +160,11 @@ export function formatTransferResultLine(
 }
 
 export function transferRateFieldSuffix(): string {
-  return `${sumUnit()} за $1`
+  return t('formSheet.rateSuffix', { unit: sumUnit() })
 }
 
 export function buildEditSheetTitle(label: string): string {
-  return `Запись · ${label}`
+  return t('formSheet.editTitle', { label })
 }
 
 export function resolveEditSheetLabel(

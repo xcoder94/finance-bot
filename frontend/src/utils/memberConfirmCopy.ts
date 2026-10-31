@@ -1,18 +1,19 @@
-/** Mini-app confirmation copy for leave / remove / transfer — verbatim approved strings. */
+/** Mini-app confirmation copy for leave / remove / transfer — approved strings, RU/UZ in the locale files. */
+import { t } from '../i18n/t'
 
 export function leaveConfirmBody(budgetName: string): string {
-  return `Вы выйдете из бюджета «${budgetName}». Ваши личные кошельки и операции по ним перейдут в ваш собственный бюджет. Операции по общим кошелькам останутся в этой семье.`
+  return t('memberConfirm.leaveBody', { name: budgetName })
 }
 
 export function removeConfirmBody(memberName: string): string {
-  return `${memberName} больше не будет участником бюджета. Личные кошельки и операции по ним перейдут в собственный бюджет участника. Операции по общим кошелькам останутся здесь.`
+  return t('memberConfirm.removeBody', { name: memberName })
 }
 
 export function transferConfirmBody(memberName: string): string {
-  return `Новый владелец бюджета: ${memberName}. Нужно его подтверждение. После этого вы останетесь обычным участником. Отменить в одиночку нельзя.`
+  return t('memberConfirm.transferBody', { name: memberName })
 }
 
-export const LEAVE_CONFIRM_ACTION = 'Выйти'
-export const REMOVE_CONFIRM_ACTION = 'Удалить'
-export const TRANSFER_CONFIRM_ACTION = 'Передать'
-export const MEMBER_CONFIRM_CANCEL = 'Отмена'
+export const leaveConfirmAction = (): string => t('memberConfirm.leave')
+export const removeConfirmAction = (): string => t('memberConfirm.remove')
+export const transferConfirmAction = (): string => t('memberConfirm.transfer')
+export const memberConfirmCancel = (): string => t('formSheet.cancel')

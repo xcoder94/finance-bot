@@ -14,7 +14,7 @@ import { SettingsSectionLoadError, SettingsSectionLoading } from '../../componen
 import { SettingsEntityGroup } from '../../components/settings/SettingsEntityGroup'
 import { SettingsSubPageShell } from '../../components/settings/SettingsSubPageShell'
 import { SwipeableSettingsRow } from '../../components/settings/SwipeableSettingsRow'
-import { LIMIT_EXPENSE_PARENTS, PARENT_CATEGORY_LIMIT } from '../../constants/entityLimits'
+import { limitExpenseParents, PARENT_CATEGORY_LIMIT } from '../../constants/entityLimits'
 import { useAuthStore } from '../../store/authStore'
 import {
   getCachedExpenseCategories,
@@ -23,7 +23,7 @@ import {
 } from '../../store/dataCacheStore'
 import {
   buildExpenseParentDeleteIntro,
-  CATEGORY_DELETE_DANGER_LABEL,
+  categoryDeleteDangerLabel,
 } from '../../utils/entityDeleteConfirmCopy'
 import { getDisplayName } from '../../utils/getDisplayName'
 import {
@@ -183,7 +183,7 @@ export function ExpenseCategoriesSettingsPage() {
           category={null}
           atLimit={nonProtectedParentCount >= PARENT_CATEGORY_LIMIT}
           limitMessage={
-            nonProtectedParentCount >= PARENT_CATEGORY_LIMIT ? LIMIT_EXPENSE_PARENTS : undefined
+            nonProtectedParentCount >= PARENT_CATEGORY_LIMIT ? limitExpenseParents() : undefined
           }
           editable={isOwner}
           onClose={closeSheets}
@@ -200,7 +200,7 @@ export function ExpenseCategoriesSettingsPage() {
             deleteTarget.transaction_count,
             deleteSubcategoryCount,
           )}
-          dangerLabel={CATEGORY_DELETE_DANGER_LABEL}
+          dangerLabel={categoryDeleteDangerLabel()}
           onClose={closeSheets}
           onConfirm={() => void handleConfirmDelete()}
           confirming={deleting}

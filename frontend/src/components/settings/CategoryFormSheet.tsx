@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { t as translate } from '../../i18n/t'
 import { ENTITY_NAME_MAX } from '../../constants/entityLimits'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
@@ -41,12 +42,12 @@ function formatNameCounter(length: number): string {
 
 function createTitle(kind: CategoryFormKind): string {
   if (kind === 'income') {
-    return 'Новая категория дохода'
+    return translate('settings.categoryForm.newIncome')
   }
   if (kind === 'expense-parent') {
-    return 'Новая категория расхода'
+    return translate('settings.categoryForm.newExpense')
   }
-  return 'Новая подкатегория'
+  return translate('settings.categoryForm.newSub')
 }
 
 export function CategoryFormSheet({
@@ -110,7 +111,7 @@ export function CategoryFormSheet({
 
   const intro =
     mode === 'create' && kind === 'expense-subcategory' && parentName
-      ? `Родитель задан экраном, откуда пришли: ${parentName}.`
+      ? t('settings.categoryForm.parentFixed', { parent: parentName })
       : undefined
 
   const handleSave = async () => {
@@ -138,7 +139,7 @@ export function CategoryFormSheet({
       intro={intro}
       onClose={onClose}
       showPrimary={editable}
-      primaryLabel="Сохранить"
+      primaryLabel={t('formSheet.save')}
       onPrimary={() => void handleSave()}
       primaryDisabled={!canSave}
       primaryLoading={saving}
@@ -152,14 +153,14 @@ export function CategoryFormSheet({
               className="form-sheet-danger-button"
               onClick={onDelete}
             >
-              Удалить
+              {t('settings.delete')}
             </button>
           )
           : undefined
       }
     >
       <FormSheetField
-        label="Название · до 30 знаков"
+        label={t('settings.nameLabel30')}
         right={formatNameCounter(trimmedLength)}
         hint={fieldHint}
         hintError={fieldHintError}

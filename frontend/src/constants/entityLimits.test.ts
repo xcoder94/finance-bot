@@ -1,35 +1,35 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  LIMIT_EXPENSE_PARENTS,
-  LIMIT_INCOME_CATEGORIES,
-  LIMIT_MEMBERS,
-  LIMIT_PERSONAL_WALLETS,
-  LIMIT_SHARED_WALLETS,
+  limitExpenseParents,
+  limitIncomeCategories,
+  limitMembers,
+  limitPersonalWallets,
+  limitSharedWallets,
   limitSubcategories,
 } from './entityLimits'
 
 describe('entity limit strings §19.1', () => {
   it('exports shared wallets limit verbatim', () => {
-    expect(LIMIT_SHARED_WALLETS).toBe(
+    expect(limitSharedWallets()).toBe(
       'Больше 10 общих кошельков создать нельзя. Удалите ненужный — место освободится.',
     )
   })
 
   it('exports personal wallets limit verbatim', () => {
-    expect(LIMIT_PERSONAL_WALLETS).toBe(
+    expect(limitPersonalWallets()).toBe(
       'Больше 5 личных кошельков создать нельзя. Удалите ненужный — место освободится.',
     )
   })
 
   it('exports expense parents limit verbatim', () => {
-    expect(LIMIT_EXPENSE_PARENTS).toBe(
+    expect(limitExpenseParents()).toBe(
       'Больше 8 категорий расходов создать нельзя. Удалите ненужную — место освободится.',
     )
   })
 
   it('exports income categories limit verbatim', () => {
-    expect(LIMIT_INCOME_CATEGORIES).toBe(
+    expect(limitIncomeCategories()).toBe(
       'Больше 8 категорий доходов создать нельзя. Удалите ненужную — место освободится.',
     )
   })
@@ -41,7 +41,7 @@ describe('entity limit strings §19.1', () => {
   })
 
   it('exports members limit verbatim', () => {
-    expect(LIMIT_MEMBERS).toBe(
+    expect(limitMembers()).toBe(
       'В семейном бюджете уже 4 участника — это предел.',
     )
   })

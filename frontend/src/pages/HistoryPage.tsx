@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { monthDateRange } from '../api/home'
 import { fetchHistoryPage, fetchSummaryForRange, type SummaryResponse } from '../api/history'
 import { HistoryTransactionList } from '../components/history/HistoryTransactionList'
-import i18n from '../i18n'
+import { formatMonthLabel } from '../utils/periodFilter'
 import { editRouteForItem } from '../utils/editRouteForItem'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
 import {
@@ -54,17 +54,6 @@ function currentMonth(): SelectedMonth {
 function shiftMonth(selected: SelectedMonth, delta: number): SelectedMonth {
   const date = new Date(selected.year, selected.month - 1 + delta, 1)
   return { year: date.getFullYear(), month: date.getMonth() + 1 }
-}
-
-function getLocale(): string {
-  return i18n.language.startsWith('uz') ? 'uz-UZ' : 'ru-RU'
-}
-
-function formatMonthLabel(selected: SelectedMonth): string {
-  return new Intl.DateTimeFormat(getLocale(), {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(selected.year, selected.month - 1, 1))
 }
 
 function getSummaryForCurrency(

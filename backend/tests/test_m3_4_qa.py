@@ -80,7 +80,7 @@ async def test_bot_replay_reports_the_recorded_amount() -> None:
     "text,expected",
     [
         ("412000", 412_000), ("412 000", 412_000), ("412.000", 412_000), ("1,500,000", 1_500_000),
-        ("1.5", None), ("412,50", None), ("31.10", None), ("1.5000", None), ("12.34.56", None),
+        ("12 3", None), ("41 2000", None), ("1 500 000", 1_500_000), ("1.5", None), ("412,50", None), ("31.10", None), ("1.5000", None), ("12.34.56", None),
     ],
 )
 def test_bare_amount_separator_only_before_three_digits(text, expected) -> None:

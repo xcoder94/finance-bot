@@ -626,7 +626,7 @@ async def get_summary(
     total_rows = (await session.execute(totals_stmt)).all()
 
     isodow = func.extract(
-        "isodow", func.timezone("UTC", Transaction.transaction_date)
+        "isodow", func.timezone("Asia/Tashkent", Transaction.transaction_date)
     )
     weekday_stmt = (
         select(

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-import { LIMIT_MEMBERS, MEMBER_LIMIT } from '../../constants/entityLimits'
+import { limitMembers, MEMBER_LIMIT } from '../../constants/entityLimits'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
 import { FormSheetField } from '../forms/FormSheetField'
@@ -37,7 +37,7 @@ export function InviteLinkSheet({
       open={open}
       title={t('settings.inviteLink')}
       onClose={onClose}
-      cancelLabel="Отмена"
+      cancelLabel={t('formSheet.cancel')}
       primaryLabel={t('settings.copyLink')}
       onPrimary={onCopy}
       primaryDisabled={copyDisabled}
@@ -51,7 +51,7 @@ export function InviteLinkSheet({
         <>
           <FormSheetField
             label={t('settings.membersScreen.linkFieldLabel')}
-            hint={atLimit ? LIMIT_MEMBERS : undefined}
+            hint={atLimit ? limitMembers() : undefined}
             hintError={atLimit}
             mono
             muted

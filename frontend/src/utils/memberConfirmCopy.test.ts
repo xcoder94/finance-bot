@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  LEAVE_CONFIRM_ACTION,
-  MEMBER_CONFIRM_CANCEL,
-  REMOVE_CONFIRM_ACTION,
-  TRANSFER_CONFIRM_ACTION,
+  leaveConfirmAction,
+  memberConfirmCancel,
+  removeConfirmAction,
+  transferConfirmAction,
   leaveConfirmBody,
   removeConfirmBody,
   transferConfirmBody,
@@ -29,9 +29,9 @@ describe('memberConfirmCopy', () => {
     )
   })
   it('confirm action labels are exact', () => {
-    expect(LEAVE_CONFIRM_ACTION).toBe('Выйти')
-    expect(REMOVE_CONFIRM_ACTION).toBe('Удалить')
-    expect(TRANSFER_CONFIRM_ACTION).toBe('Передать')
-    expect(MEMBER_CONFIRM_CANCEL).toBe('Отмена')
+    expect(leaveConfirmAction()).toBe('Выйти')
+    expect(removeConfirmAction()).toBe('Удалить')
+    expect(transferConfirmAction()).toBe('Передать')
+    expect(memberConfirmCancel()).toBe('Отмена')
   })
 })

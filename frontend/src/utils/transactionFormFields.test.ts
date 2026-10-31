@@ -122,13 +122,13 @@ describe('shouldShowTransferRateField', () => {
 describe('formatTransferResultLine', () => {
   it('formats USD to UZS like design', () => {
     expect(formatTransferResultLine(100, 'USD', 1_280_000, 'UZS')).toBe(
-      '100 $ → 1 280 000 сум',
+      '100 $ → 1 280 000 сум',
     )
   })
 
   it('formats UZS to USD', () => {
     expect(formatTransferResultLine(1_280_000, 'UZS', 100, 'USD')).toBe(
-      '1 280 000 сум → 100 $',
+      '1 280 000 сум → 100 $',
     )
   })
 })

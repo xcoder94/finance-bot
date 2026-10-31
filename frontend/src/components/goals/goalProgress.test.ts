@@ -10,12 +10,12 @@ import {
 
 describe('formatGoalMoney', () => {
   it('formats UZS with grouped digits and сум suffix', () => {
-    expect(formatGoalMoney(40_000_000, 'UZS')).toBe('40 000 000 сум')
-    expect(formatGoalMoney(200_000, 'UZS')).toBe('200 000 сум')
+    expect(formatGoalMoney(40_000_000, 'UZS')).toBe('40 000 000 сум')
+    expect(formatGoalMoney(200_000, 'UZS')).toBe('200 000 сум')
   })
 
   it('formats USD with grouped digits and $ suffix', () => {
-    expect(formatGoalMoney(1_500, 'USD')).toBe('1 500 $')
+    expect(formatGoalMoney(1_500, 'USD')).toBe('1 500 $')
     expect(formatGoalMoney(100, 'USD')).toBe('100 $')
   })
 })
@@ -30,7 +30,7 @@ describe('goalLeftLine', () => {
   it('returns remaining amount when under target', () => {
     expect(
       goalLeftLine({ done: false, balance: 24_000_000, target: 40_000_000, currency: 'UZS' }),
-    ).toBe('Осталось 16 000 000 сум')
+    ).toBe('Осталось 16 000 000 сум')
   })
 
   it('returns null when exactly at target', () => {
@@ -42,7 +42,7 @@ describe('goalLeftLine', () => {
   it('returns excess label when over target', () => {
     expect(
       goalLeftLine({ done: false, balance: 15_200_000, target: 15_000_000, currency: 'UZS' }),
-    ).toBe('Накоплено на 200 000 сум больше')
+    ).toBe('Накоплено на 200 000 сум больше')
   })
 })
 

@@ -5,7 +5,7 @@ import { initReactI18next } from 'react-i18next'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nextProvider } from 'react-i18next'
 
-import { LIMIT_PERSONAL_WALLETS } from '../../constants/entityLimits'
+import { limitPersonalWallets } from '../../constants/entityLimits'
 import ru from '../../i18n/locales/ru.json'
 import { WalletFormSheet } from './WalletFormSheet'
 
@@ -82,7 +82,7 @@ function invokeDangerClick(danger: ReactNode) {
 describe('WalletFormSheet create limits', () => {
   it('shows personal limit hint when member is at 5 personal wallets', () => {
     const html = renderWalletForm({ personalWalletCount: 5, canPickWalletType: false })
-    expect(html).toContain(LIMIT_PERSONAL_WALLETS)
+    expect(html).toContain(limitPersonalWallets())
   })
 
   it('shows member create intro when type is locked to personal', () => {

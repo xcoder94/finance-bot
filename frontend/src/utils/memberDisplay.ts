@@ -1,4 +1,5 @@
 import type { MemberResponse } from '../api/members'
+import { t } from '../i18n/t'
 
 export function getMemberDisplayName(member: MemberResponse): string {
   const firstName = member.first_name?.trim()
@@ -15,8 +16,7 @@ export function getMemberDisplayName(member: MemberResponse): string {
 }
 
 export function membersGroupTitle(memberCount: number, isOwner: boolean): string {
-  const countPart = `${memberCount} из 4`
-  return isOwner ? `${countPart} · вы владелец` : `${countPart} · вы участник`
+  return t(isOwner ? 'settings.sub.membersOwner' : 'settings.sub.membersMember', { count: memberCount })
 }
 
 export function formatMemberJoinDate(iso: string): string {
@@ -36,7 +36,7 @@ export function buildMemberRowSubtitle(
 ): string {
   const roleLabel = member.role === 'owner' ? roleOwnerLabel : roleMemberLabel
   if (member.id === currentUserId) {
-    return `${roleLabel} · вы`
+    return t('settings.sub.you', { role: roleLabel })
   }
   return `${roleLabel} · ${sincePrefix} ${formatMemberJoinDate(member.created_at)}`
 }

@@ -1,4 +1,6 @@
+import { t } from '../i18n/t'
 import { sumUnit } from './currencyUnit'
+import { groupThousands } from './groupThousands'
 export type WalletSubtitleInput = {
   is_personal?: boolean
 }
@@ -9,7 +11,7 @@ export type ExpenseCategorySubtitleInput = {
 }
 
 export function walletsSubtitle(sharedCount: number, personalCount: number): string {
-  return `${sharedCount} общих · ${personalCount} личных`
+  return t('settings.sub.wallets', { shared: sharedCount, personal: personalCount })
 }
 
 export function defaultWalletSubtitle(walletName: string | null | undefined): string {
@@ -27,7 +29,7 @@ export function formatDefaultWalletRowSubtitle(
 }
 
 function formatGroupedAmount(amount: number): string {
-  return Math.abs(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return groupThousands(Math.abs(amount))
 }
 
 function formatWalletSettingsAmount(balance: number, currency: string): string {
@@ -45,76 +47,45 @@ export function formatWalletSettingsSubtitle(
   hasActiveGoal: boolean,
 ): string {
   const base = `${currency} · ${formatWalletSettingsAmount(balance, currency)}`
-  return hasActiveGoal ? `${base} · цель` : base
-}
-
-function categoryWordRu(count: number): string {
-  const abs = Math.abs(count)
-  const mod10 = abs % 10
-  const mod100 = abs % 100
-
-  if (mod100 >= 11 && mod100 <= 14) {
-    return 'категорий'
-  }
-  if (mod10 === 1) {
-    return 'категория'
-  }
-  if (mod10 >= 2 && mod10 <= 4) {
-    return 'категории'
-  }
-  return 'категорий'
+  return hasActiveGoal ? `${base} · ${t('settings.sub.goalSuffix')}` : base
 }
 
 export function incomeCategoriesSubtitle(count: number): string {
-  return `${count} ${categoryWordRu(count)}`
-}
-
-function subcategoryWordRu(count: number): string {
-  const abs = Math.abs(count)
-  const mod10 = abs % 10
-  const mod100 = abs % 100
-
-  if (mod100 >= 11 && mod100 <= 14) {
-    return 'подкатегорий'
-  }
-  if (mod10 === 1) {
-    return 'подкатегория'
-  }
-  if (mod10 >= 2 && mod10 <= 4) {
-    return 'подкатегории'
-  }
-  return 'подкатегорий'
+  return t('settings.sub.categories', { count })
 }
 
 export function expenseCategoriesSubtitle(parentCount: number, subcategoryCount: number): string {
-  return `${parentCount} родительских · ${subcategoryCount} ${subcategoryWordRu(subcategoryCount)}`
+  return t('settings.sub.expense', {
+    parents: parentCount,
+    subs: t('settings.sub.subcategories', { count: subcategoryCount }),
+  })
 }
 
 export function expenseParentRowSubtitle(subcategoryCount: number): string {
-  return `${subcategoryCount} ${subcategoryWordRu(subcategoryCount)}`
+  return t('settings.sub.subcategories', { count: subcategoryCount })
 }
 
 export function membersSubtitle(memberCount: number): string {
-  return `${memberCount} из 4`
+  return t('settings.sub.members', { count: memberCount })
 }
 
 export function notificationsSubtitle(eveningEnabled: boolean, weeklyEnabled: boolean): string {
   if (!eveningEnabled && !weeklyEnabled) {
-    return 'Выключены'
+    return t('settings.sub.notifOff')
   }
 
   const parts: string[] = []
   if (eveningEnabled) {
-    parts.push('Напоминание вечером')
+    parts.push(t('settings.sub.notifEvening'))
   }
   if (weeklyEnabled) {
-    parts.push('Итоги недели')
+    parts.push(t('settings.sub.notifWeekly'))
   }
   return parts.join(' · ')
 }
 
 export function languageSubtitle(language: string): string {
-  return language.startsWith('uz') ? 'Oʻzbekcha' : 'Русский'
+  return language.startsWith('uz') ? "O'zbekcha" : 'Русский'
 }
 
 export function countSharedWallets(wallets: WalletSubtitleInput[]): number {

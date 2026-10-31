@@ -39,6 +39,18 @@ _SUM_TYPES = ("expense", "ambiguous")
 _PLAIN_NUMBER_RE = re.compile(r"^(?:\d+|\d{1,3}(?:[\s.,]\d{3})+)$")
 
 
+_ONLY_DIGITS_AND_SEPARATORS_RE = re.compile(r"^\d[\d\s.,]*$")
+
+
+# a trailing unit does not change the separator rule: "12 3 сум" is as broken as "12 3"
+_TRAILING_UNIT_RE = re.compile(r"^(?P<num>\d[\d\s.,]*?)\s*(?:сум|сўм|so'm|som|sum|uzs)\.?$", re.IGNORECASE)
+
+
+def _digits_part(stripped: str) -> str | None:
+    match = _TRAILING_UNIT_RE.match(stripped)
+    return match.group("num") if match else None
+
+
 def _usable(amount: int | None) -> bool:
     return amount is not None and 0 < amount <= MAX_AMOUNT
 
@@ -48,10 +60,17 @@ def bare_text_amount(text: str) -> int | None:
     stripped = text.strip()
     if not stripped:
         return None
+    unit_num = _digits_part(stripped)
+    if unit_num is not None:
+        # re-run the plain-number rule on the digits alone
+        return bare_text_amount(unit_num)
     if _PLAIN_NUMBER_RE.match(stripped):
         digits = re.sub(r"[\s.,]", "", stripped)
         value = int(digits)
         return value if _usable(value) else None
+    if _ONLY_DIGITS_AND_SEPARATORS_RE.match(stripped):
+        # "12 3", "41 2000", "1.5": digits with a wrong separator layout are never a sum
+        return None
     amounts = _find_amounts(stripped)
     if len(amounts) == 1:
         start, end = amounts[0].span
@@ -64,7 +83,10 @@ def bare_text_amount(text: str) -> int | None:
 def is_malformed_number(text: str) -> bool:
     """Only digits and separators, but not a valid sum ("1.5", "412,50"): ask again."""
     stripped = text.strip()
-    return bool(re.match(r"^\d[\d\s.,]*$", stripped)) and bare_text_amount(stripped) is None
+    unit_num = _digits_part(stripped)
+    if unit_num is not None:
+        stripped = unit_num.strip()
+    return bool(_ONLY_DIGITS_AND_SEPARATORS_RE.match(stripped)) and bare_text_amount(stripped) is None
 
 
 def op_sum(ops: list[ParsedOperation]) -> int | None:

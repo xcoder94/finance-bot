@@ -5,10 +5,10 @@ import {
   buildIncomeCategoryDeleteIntro,
   buildSubcategoryDeleteIntro,
   buildWalletDeleteIntro,
-  CATEGORY_DELETE_DANGER_LABEL,
+  categoryDeleteDangerLabel,
   formatEntityTransactionSubtitle,
-  SUBCATEGORY_DELETE_DANGER_LABEL,
-  WALLET_DELETE_DANGER_LABEL,
+  subcategoryDeleteDangerLabel,
+  walletDeleteDangerLabel,
 } from './entityDeleteConfirmCopy'
 
 describe('entity delete confirm copy', () => {
@@ -33,12 +33,12 @@ describe('entity delete confirm copy', () => {
   })
 
   it('exports wallet danger label', () => {
-    expect(WALLET_DELETE_DANGER_LABEL).toBe('Удалить кошелёк')
+    expect(walletDeleteDangerLabel()).toBe('Удалить кошелёк')
   })
 
   it('exports category danger labels', () => {
-    expect(CATEGORY_DELETE_DANGER_LABEL).toBe('Удалить категорию')
-    expect(SUBCATEGORY_DELETE_DANGER_LABEL).toBe('Удалить подкатегорию')
+    expect(categoryDeleteDangerLabel()).toBe('Удалить категорию')
+    expect(subcategoryDeleteDangerLabel()).toBe('Удалить подкатегорию')
   })
 
   it('formats entity transaction subtitle', () => {

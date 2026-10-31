@@ -1,7 +1,7 @@
 {
   "nav": {
     "home": "Bosh sahifa",
-    "shopping": "Ro‘zg‘or",
+    "shopping": "Ro'zg'or",
     "analytics": "Analitika",
     "goals": "Maqsadlar",
     "history": "Tarix",
@@ -11,25 +11,25 @@
     "unauthorized": "Autentifikatsiya xatosi",
     "notOnboarded": "Avval botni ishga tushiring",
     "removedFromFamily": "Siz oila byudjetidan olib tashlangansiz",
-    "passFailed": "Ilovani ochib bo‘lmadi. Uni yoping va bot menyusi orqali qayta oching.",
-    "networkError": "Serverga ulanib bo'lmadi",
+    "passFailed": "Ilovani ochib bo'lmadi. Uni yoping va bot menyusi orqali qayta oching.",
+    "networkError": "Ulanib bo'lmadi",
     "retry": "Qayta urinib ko'ring"
   },
   "shopping": {
-    "emptyTitle": "Ro‘yxat hozircha bo‘sh",
-    "emptyHint": "Birinchi pozitsiyani qo‘shing — yoki botga yozing: «sut, non, tuxum».",
+    "emptyTitle": "Ro'yxat hozircha bo'sh",
+    "emptyHint": "Birinchi pozitsiyani qo'shing — yoki botga yozing: «sut, non, tuxum».",
     "count_one": "{{count}} ta pozitsiya",
     "count_other": "{{count}} ta pozitsiya",
-    "addPlaceholder": "+ qo‘shish",
-    "addButton": "Qo‘shish",
-    "swipeEdit": "O‘zgartirish",
-    "swipeDelete": "O‘chirish",
-    "editTitle": "Pozitsiyani o‘zgartirish",
+    "addPlaceholder": "+ qo'shish",
+    "addButton": "Qo'shish",
+    "swipeEdit": "O'zgartirish",
+    "swipeDelete": "O'chirish",
+    "editTitle": "Pozitsiyani o'zgartirish",
     "nameLabel": "Nomi",
     "save": "Saqlash",
     "startTrip": "Xaridni boshlash",
-    "duplicate": "Ro‘yxatda bor",
-    "limit": "Ro‘yxatda allaqachon 100 ta pozitsiya bor. Yangisini qo‘shish uchun keraksizini o‘chiring.",
+    "duplicate": "Ro'yxatda bor",
+    "limit": "Ro'yxatda allaqachon 100 ta pozitsiya bor. Yangisini qo'shish uchun keraksizini o'chiring.",
     "nameRequired": "Nomini kiriting",
     "tripTitle": "Xarid",
     "cancel": "Bekor qilish",
@@ -43,23 +43,23 @@
     "resultTitle_other": "{{count}} ta mahsulot yozildi",
     "resultSum": "summa",
     "resultLeft": "qoldi",
-    "resultNote": "Sotib olinganlar ro‘yxatdan chiqdi, belgilanmaganlar ({{k}}) qoldi.",
+    "resultNote": "Sotib olinganlar ro'yxatdan chiqdi, belgilanmaganlar ({{k}}) qoldi.",
     "done": "Tayyor",
     "alreadyBought": "Bu pozitsiyalarni oiladan kimdir allaqachon sotib olgan.",
-    "recordFailed": "Yozib bo‘lmadi. Qayta urinib ko‘ring.",
+    "recordFailed": "Yozib bo'lmadi. Qayta urinib ko'ring.",
     "noCategory": "Toifasiz",
     "walletAuto": "Asosiy umumiy hamyon",
     "methodReceipt": "Chek yuboraman",
     "methodVoice": "Ovoz orqali",
-    "hintReceipt": "Ilova yig‘iladi, bot chek rasmini kutadi. Summa shu yerga qaytadi.",
-    "hintVoice": "Ilova yig‘iladi, bot ovozli xabarni kutadi. Summa shu yerga qaytadi.",
+    "hintReceipt": "Ilova yig'iladi, bot chek rasmini kutadi. Summa shu yerga qaytadi.",
+    "hintVoice": "Ilova yig'iladi, bot ovozli xabarni kutadi. Summa shu yerga qaytadi.",
     "waitReceipt": "Botda chek rasmini kutyapmiz",
     "waitVoice": "Botda ovozli xabarni kutyapmiz",
-    "manualLink": "Summani qo‘lda kiritish",
-    "manualTitle": "Summani qo‘lda kiriting",
+    "manualLink": "Summani qo'lda kiritish",
+    "manualTitle": "Summani qo'lda kiriting",
     "manualWaiting": "Butun xarid uchun bitta summa kerak.",
-    "manualReceipt": "Chekni aniqlab bo‘lmadi. Butun xarid uchun bitta summa kerak.",
-    "manualVoice": "Summani tushunib bo‘lmadi. Butun xarid uchun bitta summa kerak.",
+    "manualReceipt": "Chekni aniqlab bo'lmadi. Butun xarid uchun bitta summa kerak.",
+    "manualVoice": "Summani tushunib bo'lmadi. Butun xarid uchun bitta summa kerak.",
     "retryReceipt": "Rasmni qayta yuborish",
     "retryVoice": "Qayta aytish"
   },
@@ -81,8 +81,8 @@
     "firstName": "Ism",
     "language": "Til",
     "wallets": "Hamyonlar",
-    "categoriesIncome": "Daromad kategoriyalari",
-    "categoriesExpense": "Xarajat kategoriyalari",
+    "categoriesIncome": "Daromad toifalari",
+    "categoriesExpense": "Xarajat toifalari",
     "addWallet": "Hamyon qo'shish",
     "addCategory": "Kategoriya qo'shish",
     "addSubcategory": "Pastki kategoriya qo'shish",
@@ -99,11 +99,11 @@
     "members": "Oila a'zolari",
     "backHome": "‹ Bosh sahifa",
     "toc": {
-      "defaultWallet": "Standart hamyon",
+      "defaultWallet": "Asosiy hamyon",
       "members": "A'zolar",
       "notifications": "Bildirishnomalar",
       "back": "‹ Sozlamalar",
-      "backExpenseCategories": "‹ Xarajat kategoriyalari",
+      "backExpenseCategories": "‹ Xarajat toifalari",
       "footerHint": "Har bir bo'lim o'z ekranida sozlanadi. O'chirish ham o'sha yerda — ro'yxat qatorida emas.",
       "profileOwner": "«{{name}}» byudjeti egasi",
       "profileMember": "«{{name}}» byudjeti a'zosi"
@@ -114,7 +114,9 @@
     "walletForm": {
       "newTitle": "Yangi hamyon",
       "createIntroOwner": "Umumiy hamyonni faqat egasi yaratadi. Shaxsiyni — har kim o'ziga.",
-      "createIntroMember": "Siz faqat shaxsiy hamyon yaratishingiz mumkin."
+      "createIntroMember": "Siz faqat shaxsiy hamyon yaratishingiz mumkin.",
+      "typeTitle": "Turi",
+      "currencyLocked": "Birinchi operatsiyadan keyin valyuta o'zgarmaydi"
     },
     "walletGroups": {
       "sharedOwner": "Umumiy · siz o'zgartirasiz",
@@ -158,6 +160,29 @@
       "eveningSubtitle": "Agar kun davomida birorta ham yozuv bo'lmasa, 21:00",
       "weeklyTitle": "Hafta yakunlari",
       "weeklySubtitle": "Har dushanba, soat 10:00"
+    },
+    "sub": {
+      "wallets": "{{shared}} umumiy · {{personal}} shaxsiy",
+      "goalSuffix": "maqsad",
+      "categories_one": "{{count}} ta toifa",
+      "categories_other": "{{count}} ta toifa",
+      "subcategories_one": "{{count}} ta ichki toifa",
+      "subcategories_other": "{{count}} ta ichki toifa",
+      "expense": "{{parents}} ta asosiy · {{subs}}",
+      "members": "4 tadan {{count}}",
+      "membersOwner": "4 tadan {{count}} · siz egasisiz",
+      "membersMember": "4 tadan {{count}} · siz a'zosiz",
+      "you": "{{role}} · siz",
+      "notifOff": "O'chirilgan",
+      "notifEvening": "Kechqurungi eslatma",
+      "notifWeekly": "Haftalik hisobot"
+    },
+    "nameLabel30": "Nomi · 30 belgigacha",
+    "categoryForm": {
+      "newIncome": "Yangi daromad toifasi",
+      "newExpense": "Yangi xarajat toifasi",
+      "newSub": "Yangi ichki toifa",
+      "parentFixed": "Asosiy toifa o'tilgan ekran bo'yicha belgilangan: {{parent}}."
     }
   },
   "home": {
@@ -192,9 +217,9 @@
     "leftPerDayDone": "oy yakunlangan",
     "leftTotal": "Oy oxirigacha qoldiq",
     "leftTotalHint": "daromad − xarajat",
-    "trendTitle": "So‘nggi 3 oy xarajati",
+    "trendTitle": "So'nggi 3 oy xarajati",
     "trendUnit": "mln so'm",
-    "failHint": "Aloqani tekshirib, qayta urinib ko‘ring.",
+    "failHint": "Aloqani tekshirib, qayta urinib ko'ring.",
     "retry": "Qayta urinish",
     "onboarding": {
       "title": "Birinchi byudjetgacha 3 qadam",
@@ -203,7 +228,9 @@
       "step3": "Oilani taklif qiling",
       "cta": "Xarajat yozish",
       "close": "Yopish"
-    }
+    },
+    "emptyMonth": "{{month}} operatsiyalar yo'q",
+    "balanceMonth": "Qoldiq · {{month}}"
   },
   "addIncome": {
     "title": "Daromad qo'shish"
@@ -289,7 +316,11 @@
     "transferSameIntro": "Valyutalar bir xil — kurs maydoni yo'q.",
     "transferDiffIntro": "Valyutalar boshqacha — kurs va natija qatori paydo bo'ladi.",
     "deleteRecord": "Yozuvni o'chirish",
-    "changes": "O'zgarishlar"
+    "changes": "O'zgarishlar",
+    "deleteTitle": "Yozuv o'chirilsinmi?",
+    "deleteBody": "«{{label}}» yozuvi ({{amount}} {{unit}}) tarix va tahlildan o'chiriladi. Buni bekor qilib bo'lmaydi.",
+    "editTitle": "Yozuv · {{label}}",
+    "rateSuffix": "$1 uchun {{unit}}"
   },
   "analytics": {
     "title": "Analitika",
@@ -396,6 +427,121 @@
       "deadlineLabel": "Muddat · ixtiyoriy",
       "deadlineNotSelected": "tanlanmagan",
       "deadlineInvalid": "Sanani KK.OO.YYYY formatida kiriting"
-    }
+    },
+    "closedBadge": "Yopilgan",
+    "ofTarget": "{{amount}} dan",
+    "closeGoal": "Maqsadni yopish",
+    "ownerNote": "Maqsadni faqat byudjet egasi yopa oladi.",
+    "frozen": "Ko'rsatkichlar muzlatilgan",
+    "over": "{{amount}} ortiqcha jamg'arilgan",
+    "left": "Qoldi: {{amount}}",
+    "closedOn": "{{date}} da yopilgan",
+    "noDeadline": "muddatsiz",
+    "until": "{{date}} gacha"
+  },
+  "common": {
+    "sumUnit": "so'm",
+    "loading": "Yuklanmoqda…",
+    "close": "Yopish",
+    "day_one": "kun",
+    "day_other": "kun"
+  },
+  "months": {
+    "short": {
+      "1": "yan",
+      "2": "fev",
+      "3": "mart",
+      "4": "apr",
+      "5": "may",
+      "6": "iyun",
+      "7": "iyul",
+      "8": "avgust",
+      "9": "sen",
+      "10": "okt",
+      "11": "noy",
+      "12": "dek"
+    },
+    "prep": {
+      "1": "Yanvarda",
+      "2": "Fevralda",
+      "3": "Martda",
+      "4": "Aprelda",
+      "5": "Mayda",
+      "6": "Iyunda",
+      "7": "Iyulda",
+      "8": "Avgustda",
+      "9": "Sentabrda",
+      "10": "Oktabrda",
+      "11": "Noyabrda",
+      "12": "Dekabrda"
+    },
+    "trend": {
+      "1": "Yan",
+      "2": "Fev",
+      "3": "Mar",
+      "4": "Apr",
+      "5": "May",
+      "6": "Iyn",
+      "7": "Iyl",
+      "8": "Avg",
+      "9": "Sen",
+      "10": "Okt",
+      "11": "Noy",
+      "12": "Dek"
+    },
+    "long": {
+      "1": "yanvar",
+      "2": "fevral",
+      "3": "mart",
+      "4": "aprel",
+      "5": "may",
+      "6": "iyun",
+      "7": "iyul",
+      "8": "avgust",
+      "9": "sentabr",
+      "10": "oktabr",
+      "11": "noyabr",
+      "12": "dekabr"
+    },
+    "title": "{{year}}-yil {{month}}"
+  },
+  "limits": {
+    "sharedWallets": "10 tadan ortiq umumiy hamyon yaratib bo'lmaydi. Keraksizini o'chiring — joy bo'shaydi.",
+    "personalWallets": "5 tadan ortiq shaxsiy hamyon yaratib bo'lmaydi. Keraksizini o'chiring — joy bo'shaydi.",
+    "expenseParents": "8 tadan ortiq xarajat toifasi yaratib bo'lmaydi. Keraksizini o'chiring — joy bo'shaydi.",
+    "incomeCategories": "8 tadan ortiq daromad toifasi yaratib bo'lmaydi. Keraksizini o'chiring — joy bo'shaydi.",
+    "members": "Oilaviy byudjetda allaqachon 4 ta a'zo bor — bu chegara.",
+    "subcategories": "«{{parent}}» toifasida allaqachon 8 ta ichki toifa bor — bu chegara. Yangisini qo'shish uchun keraksizini o'chiring."
+  },
+  "memberConfirm": {
+    "leaveBody": "Siz «{{name}}» byudjetidan chiqasiz. Shaxsiy hamyonlaringiz va ulardagi operatsiyalar o'zingizning byudjetingizga o'tadi. Umumiy hamyonlardagi operatsiyalar shu oilada qoladi.",
+    "removeBody": "{{name}} endi byudjet a'zosi bo'lmaydi. Shaxsiy hamyonlar va ulardagi operatsiyalar a'zoning o'z byudjetiga o'tadi. Umumiy hamyonlardagi operatsiyalar shu yerda qoladi.",
+    "transferBody": "Byudjetning yangi egasi: {{name}}. Uning tasdig'i kerak. Shundan keyin siz oddiy a'zo bo'lib qolasiz. Yolg'iz o'zingiz bekor qila olmaysiz.",
+    "leave": "Chiqish",
+    "remove": "O'chirish",
+    "transfer": "Topshirish"
+  },
+  "entityDelete": {
+    "title": "«{{name}}» o'chirilsinmi?",
+    "noOps": "operatsiyalar yo'q",
+    "dangerWallet": "Hamyonni o'chirish",
+    "dangerCategory": "Toifani o'chirish",
+    "dangerSubcategory": "Ichki toifani o'chirish",
+    "ops_one": "{{count}} ta operatsiya",
+    "ops_other": "{{count}} ta operatsiya",
+    "subs_one": "{{count}} ta ichki toifa",
+    "subs_other": "{{count}} ta ichki toifa",
+    "willDelete_one": "o'chiriladi",
+    "willDelete_other": "o'chiriladi",
+    "remain_one": "qoladi",
+    "remain_other": "qoladi",
+    "walletPlain": "Hamyon o'chiriladi. Buni bekor qilib bo'lmaydi.",
+    "walletOps": "Hamyon o'chiriladi, {{ops}} esa tarix va tahlilda {{verb}}. Buni bekor qilib bo'lmaydi.",
+    "categoryPlain": "Toifa o'chiriladi. Buni bekor qilib bo'lmaydi.",
+    "categoryOps": "Toifa o'chiriladi, {{ops}} esa tarix va tahlilda {{verb}}. Buni bekor qilib bo'lmaydi.",
+    "categorySubs": "Toifa va {{subs}} {{subVerb}}. Buni bekor qilib bo'lmaydi.",
+    "categorySubsOps": "Toifa va {{subs}} {{subVerb}}, {{ops}} esa tarix va tahlilda {{verb}}. Buni bekor qilib bo'lmaydi.",
+    "subPlain": "Ichki toifa o'chiriladi. Buni bekor qilib bo'lmaydi.",
+    "subOps": "Ichki toifa o'chiriladi, {{year}}-yildagi {{ops}} esa «{{parent}}» asosiy toifasida {{verb}}. Buni bekor qilib bo'lmaydi."
   }
 }

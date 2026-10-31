@@ -1,3 +1,5 @@
+import { t } from '../i18n/t'
+import i18n from '../i18n'
 import type { SelectedMonth } from './periodFilter'
 
 export function isChartsTabEmpty(expenseTotal: number, sliceCount: number): boolean {
@@ -53,19 +55,20 @@ export function elapsedDaysInPeriod(
 }
 
 export function formatChartsEmptyMonth(selected: SelectedMonth): string {
-  const monthName = new Intl.DateTimeFormat('ru-RU', { month: 'long' })
-    .format(new Date(selected.year, selected.month - 1, 1))
-  return monthName.toLowerCase()
+  const month = t(`months.long.${selected.month}`).toLowerCase()
+  // UZ sentence starts with the month («Noyabr uchun…»); RU has «За ноябрь…»
+  return i18n.language.startsWith('uz') ? month.charAt(0).toUpperCase() + month.slice(1) : month
 }
 
 export function formatAnalyticsAmountDigits(amount: number): string {
   const sign = amount < 0 ? '-' : ''
   const absolute = Math.abs(amount)
-  const formatted = absolute.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const formatted = groupThousands(absolute)
   return `${sign}${formatted}`
 }
 
 import { buildCategoryColorIndexMap } from './chartColors'
+import { groupThousands } from './groupThousands'
 
 export function mergeCategoryIds(orderedIds: string[], additionalIds: string[]): string[] {
   const mergedIds = [...orderedIds]

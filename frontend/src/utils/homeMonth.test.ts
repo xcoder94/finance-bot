@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import i18n from '../i18n'
 import {
-  MONTH_PREPOSITIONAL,
-  MONTH_SHORT,
   balanceMonthLabel,
   currentMonthInTashkent,
   emptyMonthTitle,
@@ -11,41 +11,43 @@ import {
   shiftHomeMonth,
 } from './homeMonth'
 
-describe('MONTH_SHORT', () => {
+const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
+
+describe('month short labels', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('ru')
+  })
+
   it('has 12 Russian short month labels', () => {
-    expect(MONTH_SHORT).toEqual([
-      'янв',
-      'фев',
-      'март',
-      'апр',
-      'май',
-      'июнь',
-      'июль',
-      'август',
-      'сен',
-      'окт',
-      'ноя',
-      'дек',
+    expect(MONTHS.map(monthShortLabel)).toEqual([
+      'янв', 'фев', 'март', 'апр', 'май', 'июнь', 'июль', 'август', 'сен', 'окт', 'ноя', 'дек',
+    ])
+  })
+
+  it('has 12 Uzbek short month labels, no Cyrillic', async () => {
+    await i18n.changeLanguage('uz')
+    expect(MONTHS.map(monthShortLabel)).toEqual([
+      'yan', 'fev', 'mart', 'apr', 'may', 'iyun', 'iyul', 'avgust', 'sen', 'okt', 'noy', 'dek',
     ])
   })
 })
 
-describe('MONTH_PREPOSITIONAL', () => {
-  it('has 12 Russian prepositional month labels', () => {
-    expect(MONTH_PREPOSITIONAL).toEqual([
-      'январе',
-      'феврале',
-      'марте',
-      'апреле',
-      'мае',
-      'июне',
-      'июле',
-      'августе',
-      'сентябре',
-      'октябре',
-      'ноябре',
-      'декабре',
-    ])
+describe('month titles and empty-month phrase', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('ru')
+  })
+
+  it('Russian: prepositional month in the empty title', () => {
+    expect(emptyMonthTitle(8)).toBe('В августе операций нет')
+    expect(opsCountLabel(0, 8)).toBe('нет операций')
+  })
+
+  it('Uzbek: locative month, "2026-yil avgust" title, Qoldiq label', async () => {
+    await i18n.changeLanguage('uz')
+    expect(emptyMonthTitle(8)).toBe("Avgustda operatsiyalar yo'q")
+    expect(formatMonthTitle(2026, 8)).toBe('2026-yil avgust')
+    expect(balanceMonthLabel(10)).toBe('Qoldiq · okt')
+    expect(opsCountLabel(0, 8)).toBe("operatsiyalar yo'q")
   })
 })
 

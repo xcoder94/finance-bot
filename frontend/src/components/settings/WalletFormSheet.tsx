@@ -163,7 +163,7 @@ export function WalletFormSheet({
     return (
       <FormSheet
         open={open}
-        title="Тип"
+        title={t('settings.walletForm.typeTitle')}
         onClose={() => onWalletTypePickerOpenChange(false)}
         showPrimary={false}
       >
@@ -211,7 +211,7 @@ export function WalletFormSheet({
       intro={intro}
       onClose={onClose}
       showPrimary={editable}
-      primaryLabel="Сохранить"
+      primaryLabel={t('formSheet.save')}
       onPrimary={() => void handleSave()}
       primaryDisabled={!canSave}
       primaryLoading={saving}
@@ -223,14 +223,14 @@ export function WalletFormSheet({
               className="form-sheet-danger-button"
               onClick={onDelete}
             >
-              Удалить
+              {t('settings.delete')}
             </button>
           )
           : undefined
       }
     >
       <FormSheetField
-        label="Название · до 30 знаков"
+        label={t('settings.nameLabel30')}
         right={formatNameCounter(trimmedLength)}
         hint={fieldHint}
         hintError={fieldHintError}
@@ -251,7 +251,7 @@ export function WalletFormSheet({
       {mode === 'edit' && wallet?.currency === 'USD' ? (
         <FormSheetField
           label={t('settings.currencyLabel')}
-          hint={currencyLocked ? 'После первой операции валюта не меняется' : undefined}
+          hint={currencyLocked ? t('settings.walletForm.currencyLocked') : undefined}
         >
           <span className="form-sheet-field__value wallet-currency-tag">{currency}</span>
         </FormSheetField>
@@ -259,7 +259,7 @@ export function WalletFormSheet({
 
       {mode === 'create' ? (
         <FormSheetField
-          label="Тип"
+          label={t('settings.walletForm.typeTitle')}
           right={canPickWalletType ? '›' : undefined}
           onClick={
             editable && canPickWalletType

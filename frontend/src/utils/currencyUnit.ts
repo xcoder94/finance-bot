@@ -1,7 +1,6 @@
-import i18n from 'i18next'
+import { t } from '../i18n/t'
 
 /** Currency word for UZS amounts: «сум» (RU) / «so'm» (UZ). Never «UZS» in the UI. */
 export function sumUnit(): string {
-  const lang = i18n.resolvedLanguage ?? i18n.language ?? 'ru'
-  return lang.startsWith('uz') ? "so'm" : 'сум'
+  return t('common.sumUnit')
 }

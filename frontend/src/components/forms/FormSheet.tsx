@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type FormSheetProps = {
   open: boolean
@@ -24,13 +25,14 @@ export function FormSheet({
   children,
   changes,
   showPrimary = true,
-  cancelLabel = 'Отмена',
-  primaryLabel = 'Сохранить',
+  cancelLabel,
+  primaryLabel,
   onPrimary,
   primaryDisabled = false,
   primaryLoading = false,
   danger,
 }: FormSheetProps) {
+  const { t } = useTranslation()
   if (!open) {
     return null
   }
@@ -52,7 +54,7 @@ export function FormSheet({
             type="button"
             className="form-sheet-close"
             onClick={onClose}
-            aria-label="Закрыть"
+            aria-label={t('common.close')}
           >
             ✕
           </button>
@@ -67,7 +69,7 @@ export function FormSheet({
         {showPrimary ? (
           <div className="form-sheet-actions">
             <button type="button" className="form-sheet-cancel" onClick={onClose}>
-              {cancelLabel}
+              {cancelLabel ?? t('formSheet.cancel')}
             </button>
             <button
               type="button"
@@ -75,7 +77,7 @@ export function FormSheet({
               onClick={onPrimary}
               disabled={primaryDisabled || primaryLoading}
             >
-              {primaryLoading ? '…' : primaryLabel}
+              {primaryLoading ? '…' : primaryLabel ?? t('formSheet.save')}
             </button>
           </div>
         ) : null}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
@@ -13,19 +14,8 @@ from app.models.transaction_change_log import TransactionChangeLog
 from app.models.user import User
 from app.schemas.transactions import ExpenseUpdate, IncomeUpdate, TransferUpdate
 from app.services.change_log_format import (
-    FIELD_AMOUNT,
-    FIELD_CATEGORY,
-    FIELD_COMMENT,
-    FIELD_DATE,
-    FIELD_FROM,
-    FIELD_RATE,
-    FIELD_TO,
-    FIELD_WALLET,
-    change_line,
-    creation_line,
-    format_amount_text,
+    render_change_payload,
     format_rate_text,
-    format_transaction_date_text,
 )
 from app.services.wallets_categories import (
     get_active_expense_category,
@@ -34,6 +24,9 @@ from app.services.wallets_categories import (
 )
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
+
+# (field, old, new) with typed payload values (see work/db/m3-5-change-log.md)
+FieldChange = tuple[str, Any, Any]
 
 
 def _display_name(user: User) -> str:
@@ -48,17 +41,50 @@ def _tashkent_date(dt: datetime) -> date:
     return dt.astimezone(TASHKENT).date()
 
 
-def _comment_text(comment: str | None) -> str:
-    return comment or ""
+def _comment_value(comment: str | None) -> str | None:
+    return comment or None
 
 
-async def list_change_lines(session: AsyncSession, transaction_id: uuid.UUID) -> list[str]:
+def _date_value(dt: datetime) -> str:
+    return _tashkent_date(dt).isoformat()
+
+
+def _entity(obj: Any) -> dict[str, Any] | None:
+    if obj is None:
+        return None
+    return {
+        "id": str(obj.id),
+        "name": obj.name,
+        "tk": getattr(obj, "translation_key", None),
+    }
+
+
+def _same(field: str, old: Any, new: Any) -> bool:
+    if field in ("category", "wallet", "from", "to"):
+        return (old["name"] if old else None) == (new["name"] if new else None)
+    return old == new
+
+
+async def list_change_lines(
+    session: AsyncSession, transaction_id: uuid.UUID, language: str = "ru"
+) -> list[str]:
+    """Change lines for the reader: legacy text as is, payload rows in `language`."""
     stmt = (
-        select(TransactionChangeLog.line_text)
+        select(
+            TransactionChangeLog.format_version,
+            TransactionChangeLog.payload,
+            TransactionChangeLog.line_text,
+        )
         .where(TransactionChangeLog.transaction_id == transaction_id)
         .order_by(TransactionChangeLog.created_at.asc(), TransactionChangeLog.id.asc())
     )
-    return list(await session.scalars(stmt))
+    lines: list[str] = []
+    for version, payload, text in (await session.execute(stmt)).all():
+        if version == 1 and payload is not None:
+            lines.append(render_change_payload(payload, language))
+        else:
+            lines.append(text or "")
+    return lines
 
 
 async def _has_log_rows(session: AsyncSession, transaction_id: uuid.UUID) -> bool:
@@ -68,24 +94,19 @@ async def _has_log_rows(session: AsyncSession, transaction_id: uuid.UUID) -> boo
     return int(await session.scalar(stmt) or 0) > 0
 
 
-async def _get_creator_name(session: AsyncSession, created_by_user_id: uuid.UUID) -> str:
-    user = await session.get(User, created_by_user_id)
-    if user is None:
-        return "Unknown"
-    return _display_name(user)
-
-
-async def _append_lines(
+async def _append_payloads(
     session: AsyncSession,
     transaction_id: uuid.UUID,
-    lines: list[str],
+    payloads: list[dict[str, Any]],
 ) -> None:
     base = datetime.now(UTC)
-    for index, line in enumerate(lines):
+    for index, payload in enumerate(payloads):
         session.add(
             TransactionChangeLog(
                 transaction_id=transaction_id,
-                line_text=line,
+                format_version=1,
+                payload=payload,
+                line_text=None,
                 created_at=base + timedelta(microseconds=index),
             )
         )
@@ -95,40 +116,44 @@ async def _record_changes(
     session: AsyncSession,
     transaction: Transaction,
     editor: User,
-    field_changes: list[tuple[str, str, str]],
+    field_changes: list[FieldChange],
 ) -> None:
     if not field_changes:
         return
 
-    edited_on = _tashkent_today()
-    editor_name = _display_name(editor)
-    change_lines = [
-        change_line(
-            edited_on=edited_on,
-            editor_name=editor_name,
-            field_label=label,
-            old_value=old,
-            new_value=new,
-        )
-        for label, old, new in field_changes
-    ]
+    edited_on = _tashkent_today().isoformat()
+    editor_actor = {"id": str(editor.id), "name": _display_name(editor)}
+    payloads: list[dict[str, Any]] = []
 
-    lines_to_insert: list[str] = []
     if not await _has_log_rows(session, transaction.id):
-        creator_name = await _get_creator_name(session, transaction.created_by_user_id)
-        created_on = _tashkent_date(transaction.created_at)
-        lines_to_insert.append(
-            creation_line(created_on=created_on, creator_name=creator_name)
+        creator = await session.get(User, transaction.created_by_user_id)
+        payloads.append(
+            {
+                "kind": "created",
+                "on": _tashkent_date(transaction.created_at).isoformat(),
+                "actor": {
+                    "id": str(creator.id) if creator else None,
+                    "name": _display_name(creator) if creator else "Unknown",
+                },
+            }
         )
 
-    lines_to_insert.extend(change_lines)
-    await _append_lines(session, transaction.id, lines_to_insert)
+    for field, old, new in field_changes:
+        payloads.append(
+            {
+                "kind": "changed",
+                "on": edited_on,
+                "actor": editor_actor,
+                "field": field,
+                "old": old,
+                "new": new,
+            }
+        )
+    await _append_payloads(session, transaction.id, payloads)
 
 
-def _collect_changes(
-    pairs: list[tuple[str, str, str]],
-) -> list[tuple[str, str, str]]:
-    return [(label, old, new) for label, old, new in pairs if old != new]
+def _collect_changes(pairs: list[FieldChange]) -> list[FieldChange]:
+    return [(f, old, new) for f, old, new in pairs if not _same(f, old, new)]
 
 
 async def record_income_changes(
@@ -153,29 +178,29 @@ async def record_income_changes(
     field_changes = _collect_changes(
         [
             (
-                FIELD_AMOUNT,
-                format_amount_text(transaction.amount),
-                format_amount_text(body.amount),
+                "amount",
+                transaction.amount,
+                body.amount,
             ),
             (
-                FIELD_CATEGORY,
-                old_category.name if old_category else "",
-                new_category.name if new_category else "",
+                "category",
+                _entity(old_category),
+                _entity(new_category),
             ),
             (
-                FIELD_WALLET,
-                old_wallet.name if old_wallet else "",
-                new_wallet.name if new_wallet else "",
+                "wallet",
+                _entity(old_wallet),
+                _entity(new_wallet),
             ),
             (
-                FIELD_DATE,
-                format_transaction_date_text(transaction.transaction_date),
-                format_transaction_date_text(body.transaction_date),
+                "date",
+                _date_value(transaction.transaction_date),
+                _date_value(body.transaction_date),
             ),
             (
-                FIELD_COMMENT,
-                _comment_text(transaction.comment),
-                _comment_text(body.comment),
+                "comment",
+                _comment_value(transaction.comment),
+                _comment_value(body.comment),
             ),
         ]
     )
@@ -204,29 +229,29 @@ async def record_expense_changes(
     field_changes = _collect_changes(
         [
             (
-                FIELD_AMOUNT,
-                format_amount_text(transaction.amount),
-                format_amount_text(body.amount),
+                "amount",
+                transaction.amount,
+                body.amount,
             ),
             (
-                FIELD_CATEGORY,
-                old_category.name if old_category else "",
-                new_category.name if new_category else "",
+                "category",
+                _entity(old_category),
+                _entity(new_category),
             ),
             (
-                FIELD_WALLET,
-                old_wallet.name if old_wallet else "",
-                new_wallet.name if new_wallet else "",
+                "wallet",
+                _entity(old_wallet),
+                _entity(new_wallet),
             ),
             (
-                FIELD_DATE,
-                format_transaction_date_text(transaction.transaction_date),
-                format_transaction_date_text(body.transaction_date),
+                "date",
+                _date_value(transaction.transaction_date),
+                _date_value(body.transaction_date),
             ),
             (
-                FIELD_COMMENT,
-                _comment_text(transaction.comment),
-                _comment_text(body.comment),
+                "comment",
+                _comment_value(transaction.comment),
+                _comment_value(body.comment),
             ),
         ]
     )
@@ -256,21 +281,21 @@ async def record_transfer_changes(
         session, body.to_wallet_id, transaction.family_budget_id
     )
 
-    pairs: list[tuple[str, str, str]] = [
+    pairs: list[FieldChange] = [
         (
-            FIELD_AMOUNT,
-            format_amount_text(transaction.amount),
-            format_amount_text(body.amount),
+            "amount",
+            transaction.amount,
+            body.amount,
         ),
         (
-            FIELD_FROM,
-            old_from.name if old_from else "",
-            new_from.name if new_from else "",
+            "from",
+            _entity(old_from),
+            _entity(new_from),
         ),
         (
-            FIELD_TO,
-            old_to.name if old_to else "",
-            new_to.name if new_to else "",
+            "to",
+            _entity(old_to),
+            _entity(new_to),
         ),
     ]
 
@@ -278,22 +303,22 @@ async def record_transfer_changes(
         old_rate = (
             format_rate_text(transaction.rate)
             if transaction.rate is not None
-            else ""
+            else None
         )
-        new_rate = format_rate_text(stored_rate) if stored_rate is not None else ""
-        pairs.append((FIELD_RATE, old_rate, new_rate))
+        new_rate = format_rate_text(stored_rate) if stored_rate is not None else None
+        pairs.append(("rate", old_rate, new_rate))
 
     pairs.extend(
         [
             (
-                FIELD_DATE,
-                format_transaction_date_text(transaction.transaction_date),
-                format_transaction_date_text(body.transaction_date),
+                "date",
+                _date_value(transaction.transaction_date),
+                _date_value(body.transaction_date),
             ),
             (
-                FIELD_COMMENT,
-                _comment_text(transaction.comment),
-                _comment_text(body.comment),
+                "comment",
+                _comment_value(transaction.comment),
+                _comment_value(body.comment),
             ),
         ]
     )

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { GoalResponse } from '../../api/goals'
 import type { GoalCurrency } from './goalProgress'
 import {
@@ -18,10 +20,11 @@ type GoalCardProps = {
 }
 
 export function GoalCard({ goal, isOwner, onClose, onEdit, closing = false }: GoalCardProps) {
+  const { t } = useTranslation()
   const done = goal.status === 'closed'
   const currency = goal.currency as GoalCurrency
   const hasBar = !done
-  const pctLabel = done ? 'Закрыта' : `${goal.progress_pct ?? 0}%`
+  const pctLabel = done ? t('goals.closedBadge') : `${goal.progress_pct ?? 0}%`
   const left = goalLeftLine({
     done,
     balance: goal.balance,
@@ -89,7 +92,7 @@ export function GoalCard({ goal, isOwner, onClose, onEdit, closing = false }: Go
 
       <div className="goals-card__amounts">
         <div className="goals-card__saved">{formatGoalMoney(goal.balance, currency)}</div>
-        <div className="goals-card__target">из {formatGoalMoney(goal.target_amount, currency)}</div>
+        <div className="goals-card__target">{t('goals.ofTarget', { amount: formatGoalMoney(goal.target_amount, currency) })}</div>
       </div>
 
       <div className="goals-card__meta">
@@ -107,12 +110,12 @@ export function GoalCard({ goal, isOwner, onClose, onEdit, closing = false }: Go
             onClose(goal.id)
           }}
         >
-          Закрыть цель
+          {t('goals.closeGoal')}
         </button>
       ) : null}
 
       {showOwnerNote ? (
-        <div className="goals-card__owner-note">Закрыть цель может только владелец бюджета.</div>
+        <div className="goals-card__owner-note">{t('goals.ownerNote')}</div>
       ) : null}
     </div>
   )

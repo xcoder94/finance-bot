@@ -286,7 +286,7 @@ class TestText:
             await session.flush()
             parser = StubParser(responses={"sut, non": items_response("sut", "non")})
             bot = await send_text(session, monkeypatch, user, "sut, non", parser)
-            assert bot.sent[0].text == "Xarid ro‘yxatiga qo‘shdim: sut, non."
+            assert bot.sent[0].text == "Xarid ro'yxatiga qo'shdim: sut, non."
 
     async def test_user_without_wallet_can_still_add_items(self, monkeypatch) -> None:
         async with rollback_session() as session:

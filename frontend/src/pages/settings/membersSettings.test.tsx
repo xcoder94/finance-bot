@@ -6,7 +6,7 @@ import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 
 import ru from '../../i18n/locales/ru.json'
-import { LIMIT_MEMBERS } from '../../constants/entityLimits'
+import { limitMembers } from '../../constants/entityLimits'
 import { InviteLinkSheet } from '../../components/settings/InviteLinkSheet'
 import { MembersSettingsBody, MembersSettingsPageChrome } from './MembersSettingsPage'
 import type { MemberResponse } from '../../api/members'
@@ -132,14 +132,14 @@ describe('MembersSettingsPage chrome', () => {
 describe('InviteLinkSheet', () => {
   it('shows member limit hint and disables copy at four members', () => {
     const html = renderInviteSheet(true)
-    expect(html).toContain(LIMIT_MEMBERS)
+    expect(html).toContain(limitMembers())
     expect(html).toContain('form-sheet-primary')
     expect(html).toMatch(/disabled/)
   })
 
   it('allows copy when below member limit', () => {
     const html = renderInviteSheet(false)
-    expect(html).not.toContain(LIMIT_MEMBERS)
+    expect(html).not.toContain(limitMembers())
     expect(html).toContain('Скопировать')
     expect(html).toContain('Перевыпустить')
   })

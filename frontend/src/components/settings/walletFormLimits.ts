@@ -1,6 +1,6 @@
 import {
-  LIMIT_PERSONAL_WALLETS,
-  LIMIT_SHARED_WALLETS,
+  limitPersonalWallets,
+  limitSharedWallets,
   PERSONAL_WALLET_LIMIT,
   SHARED_WALLET_LIMIT,
 } from '../../constants/entityLimits'
@@ -13,10 +13,10 @@ export function walletCreateLimitHint(
   personalWalletCount: number,
 ): string | undefined {
   if (walletType === 'shared' && sharedWalletCount >= SHARED_WALLET_LIMIT) {
-    return LIMIT_SHARED_WALLETS
+    return limitSharedWallets()
   }
   if (walletType === 'personal' && personalWalletCount >= PERSONAL_WALLET_LIMIT) {
-    return LIMIT_PERSONAL_WALLETS
+    return limitPersonalWallets()
   }
   return undefined
 }

@@ -16,7 +16,7 @@ import { SettingsSubPageShell } from '../../components/settings/SettingsSubPageS
 import { SwipeableSettingsRow } from '../../components/settings/SwipeableSettingsRow'
 import {
   INCOME_CATEGORY_LIMIT,
-  LIMIT_INCOME_CATEGORIES,
+  limitIncomeCategories,
 } from '../../constants/entityLimits'
 import { useAuthStore } from '../../store/authStore'
 import {
@@ -26,7 +26,7 @@ import {
 } from '../../store/dataCacheStore'
 import {
   buildIncomeCategoryDeleteIntro,
-  CATEGORY_DELETE_DANGER_LABEL,
+  categoryDeleteDangerLabel,
   formatEntityTransactionSubtitle,
 } from '../../utils/entityDeleteConfirmCopy'
 import { getDisplayName } from '../../utils/getDisplayName'
@@ -183,7 +183,7 @@ export function IncomeCategoriesSettingsPage() {
           atLimit={sheetState.mode === 'create' && categoryCount >= INCOME_CATEGORY_LIMIT}
           limitMessage={
             sheetState.mode === 'create' && categoryCount >= INCOME_CATEGORY_LIMIT
-              ? LIMIT_INCOME_CATEGORIES
+              ? limitIncomeCategories()
               : undefined
           }
           editable={isOwner}
@@ -203,7 +203,7 @@ export function IncomeCategoriesSettingsPage() {
           entityName={getDisplayName(deleteTarget, t)}
           transactionCount={deleteTarget.transaction_count}
           intro={buildIncomeCategoryDeleteIntro(deleteTarget.transaction_count)}
-          dangerLabel={CATEGORY_DELETE_DANGER_LABEL}
+          dangerLabel={categoryDeleteDangerLabel()}
           onClose={closeSheets}
           onConfirm={() => void handleConfirmDelete()}
           confirming={deleting}

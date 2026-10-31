@@ -1,5 +1,7 @@
 import { type PointerEvent as ReactPointerEvent, useRef, useState } from 'react'
 
+import { useTranslation } from 'react-i18next'
+
 import {
   exceedsPointerDragThreshold,
   SETTINGS_SWIPE_DELETE_WIDTH,
@@ -20,6 +22,7 @@ export function SwipeableSettingsRow({
   onDelete,
   swipeDeleteEnabled = false,
 }: SwipeableSettingsRowProps) {
+  const { t } = useTranslation()
   const [offset, setOffset] = useState(0)
   const startX = useRef(0)
   const startOffset = useRef(0)
@@ -89,7 +92,7 @@ export function SwipeableSettingsRow({
           className="settings-swipe-row__delete"
           onClick={() => onDelete?.()}
         >
-          Удалить
+          {t('settings.delete')}
         </button>
       ) : null}
       <div

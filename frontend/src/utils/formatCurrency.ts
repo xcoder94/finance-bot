@@ -1,12 +1,13 @@
 import i18n from '../i18n'
 import { sumUnit } from './currencyUnit'
+import { groupThousands } from './groupThousands'
 
 export type Currency = 'UZS' | 'USD'
 
 export function formatCurrency(amount: number, currency: Currency): string {
   const sign = amount < 0 ? '-' : ''
   const absolute = Math.abs(amount)
-  const formatted = absolute.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const formatted = groupThousands(absolute)
 
   if (currency === 'USD') {
     return `${sign}$${formatted}`

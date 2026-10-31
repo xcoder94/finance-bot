@@ -446,6 +446,9 @@ async def create_pending_purchase(
             )
         )
         if existing is not None:
+            # a cancelled/expired wait is dead: the client must create a new one (new token)
+            if existing.status in ("cancelled", "expired") or await _expire_if_due(session, existing):
+                raise HTTPException(status_code=410, detail=CODE_PURCHASE_CLOSED)
             same_items = set(existing.item_ids) == set(ids)
             same_method = (not _is_open(existing)) or existing.method == METHOD_TO_DB[method]
             if not (same_items and same_method):

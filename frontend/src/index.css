@@ -712,7 +712,6 @@ body {
 .home-page__month-label {
   min-width: 140px;
   text-align: center;
-  text-transform: capitalize;
 }
 
 .home-month-nav__button {
@@ -1650,10 +1649,6 @@ button.home-ops-row:focus-visible {
   flex: 1;
   min-width: 0;
   text-align: center;
-}
-
-.analytics-page__month-bar .home-month-bar__label {
-  text-transform: capitalize;
 }
 
 .analytics-page__period-hint {

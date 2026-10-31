@@ -2,10 +2,11 @@ import { useTranslation } from 'react-i18next'
 
 import type { OnboardingState } from '../../api/me'
 import { formatMillions, trendMonthLabel, type TrendBar } from '../../utils/homeTrend'
+import { groupThousands } from '../../utils/groupThousands'
 
 function formatSumNumber(value: number): string {
   const sign = value < 0 ? '-' : ''
-  return `${sign}${Math.abs(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+  return `${sign}${groupThousands(Math.abs(value))}`
 }
 
 /** Longer amounts step the font down so «сум»/«so'm» is never cut off on 360px. */

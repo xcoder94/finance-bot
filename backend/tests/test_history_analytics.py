@@ -1340,7 +1340,9 @@ class TestAnalyticsTrendAndSummary:
         assert by_currency["USD"].transfer_net == 8
         assert summary.day_of_week_income["UZS"][0] == 1000
         assert summary.day_of_week_expense["UZS"][2] == 250 // 4
-        assert summary.day_of_week_income["USD"][6] == 75
+        # 2026-03-08 23:30 UTC is 04:30 on Monday 9 March in Tashkent (m3-5 fix1: weekday by Tashkent)
+        assert summary.day_of_week_income["USD"][0] == 75
+        assert summary.day_of_week_income["USD"][6] == 0
         uzs_summary = by_currency["UZS"]
         assert uzs_summary.most_expensive_weekday == 2
         assert uzs_summary.most_expensive_weekday_average == 250 // 4
@@ -1845,3 +1847,35 @@ class TestWalletBalances:
         assert resp.status_code == 200
         uzs = next(row for row in resp.json()["balances"] if row["currency"] == "UZS")
         assert uzs["balance"] == 400
+
+
+class TestWeekdayInTashkent:
+    async def test_night_expense_counts_on_tashkent_day(
+        self, api_client: tuple[AsyncClient, AsyncSession]
+    ) -> None:
+        # 2026-11-01 02:00 Tashkent (Sunday) == 2026-10-31 21:00 UTC (Saturday)
+        _client, session = api_client
+        telegram_id = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+        user, budget = await create_user_with_budget(session, telegram_id=telegram_id)
+        fx = await seed_fixtures(session, budget, user)
+        session.add(
+            Transaction(
+                family_budget_id=budget.id,
+                type="expense",
+                wallet_id=fx["wallet_uzs"].id,  # type: ignore[union-attr]
+                amount=400,
+                expense_category_id=fx["expense_sub_a"].id,  # type: ignore[union-attr]
+                created_by_user_id=user.id,
+                transaction_date=datetime(2026, 10, 31, 21, 0, tzinfo=UTC),
+            )
+        )
+        await session.flush()
+        summary = await get_summary(
+            session,
+            budget.id,
+            datetime(2026, 10, 31, tzinfo=UTC),
+            datetime(2026, 11, 2, tzinfo=UTC),
+            now=datetime(2026, 11, 2, tzinfo=UTC),
+        )
+        week = summary.day_of_week_expense["UZS"]
+        assert week[6] > 0 and week[5] == 0  # Sunday, not Saturday

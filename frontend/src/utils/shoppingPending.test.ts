@@ -132,6 +132,25 @@ describe('createBotStarter (client_token per attempt)', () => {
     expect(create).toHaveBeenCalledTimes(2)
     expect(close).not.toHaveBeenCalled()
   })
+  it('410 purchase_closed: retries once with a fresh token and closes', async () => {
+    const create = vi.fn()
+      .mockRejectedValueOnce(new ShoppingApiError('purchase_closed', 410))
+      .mockResolvedValueOnce({ pending: pending(), created: true })
+    const { starter, close } = mk(create)
+    expect(await starter.start('voice', ['a'])).toBe('closed')
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(tokenOf(create, 0)).not.toBe(tokenOf(create, 1))
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+  it('second refusal -> failed, and the NEXT press uses yet another token', async () => {
+    const create = vi.fn(async () => { throw new ShoppingApiError('purchase_closed', 410) })
+    const { starter, close } = mk(create)
+    expect(await starter.start('voice', ['a'])).toBe('failed')
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(close).not.toHaveBeenCalled()
+    await starter.start('voice', ['a'])
+    expect(tokenOf(create, 2)).not.toBe(tokenOf(create, 1))
+  })
 })
 
 describe('resolveLaunch (deep link from the bot)', () => {

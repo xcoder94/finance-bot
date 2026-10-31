@@ -1,8 +1,10 @@
+import { t } from '../../i18n/t'
 import { sumUnit } from '../../utils/currencyUnit'
+import { groupThousands } from '../../utils/groupThousands'
 export type GoalCurrency = 'UZS' | 'USD'
 
 function formatGroupedAmount(amount: number): string {
-  return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return groupThousands(amount)
 }
 
 export function formatGoalMoney(amount: number, currency: GoalCurrency): string {
@@ -30,18 +32,18 @@ export function goalLeftLine(opts: {
   currency: GoalCurrency
 }): string | null {
   if (opts.done) {
-    return 'Показатели заморожены'
+    return t('goals.frozen')
   }
 
   if (opts.balance > opts.target) {
-    return `Накоплено на ${formatGoalMoney(opts.balance - opts.target, opts.currency)} больше`
+    return t('goals.over', { amount: formatGoalMoney(opts.balance - opts.target, opts.currency) })
   }
 
   if (opts.balance === opts.target) {
     return null
   }
 
-  return `Осталось ${formatGoalMoney(opts.target - opts.balance, opts.currency)}`
+  return t('goals.left', { amount: formatGoalMoney(opts.target - opts.balance, opts.currency) })
 }
 
 export function goalDueLabel(
@@ -50,14 +52,14 @@ export function goalDueLabel(
   done: boolean,
 ): string {
   if (done && closedAt) {
-    return `закрыта ${formatGoalDate(closedAt)}`
+    return t('goals.closedOn', { date: formatGoalDate(closedAt) })
   }
 
   if (!deadline) {
-    return 'без срока'
+    return t('goals.noDeadline')
   }
 
-  return `до ${formatGoalDate(deadline)}`
+  return t('goals.until', { date: formatGoalDate(deadline) })
 }
 
 export function goalShowCloseButton(opts: {
