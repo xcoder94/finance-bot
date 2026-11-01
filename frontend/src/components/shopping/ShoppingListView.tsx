@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { ShoppingItem } from '../../api/shopping'
 import type { AddResult, ShoppingStatus } from '../../store/shoppingStore'
+import { useLeavingItems } from '../../hooks/useLeavingItems'
 import { ShoppingAddRow } from './ShoppingAddRow'
 import { ShoppingSwipeRow } from './ShoppingSwipeRow'
 
@@ -42,6 +43,7 @@ export function ShoppingListView({
 }: ShoppingListViewProps) {
   const { t } = useTranslation()
   const [openId, setOpenId] = useState<string | null>(null)
+  const displayed = useLeavingItems(items)
 
   const hasItems = items.length > 0
   const showSkeleton = (status === 'loading' || status === 'idle') && !hasItems
@@ -81,9 +83,10 @@ export function ShoppingListView({
 
       {hasItems ? (
         <div className="shopping-list">
-          {items.map((item) => (
+          {displayed.map(({ item, leaving }) => (
             <ShoppingSwipeRow
               key={item.id}
+              leaving={leaving}
               name={item.name}
               open={openId === item.id}
               onOpenChange={(next) => setOpenId(next ? item.id : null)}

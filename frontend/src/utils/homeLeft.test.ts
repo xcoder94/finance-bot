@@ -81,3 +81,16 @@ describe('remainingFromSummary', () => {
     expect(remainingFromSummary({ by_currency: [] } as never)).toBe(0)
   })
 })
+
+import { monthHasIncome } from './homeLeft'
+
+describe('monthHasIncome (no income -> no daily allowance)', () => {
+  const sum = (rows: Array<{ currency: string; income: number; expense: number }>) =>
+    ({ by_currency: rows } as never)
+  it('true only when the UZS row has income > 0', () => {
+    expect(monthHasIncome(sum([{ currency: 'UZS', income: 5000000, expense: 100 }]))).toBe(true)
+    expect(monthHasIncome(sum([{ currency: 'UZS', income: 0, expense: 100 }]))).toBe(false)
+    expect(monthHasIncome(sum([]))).toBe(false)
+    expect(monthHasIncome(sum([{ currency: 'USD', income: 10, expense: 0 }]))).toBe(false)
+  })
+})

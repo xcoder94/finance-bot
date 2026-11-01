@@ -48,6 +48,8 @@ import {
   resolveEditSheetLabel,
   walletCurrencySuffix,
 } from '../utils/transactionFormFields'
+import { celebrateSave } from '../store/successFlashStore'
+import { haptic } from '../telegram/haptic'
 
 function resolveExpenseCategorySelectionWithT(
   categories: ExpenseCategory[],
@@ -207,8 +209,10 @@ export function EditExpensePage() {
       })
       cacheTransaction(familyId, updated)
       invalidateTransactionData(familyId, id)
+      celebrateSave()
       closeSheet()
     } catch {
+      haptic.error()
       setSubmitError(true)
     } finally {
       setSubmitting(false)

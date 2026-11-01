@@ -179,3 +179,9 @@ export async function fetchPurchase(id: string): Promise<ShoppingPurchase> {
   const response = await send(`/api/v1/shopping/purchases/${id}`, 'GET')
   return (await response.json()) as ShoppingPurchase
 }
+
+/** Idempotent: 200 {status:"cancelled"}; 410 purchase_closed = already recorded; 404 = foreign / unknown. */
+export async function cancelPendingPurchaseApi(id: string): Promise<{ status: 'cancelled' }> {
+  const response = await send(`/api/v1/shopping/purchases/${id}/cancel`, 'POST')
+  return (await response.json()) as { status: 'cancelled' }
+}

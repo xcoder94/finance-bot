@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import suppress
 import logging
 import uuid
 from datetime import date, datetime
@@ -79,7 +80,7 @@ from app.services.quick_entry_wallets import (
     list_wallets_for_parse,
     resolve_wallet,
 )
-from app.services.shopping import add_shopping_items, find_open_purchase
+from app.services.shopping import add_shopping_items, cancel_purchase, find_open_purchase
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id, greeting_inline_keyboard
 from bot.quick_entry.cards import (
     card_keyboard,
@@ -100,6 +101,11 @@ from bot.quick_entry.shopping_pending import (
     bare_text_amount,
     finish_unrecognized,
     finish_with_amount,
+)
+from bot.quick_entry.pending_texts import (
+    CANCEL_PREFIX,
+    already_recorded_text,
+    cancelled_text,
 )
 from bot.quick_entry.pending import consume_pending, create_pending, get_pending
 from bot.quick_entry.texts import (
@@ -860,7 +866,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
 
         default_wallet = await _get_default_wallet(session, user)
         open_purchase = await find_open_purchase(session, user.id)
-        pending = open_purchase if open_purchase and open_purchase.method == "voice" else None
+        pending = open_purchase
 
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
@@ -1228,6 +1234,42 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
             parse_mode="Markdown",
         )
         await callback.answer()
+
+
+async def handle_purchase_cancel(callback: CallbackQuery) -> None:
+    """«Отменить закупку» under the wait-for-sum messages."""
+    if callback.from_user is None or callback.data is None:
+        return
+    try:
+        purchase_id = uuid.UUID(callback.data.removeprefix(CANCEL_PREFIX))
+    except ValueError:
+        await callback.answer()
+        return
+    async with async_session_factory() as session:
+        user = await get_active_user_by_telegram_id(session, callback.from_user.id)
+        if user is None:
+            await _answer_gone(callback)
+            return
+        language = user.language
+        try:
+            await cancel_purchase(session, user, purchase_id)
+            text = cancelled_text(language)
+        except HTTPException as exc:
+            await session.rollback()
+            if exc.status_code != 410:
+                await _answer_gone(callback)
+                return
+            text = already_recorded_text(language)
+    await callback.answer()
+    if callback.message is not None:
+        with suppress(Exception):
+            await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.answer(text)
+
+
+@router.callback_query(F.data.startswith(CANCEL_PREFIX))
+async def purchase_cancel_callback(callback: CallbackQuery) -> None:
+    await handle_purchase_cancel(callback)
 
 
 @router.callback_query(F.data.startswith("qe:del:"))

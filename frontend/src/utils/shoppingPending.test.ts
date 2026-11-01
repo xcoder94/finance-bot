@@ -301,3 +301,43 @@ describe('clearPendingIfMatches', () => {
     expect(readPending(s)).toBeNull()
   })
 })
+
+import { cancelPendingPurchase } from './shoppingPending'
+
+describe('cancelPendingPurchase', () => {
+  const remembered = () => {
+    const s = mem()
+    rememberPending(s, { id: ID, method: 'receipt', ids: ['a'] })
+    return s
+  }
+  it('200 -> cancelled, memory cleared', async () => {
+    const s = remembered()
+    const cancel = vi.fn(async () => ({ status: 'cancelled' as const }))
+    expect(await cancelPendingPurchase(s, cancel, ID)).toEqual({ kind: 'cancelled' })
+    expect(cancel).toHaveBeenCalledWith(ID)
+    expect(readPending(s)).toBeNull()
+  })
+  it('404 (foreign / gone) -> cancelled too, memory cleared', async () => {
+    const s = remembered()
+    expect(await cancelPendingPurchase(s, async () => { throw new ShoppingApiError('not_found', 404) }, ID)).toEqual({ kind: 'cancelled' })
+    expect(readPending(s)).toBeNull()
+  })
+  it('410 purchase_closed -> closed, memory kept (the result screen clears it)', async () => {
+    const s = remembered()
+    expect(await cancelPendingPurchase(s, async () => { throw new ShoppingApiError('purchase_closed', 410) }, ID)).toEqual({ kind: 'closed' })
+    expect(readPending(s)).not.toBeNull()
+  })
+  it('network -> failed, memory kept', async () => {
+    const s = remembered()
+    expect(await cancelPendingPurchase(s, async () => { throw new ShoppingApiError('network') }, ID)).toEqual({ kind: 'failed' })
+    expect(readPending(s)).not.toBeNull()
+  })
+})
+
+describe('resolveStartup unrecognized keeps manual entry (dev-fix5)', () => {
+  it('unrecognized -> open (manual entry, with cancel)', async () => {
+    const s = mem()
+    rememberPending(s, { id: ID, method: 'voice', ids: ['a'] })
+    expect(await resolveStartup(s, async () => pending({ status: 'unrecognized' }), { pathname: '/', search: '' })).toEqual({ kind: 'open', id: ID })
+  })
+})

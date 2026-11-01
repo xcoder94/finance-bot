@@ -39,6 +39,8 @@ import {
   resolveDefaultWalletId,
   walletCurrencySuffix,
 } from '../utils/transactionFormFields'
+import { celebrateSave } from '../store/successFlashStore'
+import { haptic } from '../telegram/haptic'
 
 type ReferenceState =
   | { status: 'loading' }
@@ -172,8 +174,10 @@ export function AddExpensePage() {
         comment: comment.trim() || null,
       })
       invalidateHomeData(familyId)
+      celebrateSave()
       closeSheet()
     } catch {
+      haptic.error()
       setSubmitError(true)
     } finally {
       setSubmitting(false)

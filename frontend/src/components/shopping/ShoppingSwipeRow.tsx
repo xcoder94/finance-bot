@@ -8,6 +8,8 @@ export const SHOPPING_SWIPE_WIDTH = 192
 
 type ShoppingSwipeRowProps = {
   name: string
+  /** Row was just removed: plays the collapse animation, then the parent drops it. */
+  leaving?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onEdit: () => void
@@ -16,6 +18,7 @@ type ShoppingSwipeRowProps = {
 
 export function ShoppingSwipeRow({
   name,
+  leaving = false,
   open,
   onOpenChange,
   onEdit,
@@ -79,7 +82,7 @@ export function ShoppingSwipeRow({
   }
 
   return (
-    <div className="shopping-row">
+    <div className={`shopping-row${leaving ? ' shopping-row--leaving' : ''}`}>
       <div className="shopping-row__actions">
         <button
           type="button"

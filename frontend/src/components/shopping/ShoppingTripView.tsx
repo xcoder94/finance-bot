@@ -16,7 +16,7 @@ type ShoppingTripViewProps = {
 function Tick() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 8.5l3.2 3.2L13 4.8" />
+      <path className="motion-tick" pathLength={1} d="M3 8.5l3.2 3.2L13 4.8" />
     </svg>
   )
 }

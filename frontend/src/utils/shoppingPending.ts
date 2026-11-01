@@ -223,3 +223,21 @@ export async function resolveStartup(
     return skip
   }
 }
+
+export type CancelResult = { kind: 'cancelled' } | { kind: 'closed' } | { kind: 'failed' }
+
+/** Cancel the wait: 404 counts as done (nothing left to cancel); 410 -> already recorded, show its result. */
+export async function cancelPendingPurchase(
+  storage: PendingStorage | null,
+  cancel: (id: string) => Promise<unknown>,
+  id: string,
+): Promise<CancelResult> {
+  try {
+    await cancel(id)
+  } catch (e) {
+    if (e instanceof ShoppingApiError && e.code === 'purchase_closed') return { kind: 'closed' }
+    if (!(e instanceof ShoppingApiError && e.code === 'not_found')) return { kind: 'failed' }
+  }
+  clearPendingIfMatches(storage, id)
+  return { kind: 'cancelled' }
+}

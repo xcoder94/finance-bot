@@ -23,6 +23,7 @@ from app.services.shopping import (
     CODE_RECEIPT_DISABLED,
     METHOD_FROM_DB,
     complete_pending_purchase,
+    cancel_purchase,
     create_pending_purchase,
     get_own_purchase,
     add_shopping_items,
@@ -113,7 +114,7 @@ async def create_pending(
         client_token=body.client_token,
     )
     if created:
-        await send_pending_hint(user, purchase.method)
+        await send_pending_hint(user, purchase.method, purchase.id)
     else:
         response.status_code = 200
     return _pending_status(purchase)
@@ -124,6 +125,13 @@ async def get_pending(
     purchase_id: uuid.UUID, user: CurrentUserDep, session: SessionDep
 ) -> PendingStatus:
     return _pending_status(await get_own_purchase(session, user, purchase_id))
+
+
+@router.post("/purchases/{purchase_id}/cancel")
+async def cancel_pending(
+    purchase_id: uuid.UUID, user: CurrentUserDep, session: SessionDep
+) -> PendingStatus:
+    return _pending_status(await cancel_purchase(session, user, purchase_id))
 
 
 @router.post("/purchases/pending/{purchase_id}/amount", status_code=201)

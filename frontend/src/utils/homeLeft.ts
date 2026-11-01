@@ -51,3 +51,9 @@ export function remainingFromSummary(summary: SummaryResponse): number {
   const row = summary.by_currency.find((entry) => entry.currency === 'UZS')
   return row ? row.income - row.expense : 0
 }
+
+/** The month has UZS income; without it «можно тратить в день» is meaningless (dev-fix5). */
+export function monthHasIncome(summary: SummaryResponse): boolean {
+  const row = summary.by_currency.find((entry) => entry.currency === 'UZS')
+  return !!row && row.income > 0
+}

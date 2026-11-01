@@ -270,7 +270,7 @@ class TestPhoto:
             assert "30 000 сум" in bot.sent[0].text
             assert await session.scalar(select(func.count()).select_from(ShoppingItem)) == 2
 
-    async def test_photo_with_voice_pending_is_normal_quick_entry(self, monkeypatch) -> None:
+    async def test_photo_with_voice_pending_completes_it(self, monkeypatch) -> None:
         async with rollback_session() as session:
             user, budget, ids = await setup_family(session, 9_350_006)
             purchase = await open_pending(session, user, ids, "voice")
@@ -279,8 +279,8 @@ class TestPhoto:
             )
             await feed(monkeypatch, session, user.telegram_id, **PHOTO)
             await session.refresh(purchase)
-            assert purchase.status == "awaiting"
-            assert await session.scalar(select(func.count()).select_from(ShoppingItem)) == 2
+            assert purchase.status == "completed"  # dev-fix5: any method of giving the sum
+            assert await session.scalar(select(func.count()).select_from(ShoppingItem)) == 0
 
     async def test_expired_pending_photo_goes_to_quick_entry(self, monkeypatch) -> None:
         async with rollback_session() as session:

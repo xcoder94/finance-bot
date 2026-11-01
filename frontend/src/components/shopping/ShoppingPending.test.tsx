@@ -91,10 +91,11 @@ describe('ShoppingAmountView: finish sheet with methods (mockup, dev-fix2)', () 
   })
 })
 
+const cancelProps = { onCancelPurchase: noop, cancelBusy: false, cancelFailed: false }
 const manualProps = {
   method: 'receipt' as const, status: 'unrecognized' as const, amount: '', overLimit: false, currencySuffix: 'сум', busy: false,
   failed: false, canRetry: true, onAmount: noop, onOverLimit: noop, onSubmit: noop,
-  onRetry: noop, onCancel: noop,
+  onRetry: noop, onCancel: noop, ...cancelProps,
 }
 
 describe('ShoppingManualView («Введите сумму вручную»)', () => {
@@ -133,20 +134,37 @@ describe('ShoppingManualView («Введите сумму вручную»)', ()
 
 describe('ShoppingWaitingBanner (back in the app while waiting)', () => {
   it('receipt / voice wait text with the manual link', () => {
-    const r = wrap(<ShoppingWaitingBanner method="receipt" status="awaiting" onManual={noop} />)
+    const r = wrap(<ShoppingWaitingBanner method="receipt" status="awaiting" onManual={noop} {...cancelProps} />)
     expect(r).toContain('Ждём фото чека в боте')
     expect(r).toContain('Ввести сумму вручную')
-    const v = wrap(<ShoppingWaitingBanner method="voice" status="awaiting" onManual={noop} />)
+    const v = wrap(<ShoppingWaitingBanner method="voice" status="awaiting" onManual={noop} {...cancelProps} />)
     expect(v).toContain('Ждём голосовое в боте')
   })
   it('Uzbek', () => {
-    const html = wrap(<ShoppingWaitingBanner method="receipt" status="awaiting" onManual={noop} />, 'uz')
+    const html = wrap(<ShoppingWaitingBanner method="receipt" status="awaiting" onManual={noop} {...cancelProps} />, 'uz')
     expect(html).toContain('Botda chek rasmini kutyapmiz')
     expect(html).toContain('Summani qo&#x27;lda kiritish')
   })
   it('unrecognized: no «waiting» text, only the manual entry', () => {
-    const html = wrap(<ShoppingWaitingBanner method="receipt" status="unrecognized" onManual={noop} />)
+    const html = wrap(<ShoppingWaitingBanner method="receipt" status="unrecognized" onManual={noop} {...cancelProps} />)
     expect(html).not.toContain('Ждём')
     expect(html).toContain('Ввести сумму вручную')
+  })
+})
+
+describe('cancel purchase (dev-fix5)', () => {
+  it('manual view: secondary cancel button, then an explicit confirmation', async () => {
+    const { ShoppingCancelPurchase } = await import('./ShoppingCancelPurchase')
+    const html = wrap(<ShoppingManualView {...manualProps} onCancelPurchase={noop} cancelBusy={false} cancelFailed={false} />)
+    expect(html).toContain('Отменить закупку')
+    const confirm = wrap(<ShoppingCancelPurchase onConfirm={noop} busy={false} failed={false} initialConfirming />)
+    expect(confirm).toContain('Да, отменить')
+    expect(confirm).toContain('role="alertdialog"')
+    expect(wrap(<ShoppingCancelPurchase onConfirm={noop} busy={false} failed />)).toContain('role="alert"')
+    expect(wrap(<ShoppingCancelPurchase onConfirm={noop} busy={false} failed={false} initialConfirming />, 'uz')).not.toContain('Да,')
+  })
+  it('waiting banner has the cancel too', () => {
+    const html = wrap(<ShoppingWaitingBanner method="voice" status="awaiting" onManual={noop} onCancelPurchase={noop} cancelBusy={false} cancelFailed={false} />)
+    expect(html).toContain('Отменить закупку')
   })
 })

@@ -3925,3 +3925,231 @@ button.home-ops-row:focus-visible {
   opacity: 0.45;
   cursor: default;
 }
+
+/* ---------- Shopping: cancel purchase (dev-fix5) ---------- */
+.shopping-cancel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shopping-cancel__open {
+  align-self: flex-start;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--red, #e5484d);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.shopping-cancel__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg2);
+}
+
+.shopping-cancel__text {
+  font-size: 13.5px;
+}
+
+.shopping-cancel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.shopping-cancel__no,
+.shopping-cancel__yes {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.shopping-cancel__no {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.shopping-cancel__yes {
+  background: var(--red, #e5484d);
+  color: #fff;
+}
+
+.shopping-cancel__open:disabled,
+.shopping-cancel__no:disabled,
+.shopping-cancel__yes:disabled {
+  opacity: 0.5;
+}
+
+/* ---- dev-fix6: motion (press feedback, sheets, ticks, skeleton lines) ---- */
+button:not(:disabled):not(.shopping-row__main):not(.shopping-row__action):not(.shopping-trip__row):not(.settings-swipe-row__main):not(.home-ops-row):not(.home-month-nav__button),
+a.tabbar-link {
+  transition: transform 0.12s ease-out, opacity 0.12s ease-out, background-color 0.12s ease-out;
+}
+
+button:not(:disabled):not(.shopping-row__main):not(.shopping-row__action):not(.shopping-trip__row):not(.settings-swipe-row__main):not(.home-ops-row):not(.home-month-nav__button):active,
+a.tabbar-link:active {
+  transform: scale(0.97);
+}
+
+.shopping-row__main,
+.shopping-trip__row,
+.home-ops-row,
+.settings-swipe-row__main {
+  transition: background-color 0.12s ease-out;
+}
+
+.shopping-row__main:active,
+.shopping-trip__row:active {
+  background: var(--chip);
+}
+
+.shopping-trip__row:active .shopping-trip__cb {
+  transform: scale(0.9);
+}
+
+.shopping-trip__cb {
+  transition: background-color 0.12s, border-color 0.12s, transform 0.12s ease-out;
+}
+
+/* Sheets: slide up over a dimmed backdrop, reverse on close */
+.form-sheet-backdrop {
+  animation: motion-fade-in 0.2s ease-out both;
+}
+
+.form-sheet-panel {
+  animation: motion-sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.form-sheet-backdrop--closing {
+  animation: motion-fade-out 0.2s ease-in both;
+  pointer-events: none;
+}
+
+.form-sheet-backdrop--closing .form-sheet-panel {
+  animation: motion-sheet-down 0.2s ease-in both;
+}
+
+@keyframes motion-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes motion-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes motion-sheet-up {
+  from { transform: translateY(100%); }
+}
+
+@keyframes motion-sheet-down {
+  to { transform: translateY(100%); }
+}
+
+/* Check mark that draws itself; the resting state is the fully drawn one */
+.motion-tick {
+  stroke-dasharray: 1 1;
+  animation: motion-draw 0.4s ease-out 0.12s both;
+}
+
+@keyframes motion-draw {
+  from { stroke-dashoffset: 1; }
+}
+
+/* Trip list: strike-through fades in, row appears / collapses */
+.shopping-trip__name {
+  text-decoration: line-through;
+  text-decoration-color: transparent;
+  transition: color 0.2s ease-out, text-decoration-color 0.2s ease-out;
+}
+
+.shopping-trip__name--on {
+  text-decoration-color: var(--hint);
+}
+
+.shopping-row {
+  animation: motion-row-in 0.22s ease-out both;
+}
+
+.shopping-row--leaving {
+  overflow: hidden;
+  pointer-events: none;
+  animation: motion-row-out 0.22s ease-in forwards;
+}
+
+@keyframes motion-row-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes motion-row-out {
+  from { max-height: 64px; opacity: 1; }
+  to { max-height: 0; opacity: 0; border-bottom-width: 0; }
+}
+
+/* Success flash after saving an operation */
+.success-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: motion-flash 1s ease-out both;
+}
+
+.success-flash__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--acct);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes motion-flash {
+  0% { opacity: 0; transform: scale(0.6); }
+  18% { opacity: 1; transform: scale(1.06); }
+  28% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Skeleton line standing in for a loading figure */
+.motion-skel-line {
+  display: inline-block;
+  width: 84px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--skel);
+  animation: home-shimmer 1.4s ease-in-out infinite;
+}
+
+.motion-skel-line--block {
+  display: block;
+  width: 100%;
+  height: 64px;
+  border-radius: 14px;
+}
+
+/* Owner-wide switch: reduced motion turns every animation and transition off */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { ShoppingPurchase } from '../../api/shopping'
+import { haptic } from '../../telegram/haptic'
+import { AnimatedTick } from '../AnimatedTick'
 import { formatCurrency } from '../../utils/formatCurrency'
 
 type ShoppingResultViewProps = {
@@ -23,14 +26,15 @@ export function ShoppingResultView({
   const { t } = useTranslation()
   const currency = purchase.currency === 'USD' ? 'USD' : 'UZS'
   const line = [categoryLabel ?? purchase.category_label, walletLabel ?? purchase.wallet_name].join(' · ')
+  useEffect(() => {
+    haptic.success()
+  }, [])
   const lost = requested !== undefined && purchase.items_recorded < requested
 
   return (
     <div className="shopping-page shopping-result">
       <div className="shopping-result__tick" aria-hidden="true">
-        <svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 8.5l3.2 3.2L13 4.8" />
-        </svg>
+        <AnimatedTick size={26} />
       </div>
       <div className="shopping-result__title" role="status">
         {t('shopping.resultTitle', { count: purchase.items_recorded })}

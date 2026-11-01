@@ -27,6 +27,7 @@ from app.services.shopping import complete_pending_purchase, mark_unrecognized
 from bot.quick_entry.pending_texts import (
     launcher_keyboard,
     not_recognized_text,
+    waiting_keyboard,
     recorded_text,
 )
 from bot.quick_entry.texts import unparsed_limit_text
@@ -210,7 +211,7 @@ async def finish_with_amount(
         await session.rollback()
         await message.answer(
             not_recognized_text(user.language),
-            reply_markup=launcher_keyboard(user.language, purchase.id),
+            reply_markup=waiting_keyboard(user.language, purchase.id, launcher=True),
         )
         return
     await message.answer(
@@ -239,14 +240,14 @@ async def finish_unrecognized(
             await mark_unrecognized(session, purchase_id)
             await message.answer(
                 unparsed_limit_text(daily_unparsed_limit),
-                reply_markup=launcher_keyboard(user.language, purchase_id),
+                reply_markup=waiting_keyboard(user.language, purchase_id, launcher=True),
             )
             return
     await session.commit()
     await mark_unrecognized(session, purchase_id)
     await message.answer(
         not_recognized_text(user.language),
-        reply_markup=launcher_keyboard(user.language, purchase_id),
+        reply_markup=waiting_keyboard(user.language, purchase_id, launcher=True),
     )
 
 

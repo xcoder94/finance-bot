@@ -74,14 +74,14 @@ class TestCreate:
         assert row.method == "photo" and row.created_by_user_id == fam["user"].id
         delta = row.expires_at - datetime.now(UTC)
         assert timedelta(minutes=29) < delta <= timedelta(minutes=30)
-        assert hints == [(tid, "Пришлите фото чека — запишу одной суммой.")]
+        assert hints == [(tid, "Пришлите сумму закупки: голосом, фото чека или текстом.")]
 
     async def test_voice_hint_text(self, api_client, hints) -> None:
         client, session = api_client
         fam, tid, ids = await two_items(client, session)
         r = await create_pending(client, tid, ids, "voice")
         assert r.status_code == 201
-        assert hints == [(tid, "Скажите сумму закупки голосом.")]
+        assert hints == [(tid, "Пришлите сумму закупки: голосом, фото чека или текстом.")]
         row = await session.get(ShoppingPurchase, uuid.UUID(r.json()["id"]))
         assert row.method == "voice"
 
@@ -91,7 +91,7 @@ class TestCreate:
         fam["user"].language = "uz"
         await session.flush()
         await create_pending(client, tid, ids, "voice")
-        assert hints[0][1] == "Xarid summasini ovozli xabarda ayting."
+        assert hints[0][1] == "Xarid summasini yuboring: ovozli xabar, chek rasmi yoki matn bilan."
 
     async def test_receipt_rejected_when_flag_off(self, api_client, hints, monkeypatch) -> None:
         client, session = api_client

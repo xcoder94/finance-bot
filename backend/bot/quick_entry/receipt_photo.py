@@ -219,7 +219,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
 
         default_wallet = await _get_default_wallet(session, user)
         open_purchase = await find_open_purchase(session, user.id)
-        pending = open_purchase if open_purchase and open_purchase.method == "photo" else None
+        pending = open_purchase
         if default_wallet is None and pending is None:
             await message.answer(MSG_NO_AMOUNT)
             return

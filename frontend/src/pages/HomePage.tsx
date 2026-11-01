@@ -35,7 +35,7 @@ import {
   peekPersonalWalletBalances,
 } from '../store/dataCacheStore'
 import { resolveFetchState, type FetchState, type KeyedFetchState } from '../utils/homeFetchState'
-import { daysLeftInMonth, perDayAllowance, remainingFromSummary } from '../utils/homeLeft'
+import { daysLeftInMonth, monthHasIncome, perDayAllowance, remainingFromSummary } from '../utils/homeLeft'
 import { buildTrend3, trendEndMonthParam } from '../utils/homeTrend'
 import {
   loadDismissedAt,
@@ -44,6 +44,7 @@ import {
   shouldShowOnboardingCard,
 } from '../utils/onboardingDismiss'
 import { editRouteForItem } from '../utils/editRouteForItem'
+import { CountUp } from '../components/CountUp'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
 import {
   getHomeBudgetHeading,
@@ -488,7 +489,12 @@ export function HomePage() {
           {anyBlockFailed ? null : summaryLoading ? (
             <HomeLeftSkeleton />
           ) : (
-            <HomeLeftBlock remaining={remaining} perDay={perDay} days={daysLeft} />
+            <HomeLeftBlock
+              remaining={remaining}
+              perDay={perDay}
+              days={daysLeft}
+              noIncome={!!summaryData && !monthHasIncome(summaryData)}
+            />
           )}
 
           {anyBlockFailed ? null : (
@@ -496,24 +502,44 @@ export function HomePage() {
           <div className="home-figures-card">
             <div className="home-figures-card__label">{balanceMonthLabel(month)}</div>
             <div className={`home-figures-card__balance${balanceSizeClass(balanceText)}`}>
-              {balanceText}
+              {summaryUnavailable || summaryLoading ? (
+                balanceText
+              ) : (
+                <CountUp
+                  id="home-balance"
+                  value={remaining}
+                  format={(n) => formatCurrency(n, primaryCurrency)}
+                />
+              )}
             </div>
             <div className="home-figures-card__stats">
               <div className="home-figures-card__stat">
                 <div className="home-figures-card__stat-label">{t('home.income')}</div>
                 <div className="home-figures-card__stat-value home-figures-card__stat-value--income">
-                  {summaryUnavailable || summaryLoading
-                    ? '—'
-                    : formatCurrency(income, primaryCurrency)}
+                  {summaryUnavailable || summaryLoading ? (
+                    '—'
+                  ) : (
+                    <CountUp
+                      id="home-income"
+                      value={income}
+                      format={(n) => formatCurrency(n, primaryCurrency)}
+                    />
+                  )}
                 </div>
               </div>
               <div className="home-figures-card__stat-divider" aria-hidden="true" />
               <div className="home-figures-card__stat">
                 <div className="home-figures-card__stat-label">{t('home.expense')}</div>
                 <div className="home-figures-card__stat-value home-figures-card__stat-value--expense">
-                  {summaryUnavailable || summaryLoading
-                    ? '—'
-                    : formatCurrency(expense, primaryCurrency)}
+                  {summaryUnavailable || summaryLoading ? (
+                    '—'
+                  ) : (
+                    <CountUp
+                      id="home-expense"
+                      value={expense}
+                      format={(n) => formatCurrency(n, primaryCurrency)}
+                    />
+                  )}
                 </div>
               </div>
             </div>

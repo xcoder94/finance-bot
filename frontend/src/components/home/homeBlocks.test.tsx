@@ -64,3 +64,16 @@ describe('HomeLeftBlock amounts use NBSP digit groups', () => {
     expect(html).not.toMatch(/\d \d{3}/)
   })
 })
+
+describe('HomeLeftBlock without income (dev-fix5)', () => {
+  it('shows a dash and the add-income hint instead of a sum', () => {
+    const html = renderToStaticMarkup(
+      <I18nextProvider i18n={make('ru')}>
+        <HomeLeftBlock remaining={-300000} perDay={null} days={14} noIncome />
+      </I18nextProvider>,
+    )
+    expect(html).toContain('Добавьте доход, чтобы посчитать')
+    expect(html).not.toContain('месяц завершён')
+    expect(html).toContain('—')
+  })
+})

@@ -10,13 +10,25 @@ from urllib.parse import urlsplit, urlunsplit
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from app import config
+from app.config import receipt_photo_enabled
 from bot.quick_entry.cards import format_number
 
+# The chosen method does not matter any more: any way of giving the sum works.
 _HINT = {
-    ("photo", "ru"): "Пришлите фото чека — запишу одной суммой.",
-    ("photo", "uz"): "Chek rasmini yuboring — bitta summa qilib yozaman.",
-    ("voice", "ru"): "Скажите сумму закупки голосом.",
-    ("voice", "uz"): "Xarid summasini ovozli xabarda ayting.",
+    ("all", "ru"): "Пришлите сумму закупки: голосом, фото чека или текстом.",
+    ("all", "uz"): "Xarid summasini yuboring: ovozli xabar, chek rasmi yoki matn bilan.",
+    ("no_photo", "ru"): "Пришлите сумму закупки: голосом или текстом.",
+    ("no_photo", "uz"): "Xarid summasini yuboring: ovozli xabar yoki matn bilan.",
+}
+_CANCEL_BUTTON = {"ru": "Отменить закупку", "uz": "Xaridni bekor qilish"}
+CANCEL_PREFIX = "shp:cancel:"
+_CANCELLED = {
+    "ru": "Закупка отменена. Товары остались в списке.",
+    "uz": "Xarid bekor qilindi. Mahsulotlar ro'yxatda qoldi.",
+}
+_ALREADY_RECORDED = {
+    "ru": "Закупка уже записана.",
+    "uz": "Xarid allaqachon yozilgan.",
 }
 _RECORDED = {
     "ru": "Записал закупку: {amount} сум.",
@@ -33,8 +45,30 @@ def _lang(language: str | None) -> str:
     return language if language in ("ru", "uz") else "ru"
 
 
-def pending_hint_text(language: str | None, method: str) -> str:
-    return _HINT[(method, _lang(language))]
+def pending_hint_text(language: str | None, method: str | None = None) -> str:
+    key = "all" if receipt_photo_enabled() else "no_photo"
+    return _HINT[(key, _lang(language))]
+
+
+def cancelled_text(language: str | None) -> str:
+    return _CANCELLED[_lang(language)]
+
+
+def already_recorded_text(language: str | None) -> str:
+    return _ALREADY_RECORDED[_lang(language)]
+
+
+def cancel_keyboard(language: str | None, purchase_id: object) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=_CANCEL_BUTTON[_lang(language)],
+                    callback_data=f"{CANCEL_PREFIX}{purchase_id}",
+                )
+            ]
+        ]
+    )
 
 
 def recorded_text(language: str | None, amount: int) -> str:
@@ -68,3 +102,16 @@ def launcher_keyboard(language: str | None, purchase_id: object) -> InlineKeyboa
             [InlineKeyboardButton(text=_BUTTON[_lang(language)], web_app=WebAppInfo(url=url))]
         ]
     )
+
+
+def waiting_keyboard(
+    language: str | None, purchase_id: object, *, launcher: bool = False
+) -> InlineKeyboardMarkup:
+    """Cancel button (+ the app launcher row when asked and MINI_APP_URL is set)."""
+    rows = []
+    if launcher:
+        launch = launcher_keyboard(language, purchase_id)
+        if launch is not None:
+            rows.extend(launch.inline_keyboard)
+    rows.extend(cancel_keyboard(language, purchase_id).inline_keyboard)
+    return InlineKeyboardMarkup(inline_keyboard=rows)

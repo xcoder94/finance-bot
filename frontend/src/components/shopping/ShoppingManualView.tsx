@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { PendingMethod } from '../../api/shopping'
 import { parsePositiveInt } from '../../utils/transactionForm'
 import { FormSheetAmountField } from '../forms/transactionAddFields'
+import { ShoppingCancelPurchase } from './ShoppingCancelPurchase'
 
 type ShoppingManualViewProps = {
   method: PendingMethod
@@ -19,7 +20,12 @@ type ShoppingManualViewProps = {
   onOverLimit: (value: boolean) => void
   onSubmit: () => void
   onRetry: () => void
+  /** Leave the screen, the wait stays. */
   onCancel: () => void
+  /** Cancel the whole purchase (after confirmation). */
+  onCancelPurchase: () => void
+  cancelBusy: boolean
+  cancelFailed: boolean
 }
 
 /** «Введите сумму вручную»: the bot could not read the amount, or the user came back himself. */
@@ -37,6 +43,9 @@ export function ShoppingManualView({
   onSubmit,
   onRetry,
   onCancel,
+  onCancelPurchase,
+  cancelBusy,
+  cancelFailed,
 }: ShoppingManualViewProps) {
   const { t } = useTranslation()
   const canSubmit = parsePositiveInt(amount) !== null && !overLimit && !busy
@@ -74,9 +83,11 @@ export function ShoppingManualView({
         </div>
       ) : null}
 
+      <ShoppingCancelPurchase onConfirm={onCancelPurchase} busy={cancelBusy || busy} failed={cancelFailed} />
+
       <div className="shopping-trip__bar">
         <button type="button" className="shopping-trip__cancel" onClick={onCancel} disabled={busy}>
-          {t('shopping.cancel')}
+          {t('shopping.leave')}
         </button>
         <button
           type="button"

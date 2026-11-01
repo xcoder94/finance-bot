@@ -504,6 +504,35 @@ async def get_own_purchase(
     return purchase
 
 
+async def cancel_purchase(
+    session: AsyncSession, user: User, purchase_id: uuid.UUID
+) -> ShoppingPurchase:
+    """Owner cancels a waiting purchase. Items stay in the list, no transaction.
+
+    awaiting/unrecognized -> cancelled; cancelled/expired -> returned as is (idempotent);
+    completed -> 410 purchase_closed; someone else's / unknown -> 404.
+    """
+    await lock_family_budget(session, user.family_budget_id)
+    purchase = await session.scalar(
+        select(ShoppingPurchase)
+        .where(
+            ShoppingPurchase.id == purchase_id,
+            ShoppingPurchase.created_by_user_id == user.id,
+            ShoppingPurchase.family_budget_id == user.family_budget_id,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if purchase is None:
+        raise HTTPException(status_code=404)
+    if purchase.status == "completed":
+        raise HTTPException(status_code=410, detail=CODE_PURCHASE_CLOSED)
+    if _is_open(purchase):
+        _close(purchase, "cancelled")
+    await session.commit()
+    return purchase
+
+
 async def find_open_purchase(
     session: AsyncSession, user_id: uuid.UUID
 ) -> ShoppingPurchase | None:

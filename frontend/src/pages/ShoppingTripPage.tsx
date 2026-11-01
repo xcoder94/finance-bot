@@ -8,6 +8,7 @@ import type { PendingMethod, ShoppingPurchase } from '../api/shopping'
 import {
   createPendingPurchase,
   fetchPendingPurchase,
+  cancelPendingPurchaseApi,
   fetchPurchase,
   submitPendingAmount,
 } from '../api/shopping'
@@ -26,6 +27,7 @@ import {
   invalidateWalletData,
 } from '../store/dataCacheStore'
 import { useShoppingStore } from '../store/shoppingStore'
+import { haptic } from '../telegram/haptic'
 import { getDisplayName } from '../utils/getDisplayName'
 import {
   canFinishTrip,
@@ -39,6 +41,7 @@ import {
 } from '../utils/shoppingTrip'
 import {
   browserStorage,
+  cancelPendingPurchase,
   clearPendingIfMatches,
   createBotStarter,
   parseLaunchParam,
@@ -70,7 +73,6 @@ export function ShoppingTripPage() {
   const navigate = useNavigate()
   const { search } = useLocation()
   const launchId = parseLaunchParam(search)
-  useHideTabbar()
 
   const scope = useAuthStore((state) => state.user?.familyBudgetId ?? '')
   const defaultWalletId = useAuthStore((state) => state.user?.defaultWalletId ?? null)
@@ -96,6 +98,8 @@ export function ShoppingTripPage() {
     method: PendingMethod
     status: 'awaiting' | 'unrecognized'
   } | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelFailed, setCancelFailed] = useState(false)
   const [launchFailed, setLaunchFailed] = useState(false)
   const [launchTry, setLaunchTry] = useState(0)
   const [wallets, setWallets] = useState<Wallet[] | null>(null)
@@ -118,6 +122,8 @@ export function ShoppingTripPage() {
     )
   }
   const submitting = useRef(false)
+  // Manual entry / launch must not lock the user in: the bottom menu stays, the wait is kept.
+  useHideTabbar(stage !== 'manual' && stage !== 'launch')
 
   useEffect(() => {
     void load(scope, { silent: true })
@@ -229,6 +235,7 @@ export function ShoppingTripPage() {
     } else if (outcome.kind === 'no_wallet') {
       setNoWallet(true)
     } else {
+      haptic.error()
       setFailed(true)
     }
   }
@@ -244,6 +251,7 @@ export function ShoppingTripPage() {
     setBusy(false)
     if (outcome !== 'closed') {
       setBotMethod(null)
+      haptic.error()
       setFailed(true)
     }
   }
@@ -264,7 +272,26 @@ export function ShoppingTripPage() {
       setResult({ purchase: outcome.purchase, requested: outcome.purchase.items_recorded })
       setStage('result')
     } else {
+      haptic.error()
       setFailed(true)
+    }
+  }
+
+  const onCancelPurchase = async () => {
+    if (!manual || cancelBusy) return
+    setCancelBusy(true)
+    setCancelFailed(false)
+    const r = await cancelPendingPurchase(browserStorage(), cancelPendingPurchaseApi, manual.id)
+    setCancelBusy(false)
+    if (r.kind === 'cancelled') {
+      void load(scope, { silent: true })
+      navigate('/', { replace: true })
+    } else if (r.kind === 'closed') {
+      setManual(null)
+      setStage('launch')
+      setLaunchTry((n) => n + 1) // recorded meanwhile: show its result
+    } else {
+      setCancelFailed(true)
     }
   }
 
@@ -338,6 +365,9 @@ export function ShoppingTripPage() {
         onSubmit={() => void onManualSubmit()}
         onRetry={() => void startBot(manual.method, retryIds)}
         onCancel={leaveToList}
+        onCancelPurchase={() => void onCancelPurchase()}
+        cancelBusy={cancelBusy}
+        cancelFailed={cancelFailed}
       />
     )
   } else if (stage === 'result' && result) {

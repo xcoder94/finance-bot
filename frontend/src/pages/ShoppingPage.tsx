@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import type { ShoppingItem } from '../api/shopping'
-import { fetchPendingPurchase } from '../api/shopping'
+import { cancelPendingPurchaseApi, fetchPendingPurchase } from '../api/shopping'
 import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
 import { EntityDeleteConfirmSheet } from '../components/settings/EntityDeleteConfirmSheet'
 import { ShoppingEditSheet } from '../components/shopping/ShoppingEditSheet'
@@ -11,7 +11,7 @@ import { ShoppingWaitingBanner } from '../components/shopping/ShoppingWaitingBan
 import { ShoppingListView } from '../components/shopping/ShoppingListView'
 import { useAuthStore } from '../store/authStore'
 import { useShoppingStore } from '../store/shoppingStore'
-import { browserStorage, loadWaiting, type WaitingState } from '../utils/shoppingPending'
+import { browserStorage, cancelPendingPurchase, loadWaiting, type WaitingState } from '../utils/shoppingPending'
 
 export function ShoppingPage() {
   const { t } = useTranslation()
@@ -29,6 +29,8 @@ export function ShoppingPage() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
   const [waiting, setWaiting] = useState<WaitingState | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelFailed, setCancelFailed] = useState(false)
 
   // Opening the tab and returning to the app both re-read the list.
   useEffect(() => {
@@ -83,6 +85,17 @@ export function ShoppingPage() {
           method={waiting.method}
           status={waiting.status}
           onManual={() => navigate(`/shopping/trip?purchase=${waiting.id}`)}
+          cancelBusy={cancelBusy}
+          cancelFailed={cancelFailed}
+          onCancelPurchase={async () => {
+            setCancelBusy(true)
+            setCancelFailed(false)
+            const r = await cancelPendingPurchase(browserStorage(), cancelPendingPurchaseApi, waiting.id)
+            setCancelBusy(false)
+            if (r.kind === 'cancelled') setWaiting(null)
+            else if (r.kind === 'closed') navigate(`/shopping/trip?purchase=${waiting.id}`)
+            else setCancelFailed(true)
+          }}
         />
       ) : null}
       <ShoppingListView

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OnboardingState } from '../../api/me'
 import { formatMillions, trendMonthLabel, type TrendBar } from '../../utils/homeTrend'
+import { CountUp } from '../CountUp'
 import { groupThousands } from '../../utils/groupThousands'
 
 function formatSumNumber(value: number): string {
@@ -23,14 +24,14 @@ export function balanceSizeClass(text: string): string {
   return ''
 }
 
-function SumAmount({ value, negative }: { value: number; negative: boolean }) {
+function SumAmount({ id, value, negative }: { id: string; value: number; negative: boolean }) {
   const { t } = useTranslation()
   const text = formatSumNumber(value)
   return (
     <div
       className={`home-left__value${negative ? ' home-left__value--negative' : ''}${sumSizeClass(text)}`}
     >
-      {text} <span className="home-left__unit">{t('home.unitSum')}</span>
+      <CountUp id={id} value={value} format={formatSumNumber} /> <span className="home-left__unit">{t('home.unitSum')}</span>
     </div>
   )
 }
@@ -39,30 +40,34 @@ export function HomeLeftBlock({
   remaining,
   perDay,
   days,
+  noIncome = false,
 }: {
   remaining: number
   perDay: number | null
   days: number | null
+  noIncome?: boolean
 }) {
   const { t } = useTranslation()
   return (
     <div className="home-left">
       <div className="home-left__plate">
         <div className="home-left__label">{t('home.leftPerDay')}</div>
-        {perDay === null ? (
+        {perDay === null || noIncome ? (
           <div className="home-left__value">—</div>
         ) : (
-          <SumAmount value={perDay} negative={perDay < 0} />
+          <SumAmount id="home-per-day" value={perDay} negative={perDay < 0} />
         )}
         <div className="home-left__hint">
-          {perDay === null || days === null
-            ? t('home.leftPerDayDone')
-            : t('home.leftPerDayHint', { days })}
+          {noIncome
+            ? t('home.leftPerDayNoIncome')
+            : perDay === null || days === null
+              ? t('home.leftPerDayDone')
+              : t('home.leftPerDayHint', { days })}
         </div>
       </div>
       <div className="home-left__plate">
         <div className="home-left__label">{t('home.leftTotal')}</div>
-        <SumAmount value={remaining} negative={remaining < 0} />
+        <SumAmount id="home-left-total" value={remaining} negative={remaining < 0} />
         <div className="home-left__hint">{t('home.leftTotalHint')}</div>
       </div>
     </div>

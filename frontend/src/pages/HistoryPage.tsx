@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { Button, Input, SegmentedControl, Spinner, Text, Title } from '@telegram-apps/telegram-ui'
+import { Button, Input, SegmentedControl, Text, Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -125,7 +125,7 @@ type MetricValueProps = {
 
 function MetricValue({ loading, unavailable, className, children }: MetricValueProps) {
   if (loading) {
-    return <Spinner size="s" />
+    return <span className="motion-skel-line" role="status" aria-busy="true" />
   }
   if (unavailable) {
     return <Text>—</Text>
@@ -490,7 +490,7 @@ export function HistoryPage() {
           </div>
         ) : rangeFetchEnabled ? (
           <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
+            <span className="motion-skel-line motion-skel-line--block" aria-hidden="true" />
             <span className="visually-hidden">{t('home.loading')}</span>
           </div>
         ) : null}

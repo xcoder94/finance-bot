@@ -39,6 +39,7 @@ import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
 import { useShoppingStartup } from '../hooks/useShoppingStartup'
+import { useTapHaptic } from '../hooks/useTapHaptic'
 import { useTxDeepLink } from '../hooks/useTxDeepLink'
 import { useChromeStore } from '../store/chromeStore'
 
@@ -207,6 +208,7 @@ function TxDeepLinkResolvingScreen() {
 }
 
 export function AppShell() {
+  useTapHaptic()
   const txDeepLinkPhase = useTxDeepLink()
   useShoppingStartup()
 

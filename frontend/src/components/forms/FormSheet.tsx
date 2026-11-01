@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useExitTransition } from '../../hooks/useExitTransition'
+
 type FormSheetProps = {
   open: boolean
   title: string
@@ -33,12 +35,16 @@ export function FormSheet({
   danger,
 }: FormSheetProps) {
   const { t } = useTranslation()
-  if (!open) {
+  const [mounted, closing] = useExitTransition(open)
+  if (!mounted) {
     return null
   }
 
   return (
-    <div className="form-sheet-backdrop" onClick={onClose}>
+    <div
+      className={`form-sheet-backdrop${closing ? ' form-sheet-backdrop--closing' : ''}`}
+      onClick={closing ? undefined : onClose}
+    >
       <div
         className="form-sheet-panel"
         role="dialog"
