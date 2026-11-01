@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+from decimal import Decimal
 
 from aiogram.types import Message
 from fastapi import HTTPException
@@ -52,6 +53,75 @@ _TRAILING_UNIT_RE = re.compile(rf"^(?P<num>\d[\d\s.,]*?)\s*{_CURRENCY_UNIT}\.?$"
 _TRAILING_THOUSAND_RE = re.compile(r"^(?P<num>\d+(?:\s+\d+)+)\s*(?:тысяч[аиу]?|тыс)\.?$", re.IGNORECASE)
 
 
+# --- spoken / short-hand thousands: "50 ming", "50к", "ellik ming", "пятьдесят тысяч" ---
+_THOUSAND_WORDS = {"ming", "минг", "тысяча", "тысячи", "тысяч", "тысячу", "тыс", "k", "к"}
+_MILLION_WORDS = {"million", "mln", "миллион", "миллиона", "миллионов", "млн"}
+_UNIT_WORDS: dict[str, int] = {}
+for _w, _v in (
+    ("bir", 1), ("ikki", 2), ("uch", 3), ("tort", 4), ("besh", 5), ("olti", 6), ("yetti", 7),
+    ("sakkiz", 8), ("toqqiz", 9), ("on", 10), ("yigirma", 20), ("ottiz", 30), ("qirq", 40),
+    ("ellik", 50), ("oltmish", 60), ("yetmish", 70), ("sakson", 80), ("toqson", 90),
+    ("один", 1), ("одна", 1), ("два", 2), ("две", 2), ("три", 3), ("четыре", 4), ("пять", 5),
+    ("шесть", 6), ("семь", 7), ("восемь", 8), ("девять", 9), ("десять", 10),
+    ("одиннадцать", 11), ("двенадцать", 12), ("тринадцать", 13), ("четырнадцать", 14),
+    ("пятнадцать", 15), ("шестнадцать", 16), ("семнадцать", 17), ("восемнадцать", 18),
+    ("девятнадцать", 19), ("двадцать", 20), ("тридцать", 30), ("сорок", 40),
+    ("пятьдесят", 50), ("шестьдесят", 60), ("семьдесят", 70), ("восемьдесят", 80),
+    ("девяносто", 90), ("сто", 100), ("двести", 200), ("триста", 300), ("четыреста", 400),
+    ("пятьсот", 500), ("шестьсот", 600), ("семьсот", 700), ("восемьсот", 800), ("девятьсот", 900),
+):
+    _UNIT_WORDS[_w] = _v
+_UZ_HUNDRED = "yuz"
+_TRAILING_CURRENCY_RE = re.compile(rf"\s*{_CURRENCY_UNIT}\.?$", re.IGNORECASE)
+_DIGITS_SCALE_RE = re.compile(r"^(?P<num>\d+(?:[.,]\d{1,2})?)\s*(?P<word>[^\W\d_]+)\.?$", re.IGNORECASE)
+
+
+def _fold_word(word: str) -> str:
+    return re.sub(_APOS, "", word.casefold())
+
+
+def _multiplier(word: str) -> int | None:
+    if word in _THOUSAND_WORDS:
+        return 1000
+    if word in _MILLION_WORDS:
+        return 1_000_000
+    return None
+
+
+def _scaled_amount(text: str) -> int | None:
+    """"50 ming", "50к", "ellik ming so'm", "сто пятьдесят тысяч": a sum written with a thousand word.
+
+    Needs a thousand / million word, so a bare "ellik" or a goods name never becomes a sum.
+    """
+    body = _TRAILING_CURRENCY_RE.sub("", text.strip(), count=1).strip() if text.strip() else ""
+    if not body:
+        return None
+    match = _DIGITS_SCALE_RE.match(body)
+    if match:
+        mult = _multiplier(_fold_word(match.group("word")))
+        if mult is None:
+            return None
+        value = Decimal(match.group("num").replace(",", ".")) * mult
+        return int(value) if value == value.to_integral_value() else None
+    total = cur = 0
+    seen_mult = False
+    tokens = body.replace(",", " ").split()
+    for raw in tokens:
+        token = _fold_word(raw.rstrip("."))
+        mult = _multiplier(token)
+        if mult is not None:
+            total += (cur or 1) * mult
+            cur = 0
+            seen_mult = True
+        elif token == _UZ_HUNDRED:
+            cur = (cur or 1) * 100
+        elif token in _UNIT_WORDS:
+            cur += _UNIT_WORDS[token]
+        else:
+            return None
+    return total + cur if seen_mult else None
+
+
 def _digits_part(stripped: str) -> str | None:
     match = _TRAILING_UNIT_RE.match(stripped)
     if match:
@@ -71,6 +141,9 @@ def bare_text_amount(text: str) -> int | None:
     stripped = text.strip()
     if not stripped:
         return None
+    scaled = _scaled_amount(stripped)
+    if scaled is not None:
+        return scaled if _usable(scaled) else None
     unit_num = _digits_part(stripped)
     if unit_num is not None:
         # re-run the plain-number rule on the digits alone
@@ -175,3 +248,22 @@ async def finish_unrecognized(
         not_recognized_text(user.language),
         reply_markup=launcher_keyboard(user.language, purchase_id),
     )
+
+
+def spoken_response_amount(response: ParseResponse) -> int | None:
+    """The sum of a voice answer while a purchase waits for one.
+
+    What the model heard (``transcript``) wins over its own number: it may read "50 ming"
+    as 50. Without a usable transcript: the operation amount, then a goods entry that is
+    really a sum ("50 ming" taken for an item).
+    """
+    if response.transcript:
+        heard = bare_text_amount(response.transcript)
+        if heard is not None:
+            return heard
+    amount = op_sum(response.operations)
+    if amount is not None:
+        return amount
+    if not response.operations and len(response.shopping_items) == 1:
+        return bare_text_amount(response.shopping_items[0])
+    return None

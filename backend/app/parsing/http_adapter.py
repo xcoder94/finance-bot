@@ -119,12 +119,17 @@ def _parse_response_payload(data: Any) -> ParseResponse:
             raise ParserMalformed("shopping_items must be a list of strings")
         shopping_items = list(raw_items)
 
+    transcript = data.get("transcript")
+    if transcript is not None and not isinstance(transcript, str):
+        transcript = None
+
     return ParseResponse(
         operations=operations,
         speech_status=speech_status,
         date_hint=date_hint,
         receipt_status=receipt_status,
         shopping_items=shopping_items,
+        transcript=transcript,
     )
 
 

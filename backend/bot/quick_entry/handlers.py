@@ -95,11 +95,11 @@ from bot.quick_entry.cards import (
 )
 from bot.quick_entry.shopping_pending import (
     bare_response_amount,
+    spoken_response_amount,
     is_malformed_number,
     bare_text_amount,
     finish_unrecognized,
     finish_with_amount,
-    op_sum,
 )
 from bot.quick_entry.pending import consume_pending, create_pending, get_pending
 from bot.quick_entry.texts import (
@@ -945,7 +945,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             return
 
         if pending is not None:
-            amount = op_sum(response.operations)
+            amount = spoken_response_amount(response)
             if amount is None:
                 await finish_unrecognized(
                     message, session, user, budget, pending, DAILY_UNPARSED_LIMIT

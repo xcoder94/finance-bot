@@ -38,6 +38,8 @@ class ParseResponse:
     # Names for the family shopping list: a message without an amount that is a
     # list of goods. Empty for expenses/income/transfers.
     shopping_items: list[str] = field(default_factory=list)
+    # Audio turns only: what the model heard, verbatim (digits as spoken, e.g. "50 ming").
+    transcript: str | None = None
 
 
 class ParserUnavailable(Exception):

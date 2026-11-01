@@ -14,7 +14,7 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     '"speech_status":"recognized|not_recognized"|null,'
     '"date_hint":"YYYY-MM-DD"|null,'
     '"receipt_status":"ok|unreadable"|null,'
-    '"shopping_items":[string]}\n'
+    '"shopping_items":[string],"transcript":string_or_null}\n'
     "Rules:\n"
     "- A text or audio message with NO amount that is just a list of goods to buy (e.g. milk, bread, eggs) → "
     "operations empty and shopping_items = the goods, one short name each, in the user's words, at most 20. "
@@ -36,6 +36,12 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     "date you resolve against the provided today.\n"
     "- Audio-carrying turns: set speech_status to not_recognized when there is no intelligible speech "
     "(silence, noise, empty); otherwise recognized. Never invent operations when not_recognized.\n"
+    "- Audio-carrying turns: transcript = the speech written down as heard, short, digits as digits "
+    "(e.g. \"50 ming\"); text-only and image turns: transcript null.\n"
+    "- Amount words: ming / минг / тысяч / тыс / k / к = thousand (\"50 ming\", \"ellik ming\", "
+    "\"50 тысяч\", \"50к\" = 50000); million / mln / миллион = 1000000. Spoken numbers (ellik = 50, "
+    "пятьдесят = 50, yuz = 100) count too. A message that is only a sum is one operation of type "
+    "ambiguous (or expense) with the full integer amount in so'm; never return the bare 50 for \"50 ming\".\n"
     "- Text-only and audio turns: receipt_status must be null.\n"
     "- Receipt-image turns: set receipt_status to ok when the total amount is legible; unreadable "
     "when the image is not a receipt or the total cannot be read. One receipt = one expense for the "
