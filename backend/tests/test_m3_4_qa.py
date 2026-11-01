@@ -52,7 +52,7 @@ async def test_competitor_completed_while_bot_held_the_row_no_second_expense() -
         )
         before = await tx_count(session)
         _result, created = await complete_pending_purchase(
-            session, user, purchase.id, amount=412_000, method="voice"
+            session, user, purchase.id, amount=412_000, method="voice", channel="voice"
         )
         assert created is False  # replay of the completed purchase
         assert await tx_count(session) == before  # no second expense
@@ -62,7 +62,7 @@ async def test_bot_replay_reports_the_recorded_amount() -> None:
     async with rollback_session() as session:
         user, _budget, ids = await setup_family(session, 9_460_002)
         purchase = await open_pending(session, user, ids, "receipt")
-        await complete_pending_purchase(session, user, purchase.id, amount=500_000, method="manual")
+        await complete_pending_purchase(session, user, purchase.id, amount=500_000, method="manual", channel="app")
         bot = FakeBot()
         message = Message.model_validate(
             {
@@ -70,7 +70,7 @@ async def test_bot_replay_reports_the_recorded_amount() -> None:
                 "from": {"id": user.telegram_id, "is_bot": False, "first_name": "T"}, "text": "412000",
             }
         ).as_(bot)
-        await finish_with_amount(message, session, user, purchase, 412_000)
+        await finish_with_amount(message, session, user, purchase, 412_000, channel="text")
         assert await tx_count(session) == 1
         assert len(bot.sent) == 1
         assert "500 000" in bot.sent[0].text, bot.sent[0].text

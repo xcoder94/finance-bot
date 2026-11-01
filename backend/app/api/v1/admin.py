@@ -1,13 +1,13 @@
 """Admin panel (read-only). Every route sits behind require_admin: non-admin -> 404."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.admin import require_admin
 from app.db import get_session
-from app.schemas.admin import AdminOverview, AdminUsersPage
+from app.schemas.admin import AdminOverview, AdminUsage, AdminUsersPage
 from app.services import admin_stats
 from app.services.activity import utcnow
 
@@ -34,8 +34,15 @@ async def get_users(
         raise HTTPException(status_code=422, detail="invalid_cursor") from None
 
 
+@router.get("/usage")
+async def get_usage(
+    session: SessionDep, period: Literal["day", "week", "month"] = "day"
+) -> AdminUsage:
+    return await admin_stats.build_usage(session, utcnow(), period)
+
+
 _ALL_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
-_KNOWN_PATHS = frozenset({f"{router.prefix}/overview", f"{router.prefix}/users"})
+_KNOWN_PATHS = frozenset({f"{router.prefix}/overview", f"{router.prefix}/users", f"{router.prefix}/usage"})
 
 
 @router.api_route("", methods=_ALL_METHODS, include_in_schema=False)

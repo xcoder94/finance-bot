@@ -255,6 +255,7 @@ async def create_income_transaction(
         comment=body.comment,
         created_by_user_id=user.id,
         transaction_date=body.transaction_date,
+        channel="app",
     )
     session.add(transaction)
     await session.commit()
@@ -286,6 +287,7 @@ async def create_expense_transaction(
         comment=body.comment,
         created_by_user_id=user.id,
         transaction_date=body.transaction_date,
+        channel="app",
     )
     session.add(transaction)
     await session.commit()
@@ -321,6 +323,7 @@ async def create_transfer_transaction(
         comment=body.comment,
         created_by_user_id=user.id,
         transaction_date=body.transaction_date,
+        channel="app",
     )
     session.add(transaction)
     await session.commit()

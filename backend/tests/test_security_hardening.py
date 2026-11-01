@@ -323,6 +323,7 @@ async def test_bad_amount_operation_produces_no_amount_reply_and_no_transaction(
             response,
             "",
             date.today(),
+            channel="text",
         )
 
     message.answer.assert_awaited_once_with(MSG_NO_AMOUNT)

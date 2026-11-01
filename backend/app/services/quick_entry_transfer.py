@@ -199,6 +199,7 @@ async def create_quick_entry_transfer(
     rate: Decimal | None,
     comment: str | None,
     transaction_date: datetime,
+    channel: str | None,
 ) -> Transaction:
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
@@ -220,6 +221,7 @@ async def create_quick_entry_transfer(
         comment=comment,
         created_by_user_id=user.id,
         transaction_date=transaction_date,
+        channel=channel,
     )
     session.add(transaction)
     await session.commit()

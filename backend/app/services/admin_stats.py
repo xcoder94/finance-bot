@@ -11,7 +11,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import DateTime, Integer, bindparam, func, or_, select, text, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.admin_tracking import UserDailyActivity
+from app import config
+from app.models.admin_tracking import AiUsageDaily, UserDailyActivity
 from app.models.family_budget import FamilyBudget
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -20,7 +21,10 @@ from app.schemas.admin import (
     AdminOverview,
     AdminUserRow,
     AdminUsersPage,
+    AdminUsage,
+    AiUsage,
     DailyActive,
+    OperationsByChannel,
     Retention,
     RetentionBlock,
     Totals,
@@ -197,6 +201,84 @@ async def build_overview(session: AsyncSession, now: datetime) -> AdminOverview:
         ),
         daily_active=await _chart(session, today),
         activity_since=since,
+    )
+
+
+# ---- usage: operations by channel ------------------------------------------------------
+
+PERIOD_DAYS = {"day": 1, "week": 7, "month": 30}
+
+
+async def build_usage(session: AsyncSession, now: datetime, period: str) -> AdminUsage:
+    """Operations created in the period (Tashkent days, today included), not demo, not deleted.
+    One grouped query on ix_transactions_created_at_channel_live (R9)."""
+    since = _since(tashkent_today(now), PERIOD_DAYS[period])
+    rows = (
+        await session.execute(
+            select(Transaction.channel, func.count())
+            .where(
+                Transaction.created_at >= since,
+                Transaction.is_deleted.is_(False),
+                Transaction.is_demo.is_(False),
+            )
+            .group_by(Transaction.channel)
+        )
+    ).all()
+    by_channel = {channel: count for channel, count in rows}
+    known = {name: by_channel.get(name, 0) for name in ("text", "voice", "photo", "app")}
+    unknown = by_channel.get(None, 0)
+    return AdminUsage(
+        period=period,  # type: ignore[arg-type]
+        operations=OperationsByChannel(
+            **known, unknown=unknown, total=sum(known.values()) + unknown
+        ),
+        ai=await _ai_block(session, tashkent_today(now), PERIOD_DAYS[period]),
+    )
+
+
+def _usd(micro: int) -> float:
+    return round(micro / 1_000_000, 6)
+
+
+async def _ai_block(session: AsyncSession, today: date, days: int) -> AiUsage:
+    """R10 (period, grouped by outcome) + R11 (today's cost); both on the PK (leading `day`).
+    No model names, keys or per-call data leave the server."""
+    u = AiUsageDaily
+    rows = (
+        await session.execute(
+            select(
+                u.outcome,
+                func.coalesce(func.sum(u.calls), 0),
+                func.coalesce(func.sum(u.calls_no_usage), 0),
+                func.coalesce(func.sum(u.messages), 0),
+                func.coalesce(func.sum(u.input_tokens), 0),
+                func.coalesce(func.sum(u.output_tokens), 0),
+                func.coalesce(func.sum(u.cost_micro_usd), 0),
+            )
+            .where(u.day >= today - timedelta(days=days - 1), u.day <= today)
+            .group_by(u.outcome)
+        )
+    ).all()
+    by_outcome = {r[0]: r[1:] for r in rows}
+    calls = sum(int(v[0]) for v in by_outcome.values())
+    no_usage = sum(int(v[1]) for v in by_outcome.values())
+    cost_today = await session.scalar(
+        select(func.coalesce(func.sum(u.cost_micro_usd), 0)).where(u.day == today)
+    )
+    threshold = config.ADMIN_AI_DAILY_COST_ALERT_USD
+    return AiUsage(
+        calls=calls,
+        error_calls=int(by_outcome.get("error", (0,))[0]),
+        calls_without_usage=no_usage,
+        cost_incomplete=no_usage > 0,
+        input_tokens=sum(int(v[3]) for v in by_outcome.values()),
+        output_tokens=sum(int(v[4]) for v in by_outcome.values()),
+        cost_usd=_usd(sum(int(v[5]) for v in by_outcome.values())),
+        messages=sum(int(v[2]) for v in by_outcome.values()),
+        unparsed=int(by_outcome.get("unparsed", (0, 0, 0))[2]),
+        errors=int(by_outcome.get("error", (0, 0, 0))[2]),
+        threshold_usd=threshold if threshold > 0 else None,
+        cost_today_usd=_usd(int(cost_today or 0)),
     )
 
 

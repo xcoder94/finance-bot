@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import async_session_factory
 from app.models.family_budget import FamilyBudget
+from app.services.admin_retention import purge_admin_tables
 from app.services.evening_reminder import (
     family_had_activity_on,
     send_evening_reminders_for_family,
@@ -49,6 +50,10 @@ async def tick(session: AsyncSession, now: datetime, bot: Bot) -> None:
     await expire_open_purchases(session)
     if is_purge_slot(now):
         await purge_closed_purchases(session)
+        try:
+            await purge_admin_tables(session, today)
+        except Exception:
+            logger.exception("admin retention purge failed")
 
     if is_evening_reminder_slot(now):
         stmt = select(FamilyBudget).where(FamilyBudget.is_deleted.is_(False))

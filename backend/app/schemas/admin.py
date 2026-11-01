@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -69,3 +70,33 @@ class AdminUsersPage(_Strict):
     items: list[AdminUserRow]
     total: int
     next_cursor: str | None
+
+
+class OperationsByChannel(_Strict):
+    text: int  # bot: text message
+    voice: int  # bot: voice message
+    photo: int  # bot: receipt photo
+    app: int  # mini-app forms and manual purchase sum
+    unknown: int  # created before channel tracking (channel IS NULL)
+    total: int
+
+
+class AiUsage(_Strict):
+    calls: int  # requests to the model, every retry included
+    error_calls: int  # of them: no answer / unusable answer
+    calls_without_usage: int  # answered but carried no token counts -> cost is a lower bound
+    cost_incomplete: bool  # calls_without_usage > 0: show the sum with "≈"
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float
+    messages: int  # bot messages that went to parsing (N)
+    unparsed: int  # of them: nothing usable found (n)
+    errors: int  # of them: no model answer after all attempts / unusable answer
+    threshold_usd: float | None  # None: no alert threshold configured
+    cost_today_usd: float  # Tashkent today, regardless of the period
+
+
+class AdminUsage(_Strict):
+    period: Literal["day", "week", "month"]
+    operations: OperationsByChannel
+    ai: AiUsage

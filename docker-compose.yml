@@ -3,11 +3,30 @@
 # Startup order: api (runs migrations) -> bot -> web.
 
 services:
+  # DEV ONLY database. Profile "devdb" is off by default (production never starts it);
+  # the dev resource turns it on with COMPOSE_PROFILES=devdb. Prod uses an external Postgres.
+  # No published ports; volume name is prefixed by the Compose project name (Coolify: resource uuid).
+  devdb:
+    profiles: ["devdb"]
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DEVDB_NAME:-chontakdev}
+      POSTGRES_USER: ${DEVDB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DEVDB_PASSWORD:-}
+    volumes:
+      - devdb_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   api:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: chontak-backend:latest
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -24,6 +43,14 @@ services:
       DAILY_UNPARSED_LIMIT: ${DAILY_UNPARSED_LIMIT:-20}
       RECEIPT_PHOTO_ENABLED: ${RECEIPT_PHOTO_ENABLED:-}
       LOG_FILE_PATH: ${LOG_FILE_PATH:-/app/logs/app.log}
+      ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
+      AI_PRICE_INPUT_USD_PER_1M: ${AI_PRICE_INPUT_USD_PER_1M:-}
+      AI_PRICE_OUTPUT_USD_PER_1M: ${AI_PRICE_OUTPUT_USD_PER_1M:-}
+      AI_PRICE_AUDIO_INPUT_USD_PER_1M: ${AI_PRICE_AUDIO_INPUT_USD_PER_1M:-}
+      ADMIN_AI_DAILY_COST_ALERT_USD: ${ADMIN_AI_DAILY_COST_ALERT_USD:-}
+      ADMIN_ACTIVITY_RETENTION_DAYS: ${ADMIN_ACTIVITY_RETENTION_DAYS:-400}
+      ADMIN_AI_USAGE_RETENTION_DAYS: ${ADMIN_AI_USAGE_RETENTION_DAYS:-730}
+      ADMIN_AI_ALERTS_RETENTION_DAYS: ${ADMIN_AI_ALERTS_RETENTION_DAYS:-730}
       PORT: ${API_PORT:-5001}
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
     expose:
@@ -34,12 +61,15 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+    depends_on:
+      devdb:
+        condition: service_healthy
+        required: false
 
   bot:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: chontak-backend:latest
     restart: unless-stopped
     command: ["python", "-m", "bot.main"]
     # The bot inherits the API image, and with it the image HEALTHCHECK that
@@ -61,6 +91,14 @@ services:
       DAILY_UNPARSED_LIMIT: ${DAILY_UNPARSED_LIMIT:-20}
       RECEIPT_PHOTO_ENABLED: ${RECEIPT_PHOTO_ENABLED:-}
       LOG_FILE_PATH: ${LOG_FILE_PATH:-/app/logs/app.log}
+      ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
+      AI_PRICE_INPUT_USD_PER_1M: ${AI_PRICE_INPUT_USD_PER_1M:-}
+      AI_PRICE_OUTPUT_USD_PER_1M: ${AI_PRICE_OUTPUT_USD_PER_1M:-}
+      AI_PRICE_AUDIO_INPUT_USD_PER_1M: ${AI_PRICE_AUDIO_INPUT_USD_PER_1M:-}
+      ADMIN_AI_DAILY_COST_ALERT_USD: ${ADMIN_AI_DAILY_COST_ALERT_USD:-}
+      ADMIN_ACTIVITY_RETENTION_DAYS: ${ADMIN_ACTIVITY_RETENTION_DAYS:-400}
+      ADMIN_AI_USAGE_RETENTION_DAYS: ${ADMIN_AI_USAGE_RETENTION_DAYS:-730}
+      ADMIN_AI_ALERTS_RETENTION_DAYS: ${ADMIN_AI_ALERTS_RETENTION_DAYS:-730}
     depends_on:
       api:
         condition: service_healthy
@@ -69,7 +107,6 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    image: chontak-web:latest
     restart: unless-stopped
     environment:
       # Where nginx forwards /api/... — no trailing slash.
@@ -85,3 +122,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+volumes:
+  devdb_data:

@@ -21,6 +21,7 @@ async def create_pending(
     category_raw: str | None,
     comment: str | None,
     operation_date: date,
+    channel: str,
     charge_on_confirm: bool = True,
 ) -> QuickEntryPending:
     pending = QuickEntryPending(
@@ -33,6 +34,7 @@ async def create_pending(
         comment=comment,
         operation_date=operation_date,
         charge_on_confirm=charge_on_confirm,
+        channel=channel,
     )
     session.add(pending)
     await session.commit()

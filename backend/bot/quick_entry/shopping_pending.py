@@ -123,11 +123,13 @@ async def finish_with_amount(
     user: User,
     purchase: ShoppingPurchase,
     amount: int,
+    channel: str,
 ) -> None:
     """Complete the purchase and answer with the sum + a launcher to the result."""
     try:
         result, _created = await complete_pending_purchase(
-            session, user, purchase.id, amount=amount, method=purchase.method or "manual"
+            session, user, purchase.id, amount=amount, method=purchase.method or "manual",
+            channel=channel,
         )
     except HTTPException as exc:
         # no wallet / purchase closed in the meantime: the app shows the exact reason

@@ -208,6 +208,7 @@ async def test_stub_parser_path_still_creates_transaction():
             expense_category_id=category_id,
             comment=op.comment,
             transaction_date=datetime(2026, 8, 4, 12, 0, tzinfo=UTC),
+            channel="text",
         )
         assert txn.amount == 25000
 

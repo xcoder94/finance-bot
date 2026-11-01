@@ -18,6 +18,8 @@ import { AdminTabs } from './AdminTabs'
 import { AdminScreen } from './AdminScreen'
 import { GrowthView } from './GrowthView'
 import { UsersView } from './UsersView'
+import { OpsView } from './OpsView'
+import type { AdminUsage } from '../../api/admin'
 
 const testI18n = i18n.createInstance()
 void testI18n.use(initReactI18next).init({
@@ -78,6 +80,54 @@ describe('AdminTabs', () => {
   })
 })
 
+const usage: AdminUsage = {
+  period: 'day',
+  operations: { text: 5, voice: 2, photo: 1, app: 7, unknown: 3, total: 18 },
+  ai: {
+    calls: 40, error_calls: 3, calls_without_usage: 0, cost_incomplete: false,
+    input_tokens: 123456, output_tokens: 7890, cost_usd: 1.234, messages: 8, unparsed: 2,
+    errors: 1, threshold_usd: 5, cost_today_usd: 0.5,
+  },
+}
+const opsRender = (data: AdminUsage, period: 'day' | 'week' | 'month' = 'day') =>
+  wrap(<OpsView state={{ period, status: 'ready', data }} onPeriod={noop} onRetry={noop} />)
+
+describe('OpsView', () => {
+  it('shows channels, ai calls, cost with two decimals, tokens, unparsed, errors, threshold', () => {
+    const html = opsRender(usage)
+    for (const s of ['Бот: текст', 'Бот: голос', 'Бот: фото', 'Приложение', 'Не известно (созданы до учёта)', 'Всего', 'Вызовов', 'Стоимость, $', '$1,23', 'Токены: вход / выход', '123\u00a0456 / 7\u00a0890', 'Не разобрано', '25% (2 из 8)', 'Ошибки ИИ', 'Порог в день: $5,00 · сегодня: $0,50']) {
+      expect(html).toContain(s)
+    }
+    expect(html).not.toContain('≈')
+  })
+  it('marks incomplete cost with ≈', () => {
+    expect(opsRender({ ...usage, ai: { ...usage.ai, cost_incomplete: true } })).toContain('≈ $1,23')
+  })
+  it('shows a dash for unparsed when there were no messages', () => {
+    const html = opsRender({ ...usage, ai: { ...usage.ai, messages: 0, unparsed: 0 } })
+    expect(html).toContain('Не разобрано')
+    expect(html).not.toContain('% (')
+  })
+  it('says the threshold is not set', () => {
+    const html = opsRender({ ...usage, ai: { ...usage.ai, threshold_usd: null } })
+    expect(html).toContain('Порог не задан')
+    expect(html).not.toContain('Порог в день')
+  })
+  it('has the period switch with the selected one marked', () => {
+    const html = opsRender(usage, 'week')
+    expect(html).toContain('Сегодня')
+    expect(html).toContain('7 дней')
+    expect(html).toContain('30 дней')
+    expect(html).toMatch(/aria-selected="true"[^>]*>7 дней/)
+  })
+  it('renders loading and error states', () => {
+    expect(wrap(<OpsView state={{ period: 'day', status: 'loading' }} onPeriod={noop} onRetry={noop} />)).toContain('Загрузка')
+    const err = wrap(<OpsView state={{ period: 'day', status: 'error' }} onPeriod={noop} onRetry={noop} />)
+    expect(err).toContain('Не получилось загрузить')
+    expect(err).toContain('Повторить')
+  })
+})
+
 describe('AdminScreen', () => {
   const growth = { status: 'ready', data: overview } as const
   const render = (tab: 'growth' | 'ops' | 'users') =>
@@ -92,12 +142,15 @@ describe('AdminScreen', () => {
         onQuery={noop}
         onMore={noop}
         onRetryUsers={noop}
+        ops={{ period: 'day', status: 'ready', data: usage }}
+        onPeriod={noop}
+        onRetryOps={noop}
       />,
     )
   it('switches the content with the tab and has a back link to Settings', () => {
     expect(render('growth')).toContain('Возвращаемость')
     expect(render('growth')).not.toContain('Скоро')
-    expect(render('ops')).toContain('Скоро')
+    expect(render('ops')).toContain('Вызовов')
     expect(render('ops')).not.toContain('Возвращаемость')
     expect(render('users')).toContain('Всего: 0')
     expect(render('growth')).toContain('href="/settings"')

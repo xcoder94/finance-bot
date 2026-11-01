@@ -26,6 +26,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
+from app.services import ai_usage
 from app.parsing.types import (
     ParseRequest,
     ParsedOperation,
@@ -279,8 +280,12 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
+            await ai_usage.record_message(None, "photo", "error")
             return
 
+        await ai_usage.record_message(
+            None, "photo", ai_usage.message_outcome(response, "photo")
+        )
         if response.receipt_status is None:
             await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
@@ -299,7 +304,9 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
                     message, session, user, budget, pending, DAILY_UNPARSED_LIMIT
                 )
             else:
-                await finish_with_amount(message, session, user, pending, total)
+                await finish_with_amount(
+                    message, session, user, pending, total, channel="photo"
+                )
             return
 
         if response.receipt_status == "unreadable":
@@ -353,6 +360,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             expense_category_id=category_id,
             comment=comment,
             transaction_date=txn_datetime,
+            channel="photo",
         )
         await check_goal_achievement(session, wallet.id, bot=bot)
 

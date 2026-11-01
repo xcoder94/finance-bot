@@ -279,7 +279,7 @@ async def get_purchase_result(
 
 
 async def _write_off(
-    session: AsyncSession, user: User, ids: list[uuid.UUID], amount: int
+    session: AsyncSession, user: User, ids: list[uuid.UUID], amount: int, channel: str
 ) -> tuple[Transaction, Wallet, list[str]]:
     """Under the family lock: wallet/category, DELETE items RETURNING, one expense.
 
@@ -310,6 +310,7 @@ async def _write_off(
         comment=(", ".join(names)[:COMMENT_MAX] or None),
         created_by_user_id=user.id,
         transaction_date=datetime.now(UTC),
+        channel=channel,
     )
     session.add(transaction)
     await session.flush()
@@ -357,7 +358,7 @@ async def complete_purchase_manual(
             raise HTTPException(status_code=409, detail=CODE_NOT_COMPLETED)
         return await build_purchase_result(session, existing), False
 
-    transaction, wallet, names = await _write_off(session, user, ids, amount)
+    transaction, wallet, names = await _write_off(session, user, ids, amount, "app")
 
     now = datetime.now(UTC)
     purchase = ShoppingPurchase(
@@ -545,6 +546,7 @@ async def complete_pending_purchase(
     *,
     amount: int,
     method: str,
+    channel: str,
 ) -> tuple[PurchaseResult, bool]:
     """Complete an open purchase with one sum (bot photo/voice/text or manual).
 
@@ -574,7 +576,7 @@ async def complete_pending_purchase(
         raise HTTPException(status_code=410, detail=CODE_PURCHASE_CLOSED)
 
     ids = list(purchase.item_ids)
-    transaction, wallet, names = await _write_off(session, user, ids, amount)
+    transaction, wallet, names = await _write_off(session, user, ids, amount, channel)
     purchase.status = "completed"
     purchase.method = method
     purchase.amount = amount

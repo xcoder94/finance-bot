@@ -122,6 +122,7 @@ class TestCreateQuickEntryExpense:
                 expense_category_id=food.id,
                 comment="обед",
                 transaction_date=txn_date,
+                channel="text",
             )
 
             assert txn.type == "expense"
@@ -143,6 +144,7 @@ class TestCreateQuickEntryExpense:
                 expense_category_id=None,
                 comment="Азиз",
                 transaction_date=txn_date,
+                channel="text",
             )
 
             assert txn.type == "expense"
@@ -162,6 +164,7 @@ class TestCreateQuickEntryExpense:
                 expense_category_id=groceries.id,
                 comment=None,
                 transaction_date=datetime(2026, 8, 3, 12, 0, tzinfo=UTC),
+                channel="text",
             )
 
             assert txn.expense_category_id == groceries.id
@@ -183,6 +186,7 @@ class TestCreateQuickEntryIncome:
                 income_category_id=income_gifts.id,
                 comment=None,
                 transaction_date=txn_date,
+                channel="text",
             )
             assert with_cat.type == "income"
             assert with_cat.income_category_id == income_gifts.id
@@ -195,6 +199,7 @@ class TestCreateQuickEntryIncome:
                 income_category_id=None,
                 comment=None,
                 transaction_date=txn_date,
+                channel="text",
             )
             assert without_cat.income_category_id is None
 

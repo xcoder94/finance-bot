@@ -369,6 +369,7 @@ class TestTypeCallback:
                 category_raw="Подарки",
                 comment=None,
                 operation_date=date(2026, 8, 1),
+                channel="text",
             )
 
             monkeypatch.setattr(
@@ -424,6 +425,7 @@ class TestTypeCallback:
                 category_raw="Подарки",
                 comment=None,
                 operation_date=date(2026, 8, 1),
+                channel="text",
             )
 
             monkeypatch.setattr(
@@ -462,6 +464,7 @@ class TestTypeCallback:
                 category_raw=None,
                 comment="Азиз",
                 operation_date=date(2026, 8, 1),
+                channel="text",
             )
 
             monkeypatch.setattr(
@@ -502,6 +505,7 @@ class TestTypeCallback:
                 category_raw=None,
                 comment=None,
                 operation_date=date(2026, 8, 1),
+                channel="text",
             )
 
             monkeypatch.setattr(

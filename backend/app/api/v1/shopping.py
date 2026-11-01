@@ -135,7 +135,7 @@ async def post_pending_amount(
     response: Response,
 ) -> PurchaseResult:
     result, created = await complete_pending_purchase(
-        session, user, purchase_id, amount=body.amount, method="manual"
+        session, user, purchase_id, amount=body.amount, method="manual", channel="app"
     )
     if not created:
         response.status_code = 200

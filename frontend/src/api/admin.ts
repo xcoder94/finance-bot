@@ -70,3 +70,32 @@ export function fetchAdminUsers(params: {
 }): Promise<AdminUsersPage> {
   return adminGet<AdminUsersPage>(buildUsersUrl(params))
 }
+
+export type AdminUsagePeriod = 'day' | 'week' | 'month'
+
+export type AdminUsage = {
+  period: AdminUsagePeriod
+  operations: { text: number; voice: number; photo: number; app: number; unknown: number; total: number }
+  ai: {
+    calls: number
+    error_calls: number
+    calls_without_usage: number
+    cost_incomplete: boolean
+    input_tokens: number
+    output_tokens: number
+    cost_usd: number
+    messages: number
+    unparsed: number
+    errors: number
+    threshold_usd: number | null
+    cost_today_usd: number
+  }
+}
+
+export function buildUsageUrl(period: AdminUsagePeriod): string {
+  return `/api/v1/admin/usage?period=${period}`
+}
+
+export function fetchAdminUsage(period: AdminUsagePeriod): Promise<AdminUsage> {
+  return adminGet<AdminUsage>(buildUsageUrl(period))
+}

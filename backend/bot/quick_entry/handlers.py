@@ -31,6 +31,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
+from app.services import ai_usage
 from app.parsing.prefilter import PrefilterCategory, build_seed_name_by_key, try_prefilter
 from app.parsing.types import (
     ParseRequest,
@@ -390,6 +391,7 @@ async def _process_parsed_response(
     source_text: str,
     today: date,
     *,
+    channel: str,
     model_call_granted: bool = False,
 ) -> None:
     countable = _filter_countable(response.operations)
@@ -481,6 +483,7 @@ async def _process_parsed_response(
                 rate=create_rate,
                 comment=comment,
                 transaction_date=txn_datetime,
+                channel=channel,
             )
         except HTTPException:
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
@@ -569,6 +572,7 @@ async def _process_parsed_response(
                 expense_category_id=category_id,
                 comment=comment,
                 transaction_date=txn_datetime,
+                channel=channel,
             )
             sign = "➖"
         else:
@@ -580,6 +584,7 @@ async def _process_parsed_response(
                 income_category_id=category_id,
                 comment=comment,
                 transaction_date=txn_datetime,
+                channel=channel,
             )
             sign = "➕"
 
@@ -632,6 +637,7 @@ async def _process_parsed_response(
             category_raw=op.category,
             comment=_strip_op_comment(op, source_text),
             operation_date=op_date,
+            channel=channel,
             charge_on_confirm=not bool(clear_ops),
         )
         await message.answer(
@@ -677,7 +683,9 @@ async def process_quick_entry_text(
         if open_purchase is not None:
             bare = bare_text_amount(text)
             if bare is not None:
-                await finish_with_amount(message, session, user, open_purchase, bare)
+                await finish_with_amount(
+                    message, session, user, open_purchase, bare, channel="text"
+                )
                 return
             if is_malformed_number(text):
                 await finish_unrecognized(
@@ -715,6 +723,7 @@ async def process_quick_entry_text(
                 fallback_reason = prefilter_result.reason or "prefilter_disabled"
 
         if prefilter_hit:
+            await ai_usage.record_message("prefilter", "text", "ok")
             if default_wallet is None:
                 await message.answer(MSG_NO_AMOUNT)
                 return
@@ -777,12 +786,18 @@ async def process_quick_entry_text(
                 await refund_model_call(session, budget)
                 await message.answer(MSG_MODEL_FAIL)
                 await session.commit()
+                await ai_usage.record_message(None, "text", "error")
                 return
+            await ai_usage.record_message(
+                None, "text", ai_usage.message_outcome(response, "text")
+            )
 
         if open_purchase is not None and not prefilter_hit:
             bare = bare_response_amount(response)
             if bare is not None:
-                await finish_with_amount(message, session, user, open_purchase, bare)
+                await finish_with_amount(
+                    message, session, user, open_purchase, bare, channel="text"
+                )
                 return
 
         if await _try_add_shopping_items(message, session, user, budget, response):
@@ -803,6 +818,7 @@ async def process_quick_entry_text(
             response,
             text,
             today,
+            channel="text",
             model_call_granted=not prefilter_hit,
         )
 
@@ -900,8 +916,12 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
             await session.commit()
+            await ai_usage.record_message(None, "voice", "error")
             return
 
+        await ai_usage.record_message(
+            None, "voice", ai_usage.message_outcome(response, "voice")
+        )
         if response.speech_status is None:
             await refund_model_call(session, budget)
             await message.answer(MSG_MODEL_FAIL)
@@ -931,7 +951,9 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
                     message, session, user, budget, pending, DAILY_UNPARSED_LIMIT
                 )
             else:
-                await finish_with_amount(message, session, user, pending, amount)
+                await finish_with_amount(
+                    message, session, user, pending, amount, channel="voice"
+                )
             return
 
         if await _try_add_shopping_items(message, session, user, budget, response):
@@ -952,6 +974,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             response,
             "",
             today,
+            channel="voice",
             model_call_granted=True,
         )
 
@@ -1177,6 +1200,7 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
                 expense_category_id=category_id,
                 comment=consumed.comment,
                 transaction_date=txn_datetime,
+                channel=consumed.channel,
             )
         else:
             txn = await create_quick_entry_income(
@@ -1187,6 +1211,7 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
                 income_category_id=category_id,
                 comment=consumed.comment,
                 transaction_date=txn_datetime,
+                channel=consumed.channel,
             )
 
         wallet = await session.get(Wallet, consumed.wallet_id)

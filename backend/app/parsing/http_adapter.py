@@ -9,6 +9,7 @@ from app.parsing.prompt import (
     build_mutable_parser_payload,
     build_parser_messages,
 )
+from app.services import ai_usage
 from app.parsing.types import (
     ParseRequest,
     ParseResponse,
@@ -206,6 +207,7 @@ class HttpParser:
             if request.image_base64
             else _TIMEOUT_SECONDS
         )
+        kind = "voice" if request.audio_base64 else "photo" if request.image_base64 else "text"
         client = self._client or httpx.AsyncClient(timeout=timeout)
         try:
             for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -218,11 +220,13 @@ class HttpParser:
                         _MAX_ATTEMPTS,
                         exc,
                     )
+                    await self._account(kind, "error", None)
                     if attempt == _MAX_ATTEMPTS:
                         raise ParserUnavailable(str(exc)) from exc
                     continue
 
                 if response.status_code >= 400:
+                    await self._account(kind, "error", None)
                     if _should_retry(response.status_code):
                         logger.warning(
                             "parser HTTP %s attempt %s/%s",
@@ -242,21 +246,34 @@ class HttpParser:
                 try:
                     body = response.json()
                 except json.JSONDecodeError as exc:
+                    await self._account(kind, "error", None, answered=True)
                     raise ParserMalformed("parser response is not JSON") from exc
 
+                usage = ai_usage.extract_usage(self._provider, body)
                 try:
                     text_payload = _extract_text_from_provider_body(
                         self._provider, body
                     )
                     payload = json.loads(text_payload)
                     parsed = _parse_response_payload(payload)
-                except json.JSONDecodeError as exc:
+                except (json.JSONDecodeError, ParserMalformed) as exc:
+                    # The model answered (and billed) but the answer is unusable.
+                    await self._account(kind, "error", usage, answered=True)
+                    if isinstance(exc, ParserMalformed):
+                        raise
                     raise ParserMalformed("model content is not JSON") from exc
 
+                await self._account(kind, "ok", usage, answered=True)
                 return parsed
         finally:
             if owns_client:
                 await client.aclose()
+
+    async def _account(
+        self, kind: str, outcome: str, usage: ai_usage.Usage | None, *, answered: bool = False
+    ) -> None:
+        # Own short transaction, never raises (see app/services/ai_usage.py).
+        await ai_usage.record_call(self._model, kind, outcome, usage, answered=answered)
 
     async def _post_google(
         self, client: httpx.AsyncClient, request: ParseRequest

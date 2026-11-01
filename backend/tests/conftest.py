@@ -10,3 +10,8 @@ def _activity_tracking_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(activity, "TRACKING_ENABLED", False)
     activity.reset_cache()
+
+    from app.services import ai_usage
+
+    monkeypatch.setattr(ai_usage, "TRACKING_ENABLED", False)
+    ai_usage.reset_state()

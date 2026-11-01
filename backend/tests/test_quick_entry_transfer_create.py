@@ -161,6 +161,7 @@ class TestCreateQuickEntryTransfer:
                 rate=None,
                 comment="переложил",
                 transaction_date=txn_date,
+                channel="text",
             )
 
             assert txn.type == "transfer"
@@ -186,6 +187,7 @@ class TestCreateQuickEntryTransfer:
                 rate=Decimal(12_800),
                 comment=None,
                 transaction_date=txn_date,
+                channel="text",
             )
 
             assert txn.type == "transfer"

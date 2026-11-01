@@ -47,6 +47,29 @@ PARSER_PROVIDER = os.environ.get("PARSER_PROVIDER") or None
 PARSER_API_KEY = os.environ.get("PARSER_API_KEY") or None
 PARSER_MODEL = os.environ.get("PARSER_MODEL") or None
 
+def _usd_env(name: str, default: float = 0.0) -> float:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        raise RuntimeError(f"{name} must be a non-negative number (USD)") from None
+    if not value >= 0 or value == float("inf"):
+        raise RuntimeError(f"{name} must be a non-negative number (USD)")
+    return value
+
+
+# Admin panel: AI cost accounting. Prices are USD per 1M tokens as billed by the provider
+# (unset/0 -> that part of the cost is counted as 0, so set them).
+AI_PRICE_INPUT_USD_PER_1M = _usd_env("AI_PRICE_INPUT_USD_PER_1M")
+AI_PRICE_OUTPUT_USD_PER_1M = _usd_env("AI_PRICE_OUTPUT_USD_PER_1M")
+# Optional: input tokens of the audio modality, when the model bills them differently.
+AI_PRICE_AUDIO_INPUT_USD_PER_1M = _usd_env("AI_PRICE_AUDIO_INPUT_USD_PER_1M")
+# Daily AI spend (Tashkent day) that triggers one Telegram message to every admin. 0/unset = off.
+ADMIN_AI_DAILY_COST_ALERT_USD = _usd_env("ADMIN_AI_DAILY_COST_ALERT_USD")
+
+
 DAILY_MODEL_CALL_LIMIT = int(os.environ.get("DAILY_MODEL_CALL_LIMIT", "50"))
 DAILY_UNPARSED_LIMIT = int(os.environ.get("DAILY_UNPARSED_LIMIT", "20"))
 

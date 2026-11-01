@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 
-import { fetchAdminOverview, fetchAdminUsers, type AdminOverview } from '../../api/admin'
+import { fetchAdminOverview, fetchAdminUsage, fetchAdminUsers, type AdminOverview } from '../../api/admin'
 import { AdminScreen } from '../../components/admin/AdminScreen'
 import type { AdminTab } from '../../components/admin/AdminTabs'
 import type { Loadable } from '../../components/admin/GrowthView'
 import { useAuthStore } from '../../store/authStore'
 import { adminRedirectTarget } from '../../utils/adminGuard'
+import { initialOpsState, opsReducer } from '../../utils/adminOps'
 import { adminUsersReducer, initialUsersState } from '../../utils/adminUsersState'
 
 const SEARCH_DEBOUNCE_MS = 350
@@ -20,6 +21,8 @@ function AdminContainer() {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [usersTry, setUsersTry] = useState(0)
+  const [ops, dispatchOps] = useReducer(opsReducer, initialOpsState)
+  const [opsTry, setOpsTry] = useState(0)
   const usersOpened = useRef(false)
   if (tab === 'users') usersOpened.current = true
 
@@ -35,6 +38,19 @@ function AdminContainer() {
       cancelled = true
     }
   }, [tab, growthTry])
+
+  // Operations & AI load when the tab is open; a period change (or retry) requests again.
+  useEffect(() => {
+    if (tab !== 'ops') return
+    let cancelled = false
+    const period = ops.period
+    fetchAdminUsage(period)
+      .then((data) => !cancelled && dispatchOps({ type: 'loaded', period, data }))
+      .catch(() => !cancelled && dispatchOps({ type: 'failed', period }))
+    return () => {
+      cancelled = true
+    }
+  }, [tab, ops.period, opsTry])
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS)
@@ -74,6 +90,12 @@ function AdminContainer() {
       onQuery={setQuery}
       onMore={onMore}
       onRetryUsers={() => setUsersTry((n) => n + 1)}
+      ops={ops}
+      onPeriod={(period) => dispatchOps({ type: 'select', period })}
+      onRetryOps={() => {
+        dispatchOps({ type: 'select', period: ops.period })
+        setOpsTry((n) => n + 1)
+      }}
     />
   )
 }

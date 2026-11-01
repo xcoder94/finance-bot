@@ -36,6 +36,28 @@
     "chart": "Активные по дням, последние 30 дней",
     "since": "Активность считается с {{date}}"
   },
+  "ops": {
+    "periodDay": "Сегодня",
+    "periodWeek": "7 дней",
+    "periodMonth": "30 дней",
+    "channels": "Операции по каналам",
+    "text": "Бот: текст",
+    "voice": "Бот: голос",
+    "photo": "Бот: фото",
+    "app": "Приложение",
+    "unknown": "Не известно (созданы до учёта)",
+    "total": "Всего",
+    "ai": "ИИ",
+    "calls": "Вызовов",
+    "cost": "Стоимость, $",
+    "tokens": "Токены: вход / выход",
+    "unparsed": "Не разобрано",
+    "unparsedValue": "{{percent}}% ({{n}} из {{total}})",
+    "errors": "Ошибки ИИ",
+    "threshold": "Порог",
+    "thresholdSet": "Порог в день: {{limit}} · сегодня: {{today}}",
+    "thresholdNone": "Порог не задан"
+  },
   "users": {
     "search": "Поиск: имя, @username, телефон",
     "total": "Всего: {{count}}",

@@ -22,7 +22,7 @@ pytestmark = [
     pytest.mark.anyio,
 ]
 
-ADMIN_PATHS = ["/api/v1/admin/overview", "/api/v1/admin/users"]
+ADMIN_PATHS = ["/api/v1/admin/overview", "/api/v1/admin/users", "/api/v1/admin/usage"]
 
 
 @pytest.mark.parametrize("path", ADMIN_PATHS)

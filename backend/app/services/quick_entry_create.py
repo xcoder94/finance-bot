@@ -30,6 +30,7 @@ async def create_quick_entry_expense(
     expense_category_id: uuid.UUID | None,
     comment: str | None,
     transaction_date: datetime,
+    channel: str | None,
 ) -> Transaction:
     await validate_quick_entry_expense_refs(
         session,
@@ -47,6 +48,7 @@ async def create_quick_entry_expense(
         comment=comment,
         created_by_user_id=user.id,
         transaction_date=transaction_date,
+        channel=channel,
     )
     session.add(transaction)
     await session.commit()
@@ -63,6 +65,7 @@ async def create_quick_entry_income(
     income_category_id: uuid.UUID | None,
     comment: str | None,
     transaction_date: datetime,
+    channel: str | None,
 ) -> Transaction:
     await validate_quick_entry_income_refs(
         session,
@@ -80,6 +83,7 @@ async def create_quick_entry_income(
         comment=comment,
         created_by_user_id=user.id,
         transaction_date=transaction_date,
+        channel=channel,
     )
     session.add(transaction)
     await session.commit()
