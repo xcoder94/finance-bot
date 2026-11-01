@@ -40,3 +40,16 @@ describe('prefers-reduced-motion guard', () => {
     expect(reducedMotionBlocks().length).toBeGreaterThan(0)
   })
 })
+
+describe('dev-fix7: motion that the owner could not see / that made pages jump', () => {
+  it('page fade-in does not move the page (no transform in app-page-in)', () => {
+    const kf = css.match(/@keyframes app-page-in\s*\{([\s\S]*?\n\})/)
+    expect(kf).not.toBeNull()
+    expect(kf![1]).not.toMatch(/transform/)
+  })
+
+  it('SuccessFlash is mounted in the app shell (it was built but never rendered)', () => {
+    const shell = readFileSync(join(__dirname, 'components/AppShell.tsx'), 'utf8')
+    expect(shell).toMatch(/<SuccessFlash\s*\/>/)
+  })
+})

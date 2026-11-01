@@ -9,7 +9,13 @@ export function useTapHaptic(): void {
       const target = event.target
       if (target instanceof Element && isHapticTapTarget(target)) haptic.light()
     }
+    // iOS WebKit only applies :active (the press scale) when some touchstart listener exists.
+    const enableActive = () => undefined
     document.addEventListener('click', onClick, true)
-    return () => document.removeEventListener('click', onClick, true)
+    document.addEventListener('touchstart', enableActive, { passive: true })
+    return () => {
+      document.removeEventListener('click', onClick, true)
+      document.removeEventListener('touchstart', enableActive)
+    }
   }, [])
 }

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { Button, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { UserAvatar } from '../components/UserAvatar'
 import {
@@ -11,6 +11,7 @@ import {
   balanceSizeClass,
   HomeOnboardingCard,
   HomeTrendCard,
+  HomeTrendPlaceholder,
 } from '../components/home/homeBlocks'
 import { fetchTrend, type TrendEntry } from '../api/analytics'
 import { fetchOnboarding, type OnboardingState } from '../api/me'
@@ -26,11 +27,14 @@ import { useAuthStore } from '../store/authStore'
 import {
   getCachedHomeSummary,
   getCachedRecentHistory,
+  getCachedTrend,
+  useDataCacheStore,
   getCachedPersonalSummary,
   getCachedPersonalWalletBalances,
   invalidateHomeData,
   peekHomeSummary,
   peekRecentHistory,
+  peekTrend,
   peekPersonalSummary,
   peekPersonalWalletBalances,
 } from '../store/dataCacheStore'
@@ -234,9 +238,27 @@ function ActionIcon({ path }: { path: string }) {
   )
 }
 
+/** Add/Edit forms are separate routes, so Home unmounts; put the scroll back when it returns. */
+let savedHomeScrollY = 0
+
+function useHomeScrollRestore() {
+  useLayoutEffect(() => {
+    if (savedHomeScrollY > 0) window.scrollTo(0, savedHomeScrollY)
+    const onScroll = () => {
+      savedHomeScrollY = window.scrollY
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+}
+
 export function HomePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
+  const homeEpoch = useDataCacheStore((state) => state.homeEpoch)
+  // Forms open as an overlay on top of this (still mounted) page, see AppShell `background`.
+  const openForm = (path: string) => navigate(path, { state: { background: location } })
   const user = useAuthStore((state) => state.user)
   const familyId = user?.familyBudgetId ?? ''
   const [selectedMonth, setSelectedMonth] = useState<HomeMonth>(currentMonthInTashkent)
@@ -245,8 +267,8 @@ export function HomePage() {
 
   const { year, month } = selectedMonth
   const monthKey = `${year}-${month}`
-  const homeFetchTrigger = composeHomeFetchTrigger(monthKey, visibilityRefreshCount)
-  const balancesFetchTrigger = composeBalancesFetchTrigger(visibilityRefreshCount)
+  const homeFetchTrigger = composeHomeFetchTrigger(monthKey, visibilityRefreshCount + homeEpoch)
+  const balancesFetchTrigger = composeBalancesFetchTrigger(visibilityRefreshCount + homeEpoch)
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -302,11 +324,18 @@ export function HomePage() {
   )
 
   const trendFetch = useFetchBlock(
-    useCallback(() => fetchTrend(trendEndMonthParam({ year, month })), [year, month]),
+    useCallback(
+      () =>
+        getCachedTrend(familyId, trendEndMonthParam({ year, month }), () =>
+          fetchTrend(trendEndMonthParam({ year, month })),
+        ),
+      [familyId, year, month],
+    ),
     homeFetchTrigger,
-    null,
+    peekTrend(familyId, trendEndMonthParam({ year, month })),
     monthKey,
   )
+  useHomeScrollRestore()
   const [dismissedAt, setDismissedAt] = useState<number | null>(readDismissedAtSync)
   useEffect(() => {
     let cancelled = false
@@ -319,7 +348,7 @@ export function HomePage() {
   }, [])
   const onboardingFetch = useFetchBlock<OnboardingState>(
     fetchOnboarding,
-    visibilityRefreshCount,
+    visibilityRefreshCount + homeEpoch,
   )
 
   const summaryData =
@@ -481,7 +510,7 @@ export function HomePage() {
           {anyBlockFailed || !showOnboarding || !onboardingState ? null : (
             <HomeOnboardingCard
               steps={onboardingState.steps}
-              onStart={() => navigate('/add-expense')}
+              onStart={() => openForm('/add-expense')}
               onClose={closeOnboarding}
             />
           )}
@@ -547,6 +576,8 @@ export function HomePage() {
 
           {!anyBlockFailed && trendBars ? (
             <HomeTrendCard bars={trendBars} />
+          ) : !anyBlockFailed && trendFetch.state.status === 'loading' ? (
+            <HomeTrendPlaceholder />
           ) : null}
 
           <div className="home-actions">
@@ -555,7 +586,7 @@ export function HomePage() {
                 key={action.key}
                 type="button"
                 className="home-actions__btn"
-                onClick={() => navigate(action.path)}
+                onClick={() => openForm(action.path)}
               >
                 <ActionIcon path={action.icon} />
                 {action.label}
@@ -590,7 +621,7 @@ export function HomePage() {
                   key={item.id}
                   type="button"
                   className="home-ops-row home-ops-row--clickable"
-                  onClick={() => navigate(editRouteForItem(item))}
+                  onClick={() => openForm(editRouteForItem(item))}
                 >
                   <div className="home-ops-row__main">
                     <div className="home-ops-row__title">

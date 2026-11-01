@@ -13,6 +13,7 @@ import type {
   SummaryResponse,
   WalletBalancesResponse,
 } from '../api/home'
+import type { TrendEntry } from '../api/analytics'
 
 type CacheEntry = {
   data: unknown
@@ -21,6 +22,8 @@ type CacheEntry = {
 
 type DataCacheState = {
   entries: Record<string, CacheEntry>
+  /** Bumped on every home invalidation, so a Home that stays mounted under a form re-fetches. */
+  homeEpoch: number
   setEntry: (key: string, data: unknown) => void
   removeKey: (key: string) => void
   removePrefix: (prefix: string) => void
@@ -32,8 +35,24 @@ const TRANSACTION_TTL_MS = 2 * 60_000
 
 const inFlight = new Map<string, Promise<unknown>>()
 
+/**
+ * Last value ever fetched per key. Survives TTL expiry and invalidation, so the home screen can
+ * render the previous figures instantly (stale-while-revalidate) instead of a skeleton and then
+ * jumping when the fresh data lands.
+ */
+const lastKnown = new Map<string, unknown>()
+
+function readLastKnown<T>(key: string): T | null {
+  return lastKnown.has(key) ? (lastKnown.get(key) as T) : null
+}
+
+function readFreshOrStale<T>(key: string, ttlMs: number): T | null {
+  return readFresh<T>(key, ttlMs) ?? readLastKnown<T>(key)
+}
+
 export const useDataCacheStore = create<DataCacheState>((set) => ({
   entries: {},
+  homeEpoch: 0,
   setEntry: (key, data) =>
     set((state) => ({
       entries: {
@@ -85,6 +104,7 @@ async function fetchCached<T>(
 
   const request = fetcher()
     .then((data) => {
+      lastKnown.set(key, data)
       useDataCacheStore.getState().setEntry(key, data)
       return data
     })
@@ -115,7 +135,7 @@ export function peekHomeSummary(
   year: number,
   month: number,
 ): SummaryResponse | null {
-  return readFresh(summaryKey(familyId, year, month), HOME_TTL_MS)
+  return readFreshOrStale(summaryKey(familyId, year, month), HOME_TTL_MS)
 }
 
 export function getCachedHomeSummary(
@@ -145,7 +165,7 @@ export function peekPersonalSummary(
   year: number,
   month: number,
 ): PersonalSummaryResponse | null {
-  return readFresh(personalSummaryKey(familyId, year, month), HOME_TTL_MS)
+  return readFreshOrStale(personalSummaryKey(familyId, year, month), HOME_TTL_MS)
 }
 
 export function getCachedPersonalSummary(
@@ -166,7 +186,7 @@ export function getCachedPersonalSummary(
 export function peekPersonalWalletBalances(
   familyId: string,
 ): PersonalWalletBalancesResponse | null {
-  return readFresh(personalBalancesKey(familyId), HOME_TTL_MS)
+  return readFreshOrStale(personalBalancesKey(familyId), HOME_TTL_MS)
 }
 
 export function getCachedPersonalWalletBalances(
@@ -182,7 +202,7 @@ export function peekRecentHistory(
   year: number,
   month: number,
 ): HistoryResponse | null {
-  return readFresh(recentHistoryKey(familyId, year, month), HOME_TTL_MS)
+  return readFreshOrStale(recentHistoryKey(familyId, year, month), HOME_TTL_MS)
 }
 
 export function getCachedRecentHistory(
@@ -193,6 +213,21 @@ export function getCachedRecentHistory(
   force = false,
 ): Promise<HistoryResponse> {
   return fetchCached(recentHistoryKey(familyId, year, month), HOME_TTL_MS, fetcher, force)
+}
+
+const trendKey = (familyId: string, endMonth: string) => `home:${familyId}:trend:${endMonth}`
+
+export function peekTrend(familyId: string, endMonth: string): TrendEntry[] | null {
+  return readFreshOrStale(trendKey(familyId, endMonth), HOME_TTL_MS)
+}
+
+export function getCachedTrend(
+  familyId: string,
+  endMonth: string,
+  fetcher: () => Promise<TrendEntry[]>,
+  force = false,
+): Promise<TrendEntry[]> {
+  return fetchCached(trendKey(familyId, endMonth), HOME_TTL_MS, fetcher, force)
 }
 
 export function peekWallets(familyId: string): Wallet[] | null {
@@ -272,6 +307,7 @@ export function cacheExpenseCategory(
 
 export function invalidateHomeData(familyId: string): void {
   useDataCacheStore.getState().removePrefix(`home:${familyId}:`)
+  useDataCacheStore.setState((state) => ({ homeEpoch: state.homeEpoch + 1 }))
 }
 
 export function invalidateWalletData(familyId: string): void {

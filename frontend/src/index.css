@@ -2927,14 +2927,13 @@ button.home-ops-row:focus-visible {
   animation: app-page-in 0.18s ease-out;
 }
 
+/* dev-fix7: fade only. A translateY here made every page (and Home on return) visibly jump. */
 @keyframes app-page-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
@@ -3997,7 +3996,8 @@ a.tabbar-link {
 
 button:not(:disabled):not(.shopping-row__main):not(.shopping-row__action):not(.shopping-trip__row):not(.settings-swipe-row__main):not(.home-ops-row):not(.home-month-nav__button):active,
 a.tabbar-link:active {
-  transform: scale(0.97);
+  transform: scale(0.95);
+  opacity: 0.8;
 }
 
 .shopping-row__main,

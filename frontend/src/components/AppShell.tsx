@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { type Location, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { Spinner, Tabbar } from '@telegram-apps/telegram-ui'
 import { useSignal, viewport } from '@tma.js/sdk-react'
 import { useTranslation } from 'react-i18next'
@@ -41,11 +41,18 @@ import { MAIN_TABS } from './mainTabs'
 import { useShoppingStartup } from '../hooks/useShoppingStartup'
 import { useTapHaptic } from '../hooks/useTapHaptic'
 import { useTxDeepLink } from '../hooks/useTxDeepLink'
+import { SuccessFlash } from './SuccessFlash'
 import { useChromeStore } from '../store/chromeStore'
 
 export { MAIN_TABS } from './mainTabs'
 
 const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'))
+
+/** Home passes its own location as `state.background` when it opens a form over itself. */
+export function backgroundLocation(state: unknown): Location | null {
+  const bg = (state as { background?: Location } | null)?.background
+  return bg && typeof bg.pathname === 'string' ? bg : null
+}
 
 let viewportMountPromise: Promise<void> | null = null
 
@@ -208,6 +215,8 @@ function TxDeepLinkResolvingScreen() {
 }
 
 export function AppShell() {
+  const location = useLocation()
+  const background = backgroundLocation(location.state)
   useTapHaptic()
   const txDeepLinkPhase = useTxDeepLink()
   useShoppingStartup()
@@ -222,7 +231,7 @@ export function AppShell() {
 
   return (
     <NativeBackButtonProvider>
-      <Routes>
+      <Routes location={background ?? location}>
         <Route path="add-income" element={<AddIncomePage />} />
         <Route path="add-expense" element={<AddExpensePage />} />
         <Route path="add-transfer" element={<AddTransferPage />} />
@@ -254,6 +263,19 @@ export function AppShell() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {background ? (
+        // Opened from Home: the page stays mounted underneath, only the sheet is drawn on top.
+        <Routes>
+          <Route path="add-income" element={<AddIncomePage />} />
+          <Route path="add-expense" element={<AddExpensePage />} />
+          <Route path="add-transfer" element={<AddTransferPage />} />
+          <Route path="edit-income/:id" element={<EditIncomePage />} />
+          <Route path="edit-expense/:id" element={<EditExpensePage />} />
+          <Route path="edit-transfer/:id" element={<EditTransferPage />} />
+          <Route path="*" element={null} />
+        </Routes>
+      ) : null}
+      <SuccessFlash />
     </NativeBackButtonProvider>
   )
 }

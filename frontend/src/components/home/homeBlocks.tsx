@@ -113,6 +113,20 @@ export function HomeTrendCard({ bars }: { bars: TrendBar[] }) {
   )
 }
 
+/** Same box as HomeTrendCard so the page below does not move when the trend arrives. */
+export function HomeTrendPlaceholder() {
+  const { t } = useTranslation()
+  return (
+    <div className="home-trend home-trend--ph" aria-hidden="true">
+      <div className="home-trend__head">
+        <div className="home-trend__title">{t('home.trendTitle')}</div>
+        <div className="home-trend__unit">{t('home.trendUnit')}</div>
+      </div>
+      <div className="home-trend__cols" />
+    </div>
+  )
+}
+
 export function HomeOnboardingCard({
   steps,
   onStart,
