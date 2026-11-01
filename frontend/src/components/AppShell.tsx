@@ -38,6 +38,7 @@ import { AdminPage } from '../pages/admin/AdminPage'
 import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
+import { useShoppingStartup } from '../hooks/useShoppingStartup'
 import { useTxDeepLink } from '../hooks/useTxDeepLink'
 import { useChromeStore } from '../store/chromeStore'
 
@@ -207,6 +208,7 @@ function TxDeepLinkResolvingScreen() {
 
 export function AppShell() {
   const txDeepLinkPhase = useTxDeepLink()
+  useShoppingStartup()
 
   if (txDeepLinkPhase === 'resolving') {
     return (

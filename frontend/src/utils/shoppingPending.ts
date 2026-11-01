@@ -182,3 +182,44 @@ export async function submitManualAmount(
     return { kind: 'failed' }
   }
 }
+
+/** Forget the remembered wait once its result/manual screen was shown (only if it is that purchase). */
+export function clearPendingIfMatches(storage: PendingStorage | null, id: string): void {
+  if (readPending(storage)?.id === id) clearPending(storage)
+}
+
+export type StartupResolution =
+  | { kind: 'skip' }
+  | { kind: 'open'; id: string }
+  | { kind: 'waiting' }
+
+/**
+ * Every app start without an explicit deep link: a remembered wait brings the user back to its
+ * result (completed), manual entry (unrecognized) or the «Покупки» tab (still waiting).
+ * Dead waits (cancelled / expired / unknown) are forgotten; network trouble changes nothing.
+ */
+export async function resolveStartup(
+  storage: PendingStorage | null,
+  fetchPending: (id: string) => Promise<PendingPurchase>,
+  ctx: { pathname: string; search: string },
+): Promise<StartupResolution> {
+  const skip: StartupResolution = { kind: 'skip' }
+  const params = new URLSearchParams(ctx.search.startsWith('?') ? ctx.search.slice(1) : ctx.search)
+  if (params.has('purchase') || params.has('tx') || ctx.pathname.startsWith('/shopping/trip')) return skip
+  const remembered = readPending(storage)
+  if (!remembered) return skip
+  try {
+    const pending = await fetchPending(remembered.id)
+    if (pending.status === 'completed' || pending.status === 'unrecognized') {
+      return { kind: 'open', id: remembered.id }
+    }
+    if (pending.status === 'awaiting') {
+      return ctx.pathname === '/shopping' ? skip : { kind: 'waiting' }
+    }
+    clearPending(storage)
+    return skip
+  } catch (e) {
+    if (e instanceof ShoppingApiError && e.code === 'not_found') clearPending(storage)
+    return skip
+  }
+}

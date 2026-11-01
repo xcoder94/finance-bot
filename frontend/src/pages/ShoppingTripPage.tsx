@@ -39,6 +39,7 @@ import {
 } from '../utils/shoppingTrip'
 import {
   browserStorage,
+  clearPendingIfMatches,
   createBotStarter,
   parseLaunchParam,
   readPending,
@@ -130,6 +131,7 @@ export function ShoppingTripPage() {
     void resolveLaunch(launchId, { fetchPending: fetchPendingPurchase, fetchPurchase }).then((r) => {
       if (!alive) return
       if (r.kind === 'result') {
+        clearPendingIfMatches(browserStorage(), launchId)
         invalidateWalletData(scope)
         invalidateHomeData(scope)
         setResult({ purchase: r.purchase, requested: r.purchase.items_recorded })
@@ -138,6 +140,7 @@ export function ShoppingTripPage() {
         setManual({ id: r.id, method: r.method, status: r.status })
         setStage('manual')
       } else if (r.kind === 'gone') {
+        clearPendingIfMatches(browserStorage(), launchId)
         navigate('/shopping', { replace: true })
       } else {
         setLaunchFailed(true)

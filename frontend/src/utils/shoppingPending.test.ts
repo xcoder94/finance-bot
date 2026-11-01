@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { ShoppingApiError } from '../api/shopping'
 import {
   clearPending,
+  clearPendingIfMatches,
+  resolveStartup,
   loadWaiting,
   parseLaunchParam,
   readPending,
@@ -236,5 +238,66 @@ describe('submitManualAmount', () => {
     rememberPending(s, { id: ID, method: 'receipt', ids: ['a'] })
     expect(await submitManualAmount(s, async () => { throw new ShoppingApiError('network') }, ID, 5)).toEqual({ kind: 'failed' })
     expect(readPending(s)).not.toBeNull()
+  })
+})
+
+describe('resolveStartup', () => {
+  const ctx = { pathname: '/', search: '' }
+  const remembered = () => {
+    const s = mem()
+    rememberPending(s, { id: ID, method: 'receipt', ids: ['a'] })
+    return s
+  }
+  it('nothing remembered -> skip, no request', async () => {
+    const fetchPending = vi.fn()
+    expect(await resolveStartup(mem(), fetchPending, ctx)).toEqual({ kind: 'skip' })
+    expect(fetchPending).not.toHaveBeenCalled()
+  })
+  it('completed -> open the result by id, memory kept until shown', async () => {
+    const s = remembered()
+    expect(await resolveStartup(s, async () => pending({ status: 'completed', purchase_id: 'p1' }), ctx)).toEqual({ kind: 'open', id: ID })
+    expect(readPending(s)).not.toBeNull()
+  })
+  it('unrecognized -> open manual entry', async () => {
+    expect(await resolveStartup(remembered(), async () => pending({ status: 'unrecognized' }), ctx)).toEqual({ kind: 'open', id: ID })
+  })
+  it('awaiting -> shopping tab with the banner', async () => {
+    expect(await resolveStartup(remembered(), async () => pending(), ctx)).toEqual({ kind: 'waiting' })
+  })
+  it('cancelled / expired / not_found -> cleared, normal start', async () => {
+    for (const status of ['cancelled', 'expired']) {
+      const s = remembered()
+      expect(await resolveStartup(s, async () => pending({ status }), ctx)).toEqual({ kind: 'skip' })
+      expect(readPending(s)).toBeNull()
+    }
+    const s = remembered()
+    expect(await resolveStartup(s, async () => { throw new ShoppingApiError('not_found', 404) }, ctx)).toEqual({ kind: 'skip' })
+    expect(readPending(s)).toBeNull()
+  })
+  it('network error -> normal start, memory kept', async () => {
+    const s = remembered()
+    expect(await resolveStartup(s, async () => { throw new ShoppingApiError('network') }, ctx)).toEqual({ kind: 'skip' })
+    expect(readPending(s)).not.toBeNull()
+  })
+  it('explicit deep link / trip page -> skip without request', async () => {
+    const fetchPending = vi.fn()
+    expect(await resolveStartup(remembered(), fetchPending, { pathname: '/shopping/trip', search: `?purchase=${ID}` })).toEqual({ kind: 'skip' })
+    expect(await resolveStartup(remembered(), fetchPending, { pathname: '/', search: `?purchase=${ID}` })).toEqual({ kind: 'skip' })
+    expect(await resolveStartup(remembered(), fetchPending, { pathname: '/', search: `?tx=${ID}` })).toEqual({ kind: 'skip' })
+    expect(fetchPending).not.toHaveBeenCalled()
+  })
+  it('already on the shopping tab and awaiting -> skip (no navigation)', async () => {
+    expect(await resolveStartup(remembered(), async () => pending(), { pathname: '/shopping', search: '' })).toEqual({ kind: 'skip' })
+  })
+})
+
+describe('clearPendingIfMatches', () => {
+  it('clears only the matching purchase', () => {
+    const s = mem()
+    rememberPending(s, { id: ID, method: 'voice', ids: [] })
+    clearPendingIfMatches(s, 'other')
+    expect(readPending(s)).not.toBeNull()
+    clearPendingIfMatches(s, ID)
+    expect(readPending(s)).toBeNull()
   })
 })
