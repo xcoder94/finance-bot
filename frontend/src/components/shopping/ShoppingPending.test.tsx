@@ -29,32 +29,65 @@ const amountProps = {
   walletLabel: 'Карта', busy: false, failed: false, noWallet: false,
   onAmount: noop, onOverLimit: noop, onSubmit: noop, onBack: noop,
   photoEnabled: true, botMethod: null as 'receipt' | 'voice' | null, onBotMethod: noop,
+  initialMethod: undefined as 'manual' | 'receipt' | 'voice' | undefined,
 }
 
-describe('ShoppingAmountView: bot methods', () => {
-  it('shows both ways when the photo flag is on', () => {
+describe('ShoppingAmountView: finish sheet with methods (mockup, dev-fix2)', () => {
+  it('is a sheet (dialog) with title, close, caption and the three tabs when the photo flag is on', () => {
     const html = wrap(<ShoppingAmountView {...amountProps} />)
-    expect(html).toContain('Отправить фото чека')
-    expect(html).toContain('Сказать сумму голосом')
+    expect(html).toContain('role="dialog"')
+    expect(html).toContain('Завершить закупку')
+    expect(html).toContain('aria-label="Закрыть"')
+    expect(html).toContain('Одна сумма на всю закупку. Отмечено товаров: 3')
+    expect(html).toMatch(/role="tab"[^>]*>Вручную</)
+    expect(html).toMatch(/role="tab"[^>]*>Фото чека</)
+    expect(html).toMatch(/role="tab"[^>]*>Голос</)
   })
-  it('hides the photo button when the flag is off; voice stays', () => {
+  it('tab order is Вручную, Фото чека, Голос; manual is selected first', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} />)
+    expect(html.indexOf('>Вручную<')).toBeLessThan(html.indexOf('>Фото чека<'))
+    expect(html.indexOf('>Фото чека<')).toBeLessThan(html.indexOf('>Голос<'))
+    expect(html).toMatch(/aria-selected="true"[^>]*>Вручную</)
+  })
+  it('photo tab hidden when the flag is off; voice stays', () => {
     const html = wrap(<ShoppingAmountView {...amountProps} photoEnabled={false} />)
+    expect(html).not.toContain('Фото чека')
     expect(html).not.toContain('Отправить фото чека')
+    expect(html).toContain('>Голос<')
+  })
+  it('manual tab: label, field, Записать, summary; no bot hint', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} />)
+    expect(html).toContain('Сумма закупки')
+    expect(html).toContain('Записать')
+    expect(html).toContain('Категория')
+    expect(html).toContain('Кошелёк')
+    expect(html).not.toContain('свернётся')
+    expect(html).not.toContain('Отправить фото чека')
+  })
+  it('receipt tab: hint and «Отправить фото чека», no amount field', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} initialMethod="receipt" />)
+    expect(html).toContain('Приложение свернётся, бот ждёт фото чека. Сумма вернётся сюда.')
+    expect(html).toContain('Отправить фото чека')
+    expect(html).not.toContain('Записать')
+    expect(html).toContain('Категория')
+  })
+  it('voice tab: hint and «Сказать сумму голосом»', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} initialMethod="voice" />)
+    expect(html).toContain('Приложение свернётся, бот ждёт голосовое. Сумма вернётся сюда.')
     expect(html).toContain('Сказать сумму голосом')
+    expect(html).not.toContain('Отправить фото чека')
   })
-  it('after a tap shows the minimise hint for that method', () => {
-    expect(wrap(<ShoppingAmountView {...amountProps} botMethod="receipt" busy />)).toContain(
-      'Приложение свернётся, бот ждёт фото чека. Сумма вернётся сюда.',
-    )
-    expect(wrap(<ShoppingAmountView {...amountProps} botMethod="voice" busy />)).toContain(
-      'Приложение свернётся, бот ждёт голосовое. Сумма вернётся сюда.',
-    )
+  it('photo method is never shown when the flag is off, even if asked', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} photoEnabled={false} initialMethod="receipt" />)
+    expect(html).not.toContain('Отправить фото чека')
+    expect(html).toContain('Записать')
   })
-  it('no hint before a tap; Uzbek labels exist', () => {
-    expect(wrap(<ShoppingAmountView {...amountProps} />)).not.toContain('свернётся')
-    const html = wrap(<ShoppingAmountView {...amountProps} />, 'uz')
+  it('Uzbek labels', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} initialMethod="receipt" />, 'uz')
+    expect(html).toContain('Qo&#x27;lda')
     expect(html).toContain('Chek yuboraman')
     expect(html).toContain('Ovoz orqali')
+    expect(html).toContain('Xaridni yakunlash')
   })
 })
 

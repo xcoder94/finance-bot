@@ -37,6 +37,7 @@ type FormSheetAmountFieldProps = {
   currencySuffix: string
   overLimit: boolean
   hint?: string
+  label?: string
   onChange: (value: string) => void
   onOverLimitChange: (overLimit: boolean) => void
 }
@@ -46,6 +47,7 @@ export function FormSheetAmountField({
   currencySuffix,
   overLimit,
   hint,
+  label,
   onChange,
   onOverLimitChange,
 }: FormSheetAmountFieldProps) {
@@ -159,7 +161,7 @@ export function FormSheetAmountField({
 
   return (
     <FormSheetField
-      label={t('addTransaction.amount')}
+      label={label ?? t('addTransaction.amount')}
       right={currencySuffix}
       mono
       hint={hint}

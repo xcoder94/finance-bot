@@ -268,6 +268,32 @@ export function ShoppingTripPage() {
   const remembered = manual ? readPending(browserStorage()) : null
   const retryIds = remembered && manual && remembered.id === manual.id ? remembered.ids : []
 
+  const finishSheet =
+    stage === 'amount' ? (
+      <ShoppingAmountView
+        count={ids.length}
+        amount={amount}
+        overLimit={overLimit}
+        currencySuffix={walletCurrencySuffix(wallet?.currency ?? 'UZS')}
+        categoryLabel={categoryLabel ?? t('shopping.noCategory')}
+        walletLabel={walletLabel ?? t('shopping.walletAuto')}
+        busy={busy}
+        failed={failed}
+        noWallet={noWallet}
+        photoEnabled={photoEnabled}
+        botMethod={botMethod}
+        onBotMethod={(method) => void startBot(method, ids)}
+        onAmount={(v) => {
+          setAmount(v)
+          setFailed(false)
+          setNoWallet(false)
+        }}
+        onOverLimit={setOverLimit}
+        onSubmit={() => void onSubmit()}
+        onBack={backToTrip}
+      />
+    ) : null
+
   let body
   if (stage === 'launch') {
     body = (
@@ -321,31 +347,6 @@ export function ShoppingTripPage() {
         onDone={done}
       />
     )
-  } else if (stage === 'amount') {
-    body = (
-      <ShoppingAmountView
-        count={ids.length}
-        amount={amount}
-        overLimit={overLimit}
-        currencySuffix={walletCurrencySuffix(wallet?.currency ?? 'UZS')}
-        categoryLabel={categoryLabel ?? t('shopping.noCategory')}
-        walletLabel={walletLabel ?? t('shopping.walletAuto')}
-        busy={busy}
-        failed={failed}
-        noWallet={noWallet}
-        photoEnabled={photoEnabled}
-        botMethod={botMethod}
-        onBotMethod={(method) => void startBot(method, ids)}
-        onAmount={(v) => {
-          setAmount(v)
-          setFailed(false)
-          setNoWallet(false)
-        }}
-        onOverLimit={setOverLimit}
-        onSubmit={() => void onSubmit()}
-        onBack={backToTrip}
-      />
-    )
   } else {
     body = (
       <ShoppingTripView
@@ -361,5 +362,10 @@ export function ShoppingTripPage() {
     )
   }
 
-  return <div className="page-content">{body}</div>
+  return (
+    <div className="page-content">
+      {body}
+      {finishSheet}
+    </div>
+  )
 }
