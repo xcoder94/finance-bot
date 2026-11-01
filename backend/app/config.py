@@ -10,6 +10,9 @@ load_dotenv(_BACKEND_ROOT / ".env")
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+if not BOT_TOKEN.strip():
+    # An empty token would sign/verify initData with an empty key -> forgeable login.
+    raise RuntimeError("BOT_TOKEN environment variable is empty")
 APP_PASS_SECRET = os.environ["APP_PASS_SECRET"]
 if not APP_PASS_SECRET:
     raise RuntimeError("APP_PASS_SECRET environment variable is empty")
