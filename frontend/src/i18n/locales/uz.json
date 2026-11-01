@@ -16,8 +16,8 @@
     "retry": "Qayta urinib ko'ring"
   },
   "shopping": {
-    "emptyTitle": "Ro'yxat hozircha bo'sh",
-    "emptyHint": "Birinchi pozitsiyani qo'shing — yoki botga yozing: «sut, non, tuxum».",
+    "emptyTitle": "Xaridlar ro'yxati",
+    "emptyHint": "Bu yerda kun, hafta yoki oy uchun xaridlar ro'yxatini yuritishingiz mumkin. Mahsulotlarni qo'shing, do'konda esa sotib olinganlarini belgilang. Yoki botga yozing: «sut, non, tuxum».",
     "count_one": "{{count}} ta pozitsiya",
     "count_other": "{{count}} ta pozitsiya",
     "addPlaceholder": "+ qo'shish",
