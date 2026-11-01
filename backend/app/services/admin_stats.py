@@ -265,6 +265,9 @@ async def _ai_block(session: AsyncSession, today: date, days: int) -> AiUsage:
     cost_today = await session.scalar(
         select(func.coalesce(func.sum(u.cost_micro_usd), 0)).where(u.day == today)
     )
+    today_no_usage = await session.scalar(
+        select(func.coalesce(func.sum(u.calls_no_usage), 0)).where(u.day == today)
+    )
     threshold = config.ADMIN_AI_DAILY_COST_ALERT_USD
     return AiUsage(
         calls=calls,
@@ -279,6 +282,7 @@ async def _ai_block(session: AsyncSession, today: date, days: int) -> AiUsage:
         errors=int(by_outcome.get("error", (0, 0, 0))[2]),
         threshold_usd=threshold if threshold > 0 else None,
         cost_today_usd=_usd(int(cost_today or 0)),
+        cost_today_incomplete=int(today_no_usage or 0) > 0,
     )
 
 

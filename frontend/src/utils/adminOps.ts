@@ -40,6 +40,7 @@ export type OpsAction =
   | { type: 'select'; period: AdminUsagePeriod }
   | { type: 'loaded'; period: AdminUsagePeriod; data: AdminUsage }
   | { type: 'failed'; period: AdminUsagePeriod }
+  | { type: 'retry' }
 
 export const initialOpsState: OpsState = { period: 'day', status: 'loading' }
 
@@ -47,9 +48,12 @@ export const initialOpsState: OpsState = { period: 'day', status: 'loading' }
 export function opsReducer(state: OpsState, action: OpsAction): OpsState {
   switch (action.type) {
     case 'select':
-      return { period: action.period, status: 'loading' }
+      // Tapping the already selected period changes nothing (and requests nothing).
+      return action.period === state.period ? state : { period: action.period, status: 'loading' }
     case 'loaded':
       return action.period === state.period ? { period: state.period, status: 'ready', data: action.data } : state
+    case 'retry':
+      return { period: state.period, status: 'loading' }
     case 'failed':
       return action.period === state.period ? { period: state.period, status: 'error' } : state
   }

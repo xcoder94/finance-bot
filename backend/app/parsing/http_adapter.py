@@ -128,11 +128,15 @@ def _parse_response_payload(data: Any) -> ParseResponse:
     )
 
 
-def _extract_text_from_provider_body(provider: str, body: dict[str, Any]) -> str:
+def _extract_text_from_provider_body(provider: str, body: Any) -> str:
+    if not isinstance(body, dict):
+        raise ParserMalformed("provider response is not a JSON object")
     if provider == "openai":
         choices = body.get("choices")
         if not isinstance(choices, list) or not choices:
             raise ParserMalformed("openai response missing choices")
+        if not isinstance(choices[0], dict):
+            raise ParserMalformed("openai choice invalid")
         message = choices[0].get("message")
         if not isinstance(message, dict):
             raise ParserMalformed("openai response missing message")
@@ -157,6 +161,8 @@ def _extract_text_from_provider_body(provider: str, body: dict[str, Any]) -> str
         candidates = body.get("candidates")
         if not isinstance(candidates, list) or not candidates:
             raise ParserMalformed("google response missing candidates")
+        if not isinstance(candidates[0], dict):
+            raise ParserMalformed("google candidate invalid")
         content = candidates[0].get("content")
         if not isinstance(content, dict):
             raise ParserMalformed("google response missing content")

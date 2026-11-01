@@ -50,8 +50,18 @@ describe('usage url and reducer', () => {
     expect(opsReducer(week, { type: 'failed', period: 'day' })).toBe(week)
     expect(opsReducer(week, { type: 'failed', period: 'week' }).status).toBe('error')
   })
+  it('tapping the already selected period is a no-op (never stuck on loading)', () => {
+    const ready = opsReducer(initialOpsState, { type: 'loaded', period: 'day', data: {} as never })
+    expect(opsReducer(ready, { type: 'select', period: 'day' })).toBe(ready)
+    const failed = opsReducer(initialOpsState, { type: 'failed', period: 'day' })
+    expect(opsReducer(failed, { type: 'select', period: 'day' })).toBe(failed)
+  })
+  it('retry action goes to loading for the same period', () => {
+    const failed = opsReducer({ period: 'week', status: 'loading' }, { type: 'failed', period: 'week' })
+    expect(opsReducer(failed, { type: 'retry' })).toEqual({ period: 'week', status: 'loading' })
+  })
   it('retry goes back to loading', () => {
     const failed = opsReducer(initialOpsState, { type: 'failed', period: 'day' })
-    expect(opsReducer(failed, { type: 'select', period: 'day' }).status).toBe('loading')
+    expect(opsReducer(failed, { type: 'retry' }).status).toBe('loading')
   })
 })

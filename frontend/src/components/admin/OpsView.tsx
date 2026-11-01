@@ -35,7 +35,7 @@ function UsageBlocks({ data }: { data: AdminUsage }) {
       ? t('ops.thresholdNone')
       : t('ops.thresholdSet', {
           limit: formatUsd(ai.threshold_usd, false),
-          today: formatUsd(ai.cost_today_usd, ai.cost_incomplete),
+          today: formatUsd(ai.cost_today_usd, ai.cost_today_incomplete === true),
         })
   return (
     <div className="admin-ops">

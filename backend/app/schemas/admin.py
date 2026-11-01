@@ -94,6 +94,7 @@ class AiUsage(_Strict):
     errors: int  # of them: no model answer after all attempts / unusable answer
     threshold_usd: float | None  # None: no alert threshold configured
     cost_today_usd: float  # Tashkent today, regardless of the period
+    cost_today_incomplete: bool  # a call WITHOUT usage happened today (not the whole period): "≈"
 
 
 class AdminUsage(_Strict):

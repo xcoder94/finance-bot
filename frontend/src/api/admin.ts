@@ -89,6 +89,8 @@ export type AdminUsage = {
     errors: number
     threshold_usd: number | null
     cost_today_usd: number
+    /** Some of today's calls came without token counts (absent from older servers). */
+    cost_today_incomplete?: boolean
   }
 }
 

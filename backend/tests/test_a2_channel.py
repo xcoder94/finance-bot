@@ -164,6 +164,18 @@ class TestBotVoice:
             assert (await _only_txn(session, budget, "income")).channel == "voice"
 
 
+    async def test_voice_pending_confirmed_as_expense_keeps_voice(self, monkeypatch) -> None:
+        async with rollback_session() as session:
+            user, budget, _ = await setup_family(session, 9_521_005)
+            set_parser_override(self._voice(expense(25_000, type_="ambiguous")))
+            await feed(monkeypatch, session, user.telegram_id, **VOICE)
+            pending = await session.scalar(
+                select(QuickEntryPending).where(QuickEntryPending.user_id == user.id)
+            )
+            await _tap_type(monkeypatch, session, user, pending, "expense")
+            assert (await _only_txn(session, budget, "expense")).channel == "voice"
+
+
 # ---- bot photo (receipt) --------------------------------------------------------------------
 
 

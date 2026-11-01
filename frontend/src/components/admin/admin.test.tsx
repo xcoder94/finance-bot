@@ -103,6 +103,25 @@ describe('OpsView', () => {
   it('marks incomplete cost with ≈', () => {
     expect(opsRender({ ...usage, ai: { ...usage.ai, cost_incomplete: true } })).toContain('≈ $1,23')
   })
+  it('marks only "today" with ≈ when today is incomplete, not the period cost', () => {
+    const html = opsRender({ ...usage, ai: { ...usage.ai, cost_today_incomplete: true } })
+    expect(html).toContain('сегодня: ≈ $0,50')
+    expect(html).toContain('$1,23')
+    expect(html).not.toContain('≈ $1,23')
+  })
+  it('does not mark today when only the period is incomplete', () => {
+    const html = opsRender({ ...usage, ai: { ...usage.ai, cost_incomplete: true, cost_today_incomplete: false } })
+    expect(html).toContain('сегодня: $0,50')
+    expect(html).toContain('≈ $1,23')
+  })
+  it('does not mark today when the server does not send the field', () => {
+    expect(opsRender({ ...usage, ai: { ...usage.ai, cost_incomplete: true } })).toContain('сегодня: $0,50')
+  })
+  it('shows AI errors as messages (errors), not failed attempts (error_calls)', () => {
+    const html = opsRender({ ...usage, ai: { ...usage.ai, errors: 7, error_calls: 3 } })
+    expect(html).toMatch(/Ошибки ИИ<\/span><span class="admin-block__value">7</)
+    expect(html).not.toMatch(/Ошибки ИИ<\/span><span class="admin-block__value">3</)
+  })
   it('shows a dash for unparsed when there were no messages', () => {
     const html = opsRender({ ...usage, ai: { ...usage.ai, messages: 0, unparsed: 0 } })
     expect(html).toContain('Не разобрано')

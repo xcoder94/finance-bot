@@ -171,6 +171,49 @@ async def test_garbage_answer_is_error_but_tokens_are_billed(api_client, monkeyp
     assert (row.calls, row.input_tokens, row.cost_micro_usd) == (1, 1000, 300)
 
 
+@pytest.mark.parametrize("provider,body", [
+    ("google", {"candidates": ["x"]}),
+    ("google", {"candidates": [{"content": ["x"]}]}),
+    ("google", ["top", "level", "array"]),
+    ("google", "just a string"),
+    ("openai", {"choices": ["x"]}),
+    ("openai", [1, 2]),
+    ("anthropic", {"content": ["x"]}),
+    ("anthropic", [1]),
+])
+async def test_valid_json_of_unexpected_shape_is_a_counted_error_not_a_crash(
+    api_client, monkeypatch, prices, provider, body
+) -> None:
+    _, session = api_client
+    usage_on(monkeypatch, session)
+    with pytest.raises(ParserMalformed):
+        await run_parser(lambda r: httpx.Response(200, json=body), provider=provider)
+    row = (await rows(session))[("gemini-test", "text", "error")]
+    assert row.calls == 1
+
+
+async def test_unexpected_shape_gives_the_user_the_usual_reply(monkeypatch, prices) -> None:
+    from tests.test_m3_4_bot_pending import feed, setup_family
+    from tests.test_quick_entry_flow import rollback_session
+
+    async with rollback_session() as session:
+        usage_on(monkeypatch, session)
+        user, _, _ = await setup_family(session, 9_530_010)
+
+        async def handler(request):
+            return httpx.Response(200, json={"candidates": ["x"]})
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        set_parser_override(HttpParser("google", "key", "gemini-test", client=client))
+        bot = await feed(monkeypatch, session, user.telegram_id, text="такси 30000")
+        got = await rows(session)
+        set_parser_override(None)
+        await client.aclose()
+    assert got[("gemini-test", "text", "error")].calls == 1
+    assert got[("gemini-test", "text", "error")].messages == 1
+    assert bot.sent, "the user must get a reply"
+
+
 async def test_accounting_failure_never_breaks_parsing(monkeypatch, prices) -> None:
     class Broken:
         def __call__(self):
@@ -210,6 +253,26 @@ async def test_bot_messages_are_counted_by_outcome(monkeypatch, prices) -> None:
     assert got[("gemini-test", "text", "unparsed")].messages == 1
     assert got[("gemini-test", "text", "error")].messages == 1
     assert all(r.calls == 0 for r in got.values())  # FixedParser makes no HTTP call
+
+
+async def test_message_with_only_shopping_items_is_ok_not_unparsed(monkeypatch, prices) -> None:
+    from tests.test_m3_4_bot_pending import FixedParser, feed, setup_family
+    from tests.test_quick_entry_flow import rollback_session
+
+    async with rollback_session() as session:
+        usage_on(monkeypatch, session)
+        user, _, _ = await setup_family(session, 9_530_011)
+        set_parser_override(FixedParser(ParseResponse(operations=[], shopping_items=["молоко", "хлеб"])))
+        await feed(monkeypatch, session, user.telegram_id, text="купить молоко и хлеб")
+        got = await rows(session)
+        set_parser_override(None)
+    assert got[("gemini-test", "text", "ok")].messages == 1
+    assert ("gemini-test", "text", "unparsed") not in got
+
+
+def test_message_outcome_shopping_items_only_is_ok() -> None:
+    assert ai_usage.message_outcome(ParseResponse(operations=[], shopping_items=["x"]), "text") == "ok"
+    assert ai_usage.message_outcome(ParseResponse(operations=[]), "text") == "unparsed"
 
 
 async def test_prefilter_hit_is_a_message_without_a_call(monkeypatch, prices) -> None:
@@ -300,6 +363,13 @@ async def test_alert_once_per_admin_when_threshold_crossed(api_client, monkeypat
     assert len(bot.sent) == 2
     stored = (await session.scalars(select(AiCostAlert).where(AiCostAlert.day == TODAY))).all()
     assert [(a.threshold_micro_usd, a.cost_micro_usd) for a in stored] == [(1000, 1600)]
+
+
+async def test_alert_fires_when_cost_equals_the_threshold_exactly(api_client, monkeypatch, prices) -> None:
+    _, session = api_client
+    bot = alert_on(monkeypatch, session, threshold_usd=0.0008)  # 800 micro
+    await one_call()  # 1000*0.30 + 200*2.50 = 800 micro: exactly the threshold
+    assert sorted(chat for chat, _ in bot.sent) == [111, 222]
 
 
 async def test_alert_text_shows_dollars(api_client, monkeypatch, prices) -> None:
@@ -412,6 +482,7 @@ async def test_usage_ai_block_matches_fixture(api_client, monkeypatch) -> None:
     day = (await get("day"))["ai"]
     assert day == {
         "calls": 14, "error_calls": 4, "calls_without_usage": 1, "cost_incomplete": True,
+        "cost_today_incomplete": True,
         "input_tokens": 9000, "output_tokens": 900, "cost_usd": 3.0,
         "messages": 13, "unparsed": 2, "errors": 1,
         "threshold_usd": 2.0, "cost_today_usd": 3.0,
@@ -422,6 +493,33 @@ async def test_usage_ai_block_matches_fixture(api_client, monkeypatch) -> None:
     assert month["calls"] == 19  # 1 May is 45 days back
 
 
+async def test_cost_today_incomplete_looks_at_today_only(api_client, monkeypatch) -> None:
+    _, session, _, get = await usage_client(api_client, monkeypatch)
+    await put(session, "ok", calls=3, no_usage=0, messages=3, cost=1_000)  # today: all with tokens
+    await put(session, "ok", day=date(2026, 6, 14), calls=2, no_usage=2, messages=2)  # yesterday: gap
+    day = (await get("day"))["ai"]
+    week = (await get("week"))["ai"]
+    assert (day["cost_incomplete"], day["cost_today_incomplete"]) == (False, False)
+    assert (week["cost_incomplete"], week["cost_today_incomplete"]) == (True, False)
+    await put(session, "error", calls=1, no_usage=1)  # today now has a gap
+    for period in ("day", "week", "month"):
+        ai = (await get(period))["ai"]
+        assert (ai["cost_incomplete"], ai["cost_today_incomplete"]) == (True, True)
+
+
+@pytest.mark.parametrize("period,days", [("day", 1), ("week", 7), ("month", 30)])
+async def test_ai_window_is_exactly_n_tashkent_days_including_today(
+    api_client, monkeypatch, period, days
+) -> None:
+    from datetime import timedelta
+
+    _, session, _, get = await usage_client(api_client, monkeypatch)
+    await put(session, "ok", day=TODAY - timedelta(days=days - 1), calls=1, messages=1)  # oldest inside
+    await put(session, "ok", day=TODAY - timedelta(days=days), calls=100, messages=100)  # one day outside
+    ai = (await get(period))["ai"]
+    assert (ai["calls"], ai["messages"]) == (1, 1)
+
+
 async def test_usage_ai_empty_and_no_threshold(api_client, monkeypatch) -> None:
     from app import config
 
@@ -430,6 +528,7 @@ async def test_usage_ai_empty_and_no_threshold(api_client, monkeypatch) -> None:
     ai = (await get("day"))["ai"]
     assert ai["calls"] == 0 and ai["cost_usd"] == 0 and ai["threshold_usd"] is None
     assert ai["cost_incomplete"] is False and ai["cost_today_usd"] == 0
+    assert ai["cost_today_incomplete"] is False
 
 
 async def test_usage_ai_is_private_and_still_guarded(api_client, monkeypatch) -> None:
