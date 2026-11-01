@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const cloud = vi.hoisted(() => ({ value: null as string | null, set: vi.fn() }))
-const chrome = vi.hoisted(() => ({ apply: vi.fn() }))
 
 vi.mock('../telegram/themeStorage', () => ({
   cloudGet: vi.fn(async () => cloud.value),
@@ -10,7 +9,6 @@ vi.mock('../telegram/themeStorage', () => ({
     return Promise.resolve()
   },
 }))
-vi.mock('../telegram/telegramChrome', () => ({ applyTelegramChrome: chrome.apply }))
 
 const local = new Map<string, string>()
 
@@ -23,7 +21,6 @@ beforeEach(() => {
   local.clear()
   cloud.value = null
   cloud.set.mockClear()
-  chrome.apply.mockClear()
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => local.get(k) ?? null,
     setItem: (k: string, v: string) => void local.set(k, v),
@@ -49,7 +46,6 @@ describe('themeStore', () => {
     expect(local.get('app-theme')).toBe('light')
     expect(cloud.set).toHaveBeenCalledWith('app-theme', 'light')
     expect(document.documentElement.dataset.theme).toBe('light')
-    expect(chrome.apply).toHaveBeenCalledWith('light')
 
     const second = await freshStore()
     expect(second.useThemeStore.getState().theme).toBe('light')
@@ -69,7 +65,6 @@ describe('themeStore', () => {
     await useThemeStore.getState().hydrate()
     expect(useThemeStore.getState().theme).toBe('dark')
     expect(document.documentElement.dataset.theme).toBe('dark')
-    expect(chrome.apply).toHaveBeenCalledWith('dark')
   })
 
   it('QA m3-1 (bug): a choice made while CloudStorage is still loading is not overwritten by the late cloud value', async () => {

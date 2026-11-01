@@ -11,7 +11,6 @@ vi.mock('../../telegram/themeStorage', () => ({
   cloudGet: async () => null,
   cloudSet: async () => undefined,
 }))
-vi.mock('../../telegram/telegramChrome', () => ({ applyTelegramChrome: () => undefined }))
 
 beforeEach(async () => {
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined })

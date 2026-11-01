@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 
-import { applyTelegramChrome } from '../telegram/telegramChrome'
 import { cloudGet, cloudSet } from '../telegram/themeStorage'
 
 export type Theme = 'dark' | 'light'
@@ -30,7 +29,6 @@ function writeLocal(theme: Theme): void {
 
 function applyToDocument(theme: Theme): void {
   document.documentElement.dataset.theme = theme
-  applyTelegramChrome(theme)
 }
 
 type ThemeStore = {

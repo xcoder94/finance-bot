@@ -1,36 +1,48 @@
-// QA m3-1: Telegram header/background follow the chosen in-app theme.
+// dev-fix1 guard: the app never changes Telegram client colours (header/background/bottom bar).
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ header: vi.fn(), bg: vi.fn(), available: true }))
+const m = vi.hoisted(() => ({ header: vi.fn(), bg: vi.fn(), bottom: vi.fn() }))
 vi.mock('@tma.js/sdk-react', () => ({
+  init: vi.fn(),
   miniApp: {
-    setHeaderColor: Object.assign(m.header, { isAvailable: () => m.available }),
-    setBgColor: Object.assign(m.bg, { isAvailable: () => m.available }),
+    setHeaderColor: Object.assign(m.header, { isAvailable: () => true }),
+    setBgColor: Object.assign(m.bg, { isAvailable: () => true }),
+    setBottomBarColor: Object.assign(m.bottom, { isAvailable: () => true }),
+    mount: Object.assign(vi.fn(), { isAvailable: () => true }),
+    isMounted: () => false,
+    unmount: vi.fn(),
   },
 }))
 
-import { applyTelegramChrome } from './telegramChrome'
+const cloud = vi.hoisted(() => ({ set: vi.fn() }))
+vi.mock('./themeStorage', () => ({
+  cloudGet: vi.fn(async () => 'light'),
+  cloudSet: (k: string, v: string) => {
+    cloud.set(k, v)
+    return Promise.resolve()
+  },
+}))
 
 beforeEach(() => {
+  vi.resetModules()
   m.header.mockClear()
   m.bg.mockClear()
-  m.available = true
+  m.bottom.mockClear()
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined })
+  vi.stubGlobal('document', { documentElement: { dataset: {} as Record<string, string> } })
 })
 
-describe('applyTelegramChrome', () => {
-  it('dark -> #17212b (matches --bg of dark palette)', () => {
-    applyTelegramChrome('dark')
-    expect(m.header).toHaveBeenCalledWith('#17212b')
-    expect(m.bg).toHaveBeenCalledWith('#17212b')
-  })
-  it('light -> #ffffff', () => {
-    applyTelegramChrome('light')
-    expect(m.header).toHaveBeenCalledWith('#ffffff')
-    expect(m.bg).toHaveBeenCalledWith('#ffffff')
-  })
-  it('old Telegram client without the methods: silently skipped', () => {
-    m.available = false
-    expect(() => applyTelegramChrome('light')).not.toThrow()
+describe('Telegram client colours are left to Telegram', () => {
+  it('theme change and hydrate never call setHeaderColor/setBgColor/setBottomBarColor', async () => {
+    const { bindTelegramThemeParams } = await import('./bindThemeParams')
+    bindTelegramThemeParams()
+    const { useThemeStore } = await import('../store/themeStore')
+    useThemeStore.getState().setTheme('light')
+    useThemeStore.getState().setTheme('dark')
+    await useThemeStore.getState().hydrate()
+    expect(document.documentElement.dataset.theme).toBe('light')
     expect(m.header).not.toHaveBeenCalled()
+    expect(m.bg).not.toHaveBeenCalled()
+    expect(m.bottom).not.toHaveBeenCalled()
   })
 })

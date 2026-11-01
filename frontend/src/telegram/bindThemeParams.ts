@@ -3,7 +3,7 @@ import { init, miniApp } from '@tma.js/sdk-react'
 /**
  * The app draws its own palette (dark by default), so Telegram theme params are
  * deliberately NOT bound to CSS variables. Only the SDK and miniApp are mounted
- * so header/background colours can follow the chosen theme.
+ * (Telegram client colours are left to Telegram; never call set*Color).
  */
 export function bindTelegramThemeParams(): () => void {
   init()
