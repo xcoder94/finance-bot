@@ -8,7 +8,7 @@ from typing import Literal
 
 from app.parsing.cascade_keywords import CASCADE_KEYWORDS
 from app.parsing.types import ParsedOperation
-from app.services.budget_seed import SEED_EXPENSE_CATEGORIES, SEED_INCOME_CATEGORIES
+from app.services.display_name import build_seed_name_by_key, is_default_name
 
 PrefilterReason = Literal[
     "transfer_signal",
@@ -75,17 +75,6 @@ class _CategoryMatch:
     op_type: Literal["expense", "income"]
     term: str
     span: tuple[int, int]
-
-
-def build_seed_name_by_key() -> dict[str, str]:
-    seed: dict[str, str] = {}
-    for name, key in SEED_INCOME_CATEGORIES:
-        seed[key] = name
-    for parent_name, (parent_key, sub_entries) in SEED_EXPENSE_CATEGORIES.items():
-        seed[parent_key] = parent_name
-        for sub_name, sub_key in sub_entries:
-            seed[sub_key] = sub_name
-    return seed
 
 
 def _normalize_number(raw: str) -> int:
@@ -177,8 +166,7 @@ def _matchable_terms(
     terms = [category.name]
     if category.translation_key is None:
         return terms
-    seed_name = seed_name_by_key.get(category.translation_key)
-    if seed_name is not None and category.name.casefold() == seed_name.casefold():
+    if is_default_name(category.name, category.translation_key, seed_name_by_key):
         terms.extend(CASCADE_KEYWORDS.get(category.translation_key, []))
     return terms
 
