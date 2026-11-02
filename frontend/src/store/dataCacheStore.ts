@@ -33,7 +33,13 @@ const HOME_TTL_MS = 30_000
 const REFERENCE_TTL_MS = 5 * 60_000
 const TRANSACTION_TTL_MS = 2 * 60_000
 
-const inFlight = new Map<string, Promise<unknown>>()
+const inFlight = new Map<string, { promise: Promise<unknown>; generation: number }>()
+
+/**
+ * Bumped on every invalidation. A request started before a change must neither be shared with
+ * a request made after it nor write its (already outdated) answer into the cache.
+ */
+let generation = 0
 
 /**
  * Last value ever fetched per key. Survives TTL expiry and invalidation, so the home screen can
@@ -98,21 +104,26 @@ async function fetchCached<T>(
   }
 
   const pending = inFlight.get(key)
-  if (pending) {
-    return pending as Promise<T>
+  if (pending && pending.generation === generation) {
+    return pending.promise as Promise<T>
   }
 
-  const request = fetcher()
+  const startedAt = generation
+  const request: Promise<T> = fetcher()
     .then((data) => {
-      lastKnown.set(key, data)
-      useDataCacheStore.getState().setEntry(key, data)
+      if (startedAt === generation) {
+        lastKnown.set(key, data)
+        useDataCacheStore.getState().setEntry(key, data)
+      }
       return data
     })
     .finally(() => {
-      inFlight.delete(key)
+      if (inFlight.get(key)?.promise === request) {
+        inFlight.delete(key)
+      }
     })
 
-  inFlight.set(key, request)
+  inFlight.set(key, { promise: request, generation: startedAt })
   return request
 }
 
@@ -305,30 +316,37 @@ export function cacheExpenseCategory(
   useDataCacheStore.getState().setEntry(key, [...cached.data, category])
 }
 
-export function invalidateHomeData(familyId: string): void {
-  useDataCacheStore.getState().removePrefix(`home:${familyId}:`)
+/**
+ * One family's data is a web: a transaction changes category/wallet counters and balances, a
+ * rename changes names shown inside cached transactions and home lists, and so on. Every change
+ * therefore drops everything cached for the family (stale-while-revalidate keeps home figures
+ * on screen meanwhile). Never invalidate "just the screen you are on".
+ */
+export function invalidateFamilyData(familyId: string): void {
+  generation += 1
+  const store = useDataCacheStore.getState()
+  store.removePrefix(`home:${familyId}:`)
+  store.removePrefix(`reference:${familyId}:`)
+  store.removePrefix(`transaction:${familyId}:`)
   useDataCacheStore.setState((state) => ({ homeEpoch: state.homeEpoch + 1 }))
 }
 
+export function invalidateHomeData(familyId: string): void {
+  invalidateFamilyData(familyId)
+}
+
 export function invalidateWalletData(familyId: string): void {
-  useDataCacheStore.getState().removeKey(walletsKey(familyId))
-  invalidateHomeData(familyId)
+  invalidateFamilyData(familyId)
 }
 
 export function invalidateIncomeCategoryData(familyId: string): void {
-  useDataCacheStore.getState().removeKey(incomeCategoriesKey(familyId))
+  invalidateFamilyData(familyId)
 }
 
 export function invalidateExpenseCategoryData(familyId: string): void {
-  useDataCacheStore.getState().removeKey(expenseCategoriesKey(familyId))
+  invalidateFamilyData(familyId)
 }
 
-export function invalidateTransactionData(
-  familyId: string,
-  transactionId?: string,
-): void {
-  if (transactionId) {
-    useDataCacheStore.getState().removeKey(transactionKey(familyId, transactionId))
-  }
-  invalidateHomeData(familyId)
+export function invalidateTransactionData(familyId: string, _transactionId?: string): void {
+  invalidateFamilyData(familyId)
 }

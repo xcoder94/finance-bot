@@ -7,8 +7,21 @@ export type TranslatableEntity = {
   translation_key: string | null
 }
 
+const DEFAULT_NAME_LANGUAGES = ['ru', 'uz'] as const
+
+/**
+ * The backend keeps translation_key after a rename, so the key alone does not mean "default".
+ * A default entity is shown localized only while its stored name is still one of the seeded
+ * names (any language); otherwise the user renamed it and their own name wins.
+ */
+function stillDefaultName(name: string, translationKey: string, t: TFunction): boolean {
+  return DEFAULT_NAME_LANGUAGES.some(
+    (lng) => (t(`defaultEntities.${translationKey}`, { lng }) as string) === name,
+  )
+}
+
 export function getDisplayName(entity: TranslatableEntity, t: TFunction): string {
-  return entity.translation_key
+  return entity.translation_key && stillDefaultName(entity.name, entity.translation_key, t)
     ? t(`defaultEntities.${entity.translation_key}`)
     : entity.name
 }
@@ -29,7 +42,9 @@ export function resolveStoredEntityDisplayName(
     return null
   }
 
-  return translationKey ? t(`defaultEntities.${translationKey}`) : storedName
+  return translationKey && stillDefaultName(storedName, translationKey, t)
+    ? t(`defaultEntities.${translationKey}`)
+    : storedName
 }
 
 export function getHistoryItemTitle(

@@ -105,7 +105,9 @@ d2('wallets (B2)', () => {
   })
 
   i2('result label comes from the API wallet_name; translated only when it is a known default wallet', () => {
-    const t = ((k: string) => `T:${k}`) as never
+    // seeded (ru) default name is 'Cash'; a renamed default would differ from it
+    const t = ((k: string, o?: { lng?: string }) =>
+      o?.lng ? (k === 'defaultEntities.cash' ? 'Cash' : `L:${k}`) : `T:${k}`) as never
     const wallets = [
       { id: '1', name: 'Личный QA', translation_key: null },
       { id: '2', name: 'Cash', translation_key: 'cash' },
