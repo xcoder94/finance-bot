@@ -7,7 +7,16 @@ import {
   useRef,
   useState,
 } from 'react'
-import { type Location, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import {
+  type Location,
+  Navigate,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigationType,
+} from 'react-router-dom'
 import { Spinner, Tabbar } from '@telegram-apps/telegram-ui'
 import { useSignal, viewport } from '@tma.js/sdk-react'
 import { useTranslation } from 'react-i18next'
@@ -38,6 +47,8 @@ import { AdminPage } from '../pages/admin/AdminPage'
 import { WalletsSettingsPage } from '../pages/settings/WalletsSettingsPage'
 import { NativeBackButtonProvider } from './NativeBackButton'
 import { MAIN_TABS } from './mainTabs'
+import { usePageDirection } from '../hooks/usePageDirection'
+import { pageScreenKey } from '../utils/pageTransition'
 import { useShoppingStartup } from '../hooks/useShoppingStartup'
 import { useTapHaptic } from '../hooks/useTapHaptic'
 import { useTxDeepLink } from '../hooks/useTxDeepLink'
@@ -86,7 +97,9 @@ function AppLayout() {
   const [tabbarHeight, setTabbarHeight] = useState(0)
   const tabbarHidden = useChromeStore((s) => s.tabbarHidden)
   const location = useLocation()
-  const pageKey = location.pathname.split('/')[1] ?? ''
+  const navigationType = useNavigationType()
+  const pageKey = pageScreenKey(location.pathname)
+  const pageDirection = usePageDirection(location.pathname, navigationType)
   const viewportHeight = useSignal(viewport.height)
   const safeAreaBottom = useSignal(viewport.safeAreaInsetBottom)
   const contentSafeAreaBottom = useSignal(viewport.contentSafeAreaInsetBottom)
@@ -149,7 +162,11 @@ function AppLayout() {
       }
     >
       <main className="app-shell__main">
-        <div key={pageKey} className="app-shell__page">
+        <div
+          key={pageKey}
+          className="app-shell__page"
+          data-direction={pageDirection}
+        >
           <Outlet />
         </div>
       </main>

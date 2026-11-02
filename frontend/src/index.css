@@ -2923,22 +2923,90 @@ button.home-ops-row:focus-visible {
   background: var(--bg);
 }
 
-.app-shell__page {
-  animation: app-page-in 0.18s ease-out;
+/* dev-fix10: screen transitions. Only the enter of the new screen is animated (old one is
+   unmounted at once, so quick taps never stack layers). transform + opacity only, no fill-mode:
+   after the animation the page has no transform, so position:fixed sheets/backdrops inside it
+   are positioned against the viewport as before. Start opacity is not 0: no blank frame. */
+.app-shell__main {
+  overflow-x: clip;
 }
 
-/* dev-fix7: fade only. A translateY here made every page (and Home on return) visibly jump. */
+.app-shell__page {
+  animation: app-page-in 0.22s ease-out;
+}
+
+.app-shell__page[data-direction='forward'] {
+  animation: app-page-forward 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-shell__page[data-direction='back'] {
+  animation: app-page-back 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-shell__page[data-direction='tab-next'] {
+  animation: app-page-tab-next 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-shell__page[data-direction='tab-prev'] {
+  animation: app-page-tab-prev 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 @keyframes app-page-in {
   from {
-    opacity: 0;
+    opacity: 0.35;
   }
   to {
     opacity: 1;
   }
 }
 
+@keyframes app-page-forward {
+  from {
+    opacity: 0.35;
+    transform: translate3d(64px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes app-page-back {
+  from {
+    opacity: 0.35;
+    transform: translate3d(-40px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes app-page-tab-next {
+  from {
+    opacity: 0.35;
+    transform: translate3d(32px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes app-page-tab-prev {
+  from {
+    opacity: 0.35;
+    transform: translate3d(-32px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .app-shell__page {
+  .app-shell__page,
+  .app-shell__page[data-direction] {
     animation: none;
   }
 }
