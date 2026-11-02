@@ -80,6 +80,7 @@
   },
   "settings": {
     "theme": "Mavzu",
+    "themeSystem": "Tizim",
     "themeDark": "Tungi",
     "themeLight": "Kunduzgi",
     "role": "Rol",

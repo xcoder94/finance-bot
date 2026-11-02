@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ header: vi.fn(), bg: vi.fn(), bottom: vi.fn() }))
 vi.mock('@tma.js/sdk-react', () => ({
   init: vi.fn(),
+  on: vi.fn(),
+  themeParams: { state: () => ({}) },
   miniApp: {
     setHeaderColor: Object.assign(m.header, { isAvailable: () => true }),
     setBgColor: Object.assign(m.bg, { isAvailable: () => true }),

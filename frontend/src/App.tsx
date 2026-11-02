@@ -14,10 +14,13 @@ function App() {
   const errorType = useAuthStore((state) => state.errorType)
   const appearance = useThemeStore((state) => state.theme)
   const hydrateTheme = useThemeStore((state) => state.hydrate)
+  const watchSystemTheme = useThemeStore((state) => state.watchSystem)
 
   useEffect(() => {
     void hydrateTheme()
   }, [hydrateTheme])
+
+  useEffect(() => watchSystemTheme(), [watchSystemTheme])
 
   let content
   if (status === 'loading') {

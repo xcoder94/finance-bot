@@ -33,18 +33,32 @@ function render() {
 }
 
 describe('ThemeSwitch', () => {
-  it('shows both options with the dark one selected by default', () => {
-    useThemeStore.setState({ theme: 'dark' })
+  it('shows System / Light / Dark with System selected by default', () => {
+    useThemeStore.setState({ preference: 'system' })
     const html = render()
-    expect(html).toContain('Тёмная')
-    expect(html).toContain('Светлая')
-    expect(html).toMatch(/aria-checked="true"[^>]*>Тёмная/)
+    expect(html).toContain('Системная')
+    expect(html).toMatch(/aria-checked="true"[^>]*>Системная/)
     expect(html).toMatch(/aria-checked="false"[^>]*>Светлая/)
+    expect(html).toMatch(/aria-checked="false"[^>]*>Тёмная/)
+  })
+
+  it('marks the saved manual choice', async () => {
+    // SSR reads the store's initial state, so seed storage and load a fresh store + component
+    vi.stubGlobal('localStorage', { getItem: () => 'dark', setItem: () => undefined })
+    vi.resetModules()
+    const { ThemeSwitch: Fresh } = await import('./ThemeSwitch')
+    const instance = (globalThis as unknown as { __i18n: typeof i18n }).__i18n
+    const html = renderToStaticMarkup(
+      <I18nextProvider i18n={instance}>
+        <Fresh />
+      </I18nextProvider>,
+    )
+    expect(html).toMatch(/aria-checked="true"[^>]*>Тёмная/)
   })
 
   it('renders radio semantics for both options', () => {
     const html = render()
-    expect(html.match(/role="radio"/g)).toHaveLength(2)
+    expect(html.match(/role="radio"/g)).toHaveLength(3)
     expect(html).toContain('role="radiogroup"')
   })
 })

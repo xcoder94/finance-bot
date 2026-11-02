@@ -161,7 +161,10 @@ export function resolveCategoryAmountDisplayName(
   displayNameById: Map<string, string> | undefined,
   t: TFunction,
 ): string {
-  if (entry.category_translation_key) {
+  if (
+    entry.category_translation_key &&
+    stillDefaultName(entry.category_name, entry.category_translation_key, t)
+  ) {
     return t(`defaultEntities.${entry.category_translation_key}`)
   }
   return displayNameById?.get(entry.category_id) ?? entry.category_name
@@ -176,7 +179,10 @@ export function resolveSubcategoryAmountDisplayName(
   displayNameById: Map<string, string> | undefined,
   t: TFunction,
 ): string {
-  if (entry.subcategory_translation_key) {
+  if (
+    entry.subcategory_translation_key &&
+    stillDefaultName(entry.subcategory_name, entry.subcategory_translation_key, t)
+  ) {
     return t(`defaultEntities.${entry.subcategory_translation_key}`)
   }
   return displayNameById?.get(entry.subcategory_id) ?? entry.subcategory_name

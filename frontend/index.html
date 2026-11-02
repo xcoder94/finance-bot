@@ -6,12 +6,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Family Budget</title>
     <script>
-      try {
-        var t = localStorage.getItem('app-theme')
-        document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'
-      } catch (e) {
-        document.documentElement.dataset.theme = 'dark'
-      }
+      // Pre-paint theme: saved explicit choice, else Telegram scheme, else browser scheme, else dark.
+      ;(function () {
+        var theme = null
+        function dark(color) {
+          var m = /^#?([0-9a-f]{6})$/i.exec(String(color || ''))
+          if (!m) return null
+          var n = parseInt(m[1], 16)
+          var y = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)
+          return y < 128 ? 'dark' : 'light'
+        }
+        function fromLaunch(raw) {
+          var v = new URLSearchParams(raw).get('tgWebAppThemeParams')
+          return v ? dark(JSON.parse(v).bg_color) : null
+        }
+        try {
+          var saved = localStorage.getItem('app-theme')
+          if (saved === 'light' || saved === 'dark') theme = saved
+        } catch (e) {}
+        if (!theme) {
+          try {
+            var cs = window.Telegram.WebApp.colorScheme
+            if (cs === 'light' || cs === 'dark') theme = cs
+          } catch (e) {}
+        }
+        if (!theme) {
+          try {
+            theme = fromLaunch(location.hash.slice(1))
+          } catch (e) {}
+        }
+        if (!theme) {
+          try {
+            theme = fromLaunch(sessionStorage.getItem('tapps/launchParams') || '')
+          } catch (e) {}
+        }
+        if (!theme) {
+          try {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          } catch (e) {}
+        }
+        document.documentElement.dataset.theme = theme || 'dark'
+      })()
     </script>
   </head>
   <body>

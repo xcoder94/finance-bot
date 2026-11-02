@@ -52,7 +52,7 @@ describe('SettingsPage', () => {
     expect(html).toContain('Владелец')
   })
 
-  it('QA m3-1: the Theme row carries the Тёмная/Светлая switch, dark checked by default', () => {
+  it('QA m3-1: the Theme row carries the Системная/Светлая/Тёмная switch, System checked by default', () => {
     const html = renderToStaticMarkup(
       <I18nextProvider i18n={testI18n}>
         <MemoryRouter initialEntries={['/settings']}>
@@ -62,8 +62,9 @@ describe('SettingsPage', () => {
     )
     const themeRow = html.slice(html.lastIndexOf('settings-toc-row'))
     expect(themeRow).toContain('role="radiogroup"')
-    expect(themeRow.match(/role="radio"/g) ?? []).toHaveLength(2)
-    expect(themeRow).toMatch(/aria-checked="true"[^>]*>Тёмная</)
+    expect(themeRow.match(/role="radio"/g) ?? []).toHaveLength(3)
+    expect(themeRow).toMatch(/aria-checked="true"[^>]*>Системная</)
     expect(themeRow).toContain('Светлая')
+    expect(themeRow).toContain('Тёмная')
   })
 })
