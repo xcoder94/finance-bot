@@ -17,7 +17,18 @@
           return y < 128 ? 'dark' : 'light'
         }
         function fromLaunch(raw) {
-          var v = new URLSearchParams(raw).get('tgWebAppThemeParams')
+          raw = String(raw || '').trim()
+          if (raw.charAt(0) === '"') {
+            try {
+              var parsed = JSON.parse(raw)
+              if (typeof parsed === 'string') raw = parsed
+            } catch (e) {
+              raw = raw.replace(/^"/, '').replace(/"$/, '')
+            }
+          } else if (raw.charAt(raw.length - 1) === '"') {
+            raw = raw.slice(0, -1)
+          }
+          var v = new URLSearchParams(raw.replace(/^#/, '')).get('tgWebAppThemeParams')
           return v ? dark(JSON.parse(v).bg_color) : null
         }
         try {

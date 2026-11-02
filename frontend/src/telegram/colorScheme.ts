@@ -1,4 +1,4 @@
-import { on, themeParams } from '@tma.js/sdk-react'
+import { on, postEvent, themeParams } from '@tma.js/sdk-react'
 
 import { parseScheme, schemeFromBgColor, schemeFromLaunchParams, type Theme } from '../store/themeMode'
 
@@ -27,6 +27,19 @@ try {
   })
 } catch {
   // no SDK bridge (tests, plain browser)
+}
+
+/**
+ * Asks the Telegram client for the current theme over the Mini Apps bridge; the answer arrives as
+ * theme_changed (handled above). Does not touch window.Telegram.WebApp (the app does not load
+ * telegram-web-app.js) and never sets header/background colours.
+ */
+export function requestTelegramTheme(): void {
+  try {
+    postEvent('web_app_request_theme')
+  } catch {
+    // no bridge (plain browser)
+  }
 }
 
 /** Telegram colorScheme; falls back to the SDK theme params (background colour). Null outside Telegram. */
@@ -68,26 +81,32 @@ export function readMediaScheme(): Theme | null {
  */
 export function watchSystemScheme(onChange: () => void): () => void {
   const stops: Array<() => void> = []
+  // Every return to the app also asks the client for the current theme; the reply (theme_changed)
+  // reaches onChange through bridgeListeners, so the request itself is not an onChange trigger.
+  const onReturn = () => {
+    requestTelegramTheme()
+    onChange()
+  }
   const app = webApp()
   if (app?.onEvent && app.offEvent) {
-    for (const name of ['themeChanged', 'activated']) {
-      app.onEvent(name, onChange)
-      stops.push(() => app.offEvent?.(name, onChange))
-    }
+    app.onEvent('themeChanged', onChange)
+    stops.push(() => app.offEvent?.('themeChanged', onChange))
+    app.onEvent('activated', onReturn)
+    stops.push(() => app.offEvent?.('activated', onReturn))
   }
   bridgeListeners.add(onChange)
   stops.push(() => bridgeListeners.delete(onChange))
   if (typeof document !== 'undefined') {
     const onVisible = () => {
-      if (document.visibilityState !== 'hidden') onChange()
+      if (document.visibilityState !== 'hidden') onReturn()
     }
     document.addEventListener('visibilitychange', onVisible)
     stops.push(() => document.removeEventListener('visibilitychange', onVisible))
   }
   if (typeof window !== 'undefined') {
     for (const name of ['focus', 'pageshow']) {
-      window.addEventListener(name, onChange)
-      stops.push(() => window.removeEventListener(name, onChange))
+      window.addEventListener(name, onReturn)
+      stops.push(() => window.removeEventListener(name, onReturn))
     }
     try {
       const mq = window.matchMedia?.('(prefers-color-scheme: dark)')

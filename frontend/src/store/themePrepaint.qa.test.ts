@@ -71,4 +71,13 @@ describe('index.html pre-paint theme script', () => {
     expect(prepaint({ getItem: () => 'dark' }, { colorScheme: 'light' })).toBe('dark')
     expect(prepaint({ getItem: () => 'light' }, { colorScheme: 'dark' })).toBe('light')
   })
+  it('System: sessionStorage launch params are a JSON string; theme on any position', () => {
+    const other = ['tgWebAppVersion=8.0', 'tgWebAppPlatform=ios']
+    const quoted = (parts: string[]) => JSON.stringify(parts.join('&'))
+    for (const [bg, want] of [['#ffffff', 'light'], ['#17212b', 'dark']] as const) {
+      for (const parts of [[launch(bg), ...other], [other[0], launch(bg), other[1]], [...other, launch(bg)], [launch(bg)]]) {
+        expect(prepaint({ getItem: () => null }, { session: quoted(parts), media: want === 'dark' ? 'light' : 'dark' })).toBe(want)
+      }
+    }
+  })
 })

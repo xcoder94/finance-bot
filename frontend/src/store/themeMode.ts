@@ -45,11 +45,30 @@ export function detectSystemScheme(sources: SchemeSources): Theme | null {
   return sources.telegram() ?? sources.media()
 }
 
+/**
+ * The SDK stores launch params in sessionStorage as a JSON string (wrapped in double quotes); the URL
+ * hash is plain. Accept both so the result does not depend on where the theme parameter sits.
+ */
+export function unwrapLaunchParams(raw: string): string {
+  let text = raw.trim()
+  if (text.startsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(text)
+      if (typeof parsed === 'string') text = parsed
+    } catch {
+      text = text.replace(/^"/, '').replace(/"$/, '')
+    }
+  } else if (text.endsWith('"')) {
+    text = text.slice(0, -1)
+  }
+  return text.replace(/^#/, '')
+}
+
 /** Scheme from Telegram launch params ("tgWebAppThemeParams=<json>" in the URL hash / session storage). */
 export function schemeFromLaunchParams(raw: string | null | undefined): Theme | null {
   if (!raw) return null
   try {
-    const value = new URLSearchParams(raw.replace(/^#/, '')).get('tgWebAppThemeParams')
+    const value = new URLSearchParams(unwrapLaunchParams(raw)).get('tgWebAppThemeParams')
     return value ? schemeFromBgColor((JSON.parse(value) as { bg_color?: unknown }).bg_color) : null
   } catch {
     return null

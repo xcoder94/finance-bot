@@ -61,3 +61,26 @@ describe('schemeFromLaunchParams', () => {
     expect(schemeFromLaunchParams(null)).toBeNull()
   })
 })
+
+describe('schemeFromLaunchParams: sessionStorage tapps/launchParams (JSON string in quotes)', () => {
+  const theme = (bg: string) => `tgWebAppThemeParams=${encodeURIComponent(JSON.stringify({ bg_color: bg }))}`
+  const others = ['tgWebAppVersion=8.0', 'tgWebAppPlatform=ios']
+  const positions = (bg: string) => [
+    [theme(bg), ...others],
+    [others[0], theme(bg), others[1]],
+    [...others, theme(bg)],
+    [theme(bg)],
+  ].map((parts) => JSON.stringify(parts.join('&')))
+  it('finds the theme on any position', () => {
+    for (const raw of positions('#ffffff')) expect(schemeFromLaunchParams(raw)).toBe('light')
+    for (const raw of positions('#17212b')) expect(schemeFromLaunchParams(raw)).toBe('dark')
+  })
+  it('hash-form still works on any position', () => {
+    expect(schemeFromLaunchParams('#' + [...others, theme('#ffffff')].join('&'))).toBe('light')
+    expect(schemeFromLaunchParams('#' + [theme('#17212b'), ...others].join('&'))).toBe('dark')
+  })
+  it('malformed quotes do not throw', () => {
+    expect(schemeFromLaunchParams('"' + theme('#ffffff'))).toBe('light')
+    expect(schemeFromLaunchParams(theme('#17212b') + '"')).toBe('dark')
+  })
+})
