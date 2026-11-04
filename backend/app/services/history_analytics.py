@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
-from sqlalchemy import case, func, literal, select, union_all
+from sqlalchemy import case, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -210,6 +210,7 @@ async def get_history(
     offset: int,
     include_created_by: bool,
     expense_category_id: uuid.UUID | None = None,
+    wallet_id: uuid.UUID | None = None,
 ) -> tuple[list[HistoryItem], int]:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
@@ -225,6 +226,11 @@ async def get_history(
             *base_filters,
             Transaction.type == "expense",
             Transaction.expense_category_id == expense_category_id,
+        )
+    if wallet_id is not None:
+        base_filters = (
+            *base_filters,
+            or_(Transaction.wallet_id == wallet_id, Transaction.to_wallet_id == wallet_id),
         )
 
     from_wallet = aliased(Wallet)
@@ -277,7 +283,11 @@ async def get_history(
         .outerjoin(expense_sub, Transaction.expense_category_id == expense_sub.id)
         .outerjoin(expense_parent, expense_sub.parent_id == expense_parent.id)
         .where(*base_filters, visibility)
-        .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+        .order_by(
+            func.date(func.timezone("Asia/Tashkent", Transaction.transaction_date)).desc(),
+            Transaction.created_at.desc(),
+            Transaction.id.desc(),
+        )
         .limit(limit)
         .offset(offset)
     )
