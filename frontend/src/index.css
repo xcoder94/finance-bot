@@ -377,6 +377,56 @@ body {
   padding: 14px 16px 4px;
 }
 
+button.home-figures-card--link {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.home-figures-card--link:active {
+  background: var(--chip);
+}
+
+button.home-figures-card--link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--acc);
+}
+
+.home-figures-card__chevron {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--hint);
+}
+
+.wallets-page__hint {
+  display: block;
+  margin: 12px 0 16px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.wallets-group {
+  margin-bottom: 16px;
+}
+
+.wallets-total {
+  padding-bottom: 14px;
+}
+
+.wallets-page__empty {
+  display: block;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--hint);
+}
+
 .home-figures-card__label {
   font-size: 12px;
   font-weight: 500;

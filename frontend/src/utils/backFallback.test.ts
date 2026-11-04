@@ -13,3 +13,9 @@ describe('backFallbackPath', () => {
     expect(backFallbackPath('/settings', null)).toBe('/')
   })
 })
+
+describe('backFallbackPath /wallets', () => {
+  it('goes home', () => {
+    expect(backFallbackPath('/wallets', null)).toBe('/')
+  })
+})

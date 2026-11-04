@@ -43,3 +43,10 @@ describe('transitionDirection', () => {
     expect(transitionDirection(null, '/', 'POP')).toBe('fade')
   })
 })
+
+describe('/wallets transitions', () => {
+  it('home -> wallets is forward, wallets -> home is back', () => {
+    expect(transitionDirection('/', '/wallets', 'PUSH')).toBe('forward')
+    expect(transitionDirection('/wallets', '/', 'POP')).toBe('back')
+  })
+})

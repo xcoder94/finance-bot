@@ -19,6 +19,7 @@ vi.mock('../i18n', () => ({ default: { language: 'ru' } }))
 vi.mock('@tma.js/sdk-react', () => ({ useRawInitData: () => undefined }))
 
 import { HomePage } from './HomePage'
+import { forgetHomeMonth, rememberHomeMonth } from '../utils/homeMonthMemory'
 import { useDataCacheStore } from '../store/dataCacheStore'
 
 const testI18n = i18n.createInstance()
@@ -88,5 +89,31 @@ describe('HomePage', () => {
     expect(card.slice(0, 120)).toContain('3 450 000 сум')
     expect(html).not.toContain('13 550 000')
     expect(html).not.toContain('UZS')
+  })
+
+  it('balance card is a button that opens /wallets, with a screen-reader label', () => {
+    seed({ total_count: 0 })
+    const html = renderHome()
+    const m = html.match(/<button[^>]*home-figures-card[^>]*>/)
+    expect(m).not.toBeNull()
+    expect(m![0]).toContain('type="button"')
+    const card = html.slice(html.indexOf('home-figures-card')).replace(/\u00a0/g, ' ')
+    expect(card).toContain('Кошельки')
+    expect(card).toContain('visually-hidden')
+    expect(card).toContain('Остаток · окт')
+    expect(card).toContain('3 450 000 сум')
+    expect(card).toContain('Доход')
+    expect(card).toContain('Расход')
+  })
+
+  it('keeps the month picked before opening /wallets when Home mounts again', () => {
+    seed({ total_count: 0 })
+    rememberHomeMonth({ year: 2026, month: 8 })
+    try {
+      expect(renderHome()).toContain('Август 2026')
+    } finally {
+      forgetHomeMonth()
+    }
+    expect(renderHome()).toContain('Октябрь 2026')
   })
 })

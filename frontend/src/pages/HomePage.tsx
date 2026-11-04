@@ -68,6 +68,7 @@ import {
   getHistoryItemMeta,
   getHistoryItemTitle,
 } from '../utils/getDisplayName'
+import { forgetHomeMonth, openWalletsFromHome, peekHomeMonth } from '../utils/homeMonthMemory'
 import {
   balanceMonthLabel,
   currentMonthInTashkent,
@@ -261,7 +262,9 @@ export function HomePage() {
   const openForm = (path: string) => navigate(path, { state: { background: location } })
   const user = useAuthStore((state) => state.user)
   const familyId = user?.familyBudgetId ?? ''
-  const [selectedMonth, setSelectedMonth] = useState<HomeMonth>(currentMonthInTashkent)
+  const [selectedMonth, setSelectedMonth] = useState<HomeMonth>(
+    () => peekHomeMonth() ?? currentMonthInTashkent(),
+  )
   const primaryCurrency = PRIMARY_CURRENCY
   const [visibilityRefreshCount, setVisibilityRefreshCount] = useState(0)
 
@@ -269,6 +272,11 @@ export function HomePage() {
   const monthKey = `${year}-${month}`
   const homeFetchTrigger = composeHomeFetchTrigger(monthKey, visibilityRefreshCount + homeEpoch)
   const balancesFetchTrigger = composeBalancesFetchTrigger(visibilityRefreshCount + homeEpoch)
+
+  // The month parked for the /wallets round trip has been picked up; later visits start fresh.
+  useEffect(() => {
+    forgetHomeMonth()
+  }, [])
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -528,7 +536,13 @@ export function HomePage() {
 
           {anyBlockFailed ? null : (
           <>
-          <div className="home-figures-card">
+          <button
+            type="button"
+            className="home-figures-card home-figures-card--link"
+            onClick={() => openWalletsFromHome(selectedMonth, (path) => navigate(path))}
+          >
+            <span className="visually-hidden">{t('wallets.title')}. </span>
+            <span className="home-figures-card__chevron" aria-hidden="true">›</span>
             <div className="home-figures-card__label">{balanceMonthLabel(month)}</div>
             <div className={`home-figures-card__balance${balanceSizeClass(balanceText)}`}>
               {summaryUnavailable || summaryLoading ? (
@@ -572,7 +586,7 @@ export function HomePage() {
                 </div>
               </div>
             </div>
-          </div>
+          </button>
 
           {!anyBlockFailed && trendBars ? (
             <HomeTrendCard bars={trendBars} />

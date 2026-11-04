@@ -554,5 +554,15 @@
     "categorySubsOps": "Toifa va {{subs}} {{subVerb}}, {{ops}} esa tarix va tahlilda {{verb}}. Buni bekor qilib bo'lmaydi.",
     "subPlain": "Ichki toifa o'chiriladi. Buni bekor qilib bo'lmaydi.",
     "subOps": "Ichki toifa o'chiriladi, {{year}}-yildagi {{ops}} esa «{{parent}}» asosiy toifasida {{verb}}. Buni bekor qilib bo'lmaydi."
+  },
+  "wallets": {
+    "title": "Hamyonlar",
+    "total": "Hamyonlardagi jami",
+    "shared": "Umumiy",
+    "personal": "Shaxsiy",
+    "hint": "Bu hozir hamyonlardagi pul. Bosh sahifadagi «Qoldiq» oylik daromad minus xarajatni ko'rsatadi.",
+    "empty": "Hozircha hamyonlar yo'q",
+    "balanceNow": "Hozir hamyonda",
+    "opsEmptyHint": "Boshqa oyni tanlang."
   }
 }
