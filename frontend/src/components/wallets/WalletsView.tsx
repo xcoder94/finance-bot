@@ -2,6 +2,7 @@ import { Button, Text, Title } from '@telegram-apps/telegram-ui'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
+import { balanceSizeClass } from '../home/homeBlocks'
 import { formatCurrency, type Currency } from '../../utils/formatCurrency'
 import { getDisplayName } from '../../utils/getDisplayName'
 import {
@@ -81,11 +82,17 @@ export function WalletsView({ status, wallets, onRetry, onOpenWallet }: WalletsV
         <>
           <div className="home-figures-card wallets-total">
             <div className="home-figures-card__label">{t('wallets.total')}</div>
-            {totalsByCurrency(wallets).map(({ currency, total }) => (
-              <div key={currency} className="home-figures-card__balance wallets-total__value">
-                {formatCurrency(total, currency as Currency)}
-              </div>
-            ))}
+            {totalsByCurrency(wallets).map(({ currency, total }) => {
+              const totalText = formatCurrency(total, currency as Currency)
+              return (
+                <div
+                  key={currency}
+                  className={`home-figures-card__balance wallets-total__value${balanceSizeClass(totalText)}`}
+                >
+                  {totalText}
+                </div>
+              )
+            })}
           </div>
           <Text className="wallets-page__hint">{t('wallets.hint')}</Text>
           {shared.length > 0 ? (

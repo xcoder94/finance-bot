@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { Button, Input, SegmentedControl, Text, Title } from '@telegram-apps/telegram-ui'
@@ -24,10 +25,22 @@ import {
   maskedDateToUtcEndIso,
   maskedDateToUtcStartIso,
 } from '../utils/transactionForm'
-import type { HistoryItem } from '../api/history'
+import {
+  createWalletOpsController,
+  type WalletOpsController,
+  type WalletOpsState,
+} from '../utils/walletOps'
+import { subscribeWalletsRefresh } from '../utils/walletsOverview'
 
 const CURRENCIES = ['UZS'] as const
-const HISTORY_PAGE_SIZE = 50
+
+const LOADING_LIST: WalletOpsState = {
+  status: 'loading',
+  items: [],
+  total: 0,
+  loadingMore: false,
+  loadMoreError: false,
+}
 
 type PeriodTab = 'month' | 'range'
 
@@ -257,12 +270,8 @@ export function HistoryPage() {
   const [rangeFromTouched, setRangeFromTouched] = useState(false)
   const [rangeToTouched, setRangeToTouched] = useState(false)
 
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([])
-  const [historyTotal, setHistoryTotal] = useState(0)
-  const [historyStatus, setHistoryStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle')
-  const [historyRetryCount, setHistoryRetryCount] = useState(0)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadMoreError, setLoadMoreError] = useState(false)
+  const [list, setList] = useState<WalletOpsState>(LOADING_LIST)
+  const controller = useRef<WalletOpsController | null>(null)
 
   const { range, rangeOrderInvalid } = useMemo(
     () => resolveRange(periodTab, selectedMonth, rangeFrom, rangeTo),
@@ -297,61 +306,38 @@ export function HistoryPage() {
     setPeriodTab(tab)
   }
 
+  // The list lives in a controller: pages are merged by id (a record added between two pages does
+  // not make a duplicate) and a refresh on return replaces the data without clearing the list.
   useEffect(() => {
-    if (!range) {
-      setHistoryItems([])
-      setHistoryTotal(0)
-      setHistoryStatus('idle')
-      return
-    }
-
-    let cancelled = false
-    setHistoryStatus('loading')
-    setHistoryItems([])
-    setHistoryTotal(0)
-    setLoadMoreError(false)
-
-    void fetchHistoryPage(range.dateFrom, range.dateTo, HISTORY_PAGE_SIZE, 0)
-      .then((data) => {
-        if (!cancelled) {
-          setHistoryItems(data.items)
-          setHistoryTotal(data.total_count)
-          setHistoryStatus('success')
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHistoryStatus('error')
-        }
-      })
-
+    const next = createWalletOpsController({
+      fetchPage: (period, limit, offset) =>
+        fetchHistoryPage(period.dateFrom, period.dateTo, limit, offset),
+      onChange: setList,
+    })
+    controller.current = next
     return () => {
-      cancelled = true
+      next.dispose()
+      controller.current = null
     }
-  }, [range, rangeKey, historyRetryCount])
+  }, [])
 
-  const handleLoadMore = async () => {
-    if (!range || loadingMore || historyItems.length >= historyTotal) {
+  const periodFrom = range?.dateFrom
+  const periodTo = range?.dateTo
+  useEffect(() => {
+    if (periodFrom === undefined || periodTo === undefined) {
+      setList(LOADING_LIST)
       return
     }
+    void controller.current?.setPeriod({ dateFrom: periodFrom, dateTo: periodTo })
+  }, [periodFrom, periodTo])
 
-    setLoadingMore(true)
-    setLoadMoreError(false)
-    try {
-      const data = await fetchHistoryPage(
-        range.dateFrom,
-        range.dateTo,
-        HISTORY_PAGE_SIZE,
-        historyItems.length,
-      )
-      setHistoryItems((current) => [...current, ...data.items])
-      setHistoryTotal(data.total_count)
-    } catch {
-      setLoadMoreError(true)
-    } finally {
-      setLoadingMore(false)
-    }
-  }
+  // Return from the bot: the browser event or the Telegram bridge signal, selected period kept.
+  useEffect(
+    () => subscribeWalletsRefresh(document, () => void controller.current?.refresh()),
+    [],
+  )
+
+  const historyStatus = range ? list.status : 'idle'
 
   const summaryLoading = summaryFetch.state.status === 'loading'
   const summaryUnavailable = summaryFetch.state.status === 'error'
@@ -499,13 +485,13 @@ export function HistoryPage() {
       <div className="history-page__list">
         <HistoryTransactionList
           status={historyStatus}
-          items={historyItems}
-          totalCount={historyTotal}
+          items={list.items}
+          totalCount={list.total}
           onItemClick={(item) => navigate(editRouteForItem(item))}
-          onRetry={() => setHistoryRetryCount((count) => count + 1)}
-          loadingMore={loadingMore}
-          loadMoreError={loadMoreError}
-          onLoadMore={() => void handleLoadMore()}
+          onRetry={() => void controller.current?.retry()}
+          loadingMore={list.loadingMore}
+          loadMoreError={list.loadMoreError}
+          onLoadMore={() => void controller.current?.loadMore()}
         />
       </div>
     </div>

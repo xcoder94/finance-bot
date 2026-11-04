@@ -87,6 +87,24 @@ describe('fresh data', () => {
   })
 })
 
+describe('return refresh over the Telegram bridge', () => {
+  it('refreshes on the bridge signal alone and unsubscribes from both', () => {
+    const doc = { visibilityState: 'hidden' as DocumentVisibilityState, addEventListener: () => {}, removeEventListener: () => {} }
+    let fire!: () => void
+    const stopBridge = vi.fn()
+    const bridge = (cb: () => void) => {
+      fire = cb
+      return stopBridge
+    }
+    const cb = vi.fn()
+    const off = subscribeWalletsRefresh(doc, cb, bridge)
+    fire()
+    expect(cb).toHaveBeenCalledTimes(1)
+    off()
+    expect(stopBridge).toHaveBeenCalled()
+  })
+})
+
 describe('home month memory', () => {
   it('keeps the month until forgotten', () => {
     forgetHomeMonth()

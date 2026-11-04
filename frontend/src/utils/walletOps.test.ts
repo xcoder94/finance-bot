@@ -208,3 +208,23 @@ describe('createWalletOpsController', () => {
     expect(states.length).toBe(n)
   })
 })
+
+describe('a record added between pages', () => {
+  const range = { dateFrom: 'F1', dateTo: 'T1' }
+  const page = (ids: string[], total: number): HistoryResponse => ({ items: ids.map((i) => item(i)), total_count: total })
+  it('load more after an insert shows no duplicate and loses nothing', async () => {
+    const ids = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => String(from + i))
+    // before: 1..60 (newest first). A new row "0" arrives; page 2 (offset 50) now starts at old row 50.
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce(page(ids(1, 51), 60))
+      .mockResolvedValueOnce(page(['50', ...ids(51, 61)], 61))
+    const states: WalletOpsState[] = []
+    const ctl = createWalletOpsController({ fetchPage, onChange: (s) => states.push(s) })
+    await ctl.setPeriod(range)
+    await ctl.loadMore()
+    const shown = states[states.length - 1].items.map((x) => x.id)
+    expect(new Set(shown).size).toBe(shown.length)
+    expect(shown).toEqual(ids(1, 61))
+  })
+})

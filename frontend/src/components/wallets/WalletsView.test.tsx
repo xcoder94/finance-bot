@@ -100,4 +100,9 @@ describe('WalletsView', () => {
     expect(rows).toHaveLength(2)
     expect(html).toMatch(/<button[^>]*>[^]*Alpha/)
   })
+
+  it('long total shrinks like on Home', () => {
+    const html = render({ status: 'success', wallets: [w('Alpha', 1234567890)], onRetry: () => {} })
+    expect(html).toContain('wallets-total__value home-figures-card__balance--xlong')
+  })
 })

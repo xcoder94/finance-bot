@@ -8,6 +8,7 @@ import type { HomeMonth } from '../../utils/homeMonth'
 import { formatMonthLabel } from '../../utils/periodFilter'
 import { walletOpAmount, type WalletOpsState } from '../../utils/walletOps'
 import type { WalletsOverviewItem } from '../../utils/walletsOverview'
+import { balanceSizeClass } from '../home/homeBlocks'
 import { HistoryTransactionList } from '../history/HistoryTransactionList'
 
 export type WalletOpsViewProps = {
@@ -32,6 +33,7 @@ export function WalletOpsView({
   onLoadMore,
 }: WalletOpsViewProps) {
   const { t } = useTranslation()
+  const balanceText = formatCurrency(wallet.balance, wallet.currency as Currency)
 
   return (
     <div className="page-content home-page wallets-page">
@@ -41,8 +43,8 @@ export function WalletOpsView({
 
       <div className="home-figures-card wallets-total">
         <div className="home-figures-card__label">{t('wallets.balanceNow')}</div>
-        <div className="home-figures-card__balance wallets-total__value">
-          {formatCurrency(wallet.balance, wallet.currency as Currency)}
+        <div className={`home-figures-card__balance wallets-total__value${balanceSizeClass(balanceText)}`}>
+          {balanceText}
         </div>
       </div>
 

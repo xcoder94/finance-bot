@@ -1,5 +1,6 @@
 import { getWallets } from '../api/wallets'
 import type { Wallet } from '../api/transactions'
+import { subscribeBridgeVisible } from '../telegram/bridgeVisibility'
 import { getCachedWallets } from '../store/dataCacheStore'
 import { shouldRefreshHomeOnVisibility } from './homeVisibility'
 
@@ -50,10 +51,19 @@ type VisibilityDoc = {
   removeEventListener: (type: 'visibilitychange', handler: () => void) => void
 }
 
-export function subscribeWalletsRefresh(doc: VisibilityDoc, onRefresh: () => void): () => void {
+/** Return to the app: the browser visibilitychange event and the Telegram bridge visibility_changed. */
+export function subscribeWalletsRefresh(
+  doc: VisibilityDoc,
+  onRefresh: () => void,
+  bridge: (cb: () => void) => () => void = subscribeBridgeVisible,
+): () => void {
   const handler = () => {
     if (shouldRefreshHomeOnVisibility(doc.visibilityState)) onRefresh()
   }
   doc.addEventListener('visibilitychange', handler)
-  return () => doc.removeEventListener('visibilitychange', handler)
+  const stopBridge = bridge(onRefresh)
+  return () => {
+    doc.removeEventListener('visibilitychange', handler)
+    stopBridge()
+  }
 }

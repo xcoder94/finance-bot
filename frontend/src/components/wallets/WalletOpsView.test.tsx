@@ -108,4 +108,10 @@ describe('WalletOpsView', () => {
     const html = render({ ops: ops({ items: [outTransfer], total: 60 }) })
     expect(html).toContain(ru.history.loadMore)
   })
+
+  it('long balance shrinks like on Home: 10 digits and minus fit the card', () => {
+    const html = render({ wallet: { ...wallet, balance: -1234567890 } })
+    expect(html).toContain('home-figures-card__balance--xlong')
+    expect(render()).not.toContain('home-figures-card__balance--')
+  })
 })
