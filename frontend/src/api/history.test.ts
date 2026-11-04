@@ -50,3 +50,31 @@ describe('fetchHistoryPage', () => {
     expect(parsed.searchParams.get('expense_category_id')).toBe('sub-groceries')
   })
 })
+
+describe('fetchHistoryPage wallet_id', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const run = async (walletId?: string) => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total_count: 0 }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await fetchHistoryPage('2026-11-01T00:00:00.000+05:00', '2026-11-30T23:59:59.999+05:00', 50, 0, undefined, walletId)
+    const [url] = fetchMock.mock.calls[0] as [string]
+    return new URL(url, 'http://localhost').searchParams
+  }
+
+  it('sends wallet_id when given', async () => {
+    const params = await run('w-1')
+    expect(params.get('wallet_id')).toBe('w-1')
+    expect(params.get('date_from')).toBe('2026-11-01T00:00:00.000+05:00')
+    expect(params.get('limit')).toBe('50')
+  })
+
+  it('omits wallet_id by default', async () => {
+    expect((await run()).has('wallet_id')).toBe(false)
+  })
+})

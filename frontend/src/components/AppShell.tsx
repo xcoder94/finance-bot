@@ -30,6 +30,7 @@ import { EditIncomePage } from '../pages/EditIncomePage'
 import { EditTransferPage } from '../pages/EditTransferPage'
 import { GoalsPage } from '../pages/GoalsPage'
 import { HistoryPage } from '../pages/HistoryPage'
+import { WalletDetailPage } from '../pages/WalletDetailPage'
 import { WalletsPage } from '../pages/WalletsPage'
 import { HomePage } from '../pages/HomePage'
 import { ShoppingPage } from '../pages/ShoppingPage'
@@ -265,6 +266,7 @@ export function AppShell() {
           <Route path="goals" element={<GoalsPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="wallets" element={<WalletsPage />} />
+          <Route path="wallets/:id" element={<WalletDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/wallets" element={<WalletsSettingsPage />} />
           <Route path="settings/default-wallet" element={<DefaultWalletSettingsPage />} />

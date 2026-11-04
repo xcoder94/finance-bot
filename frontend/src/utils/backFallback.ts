@@ -8,5 +8,8 @@ export function backFallbackPath(pathname: string, locationState: unknown): stri
   if (pathname === '/admin') {
     return '/settings'
   }
+  if (/^\/wallets\/[^/]+\/?$/.test(pathname)) {
+    return '/wallets'
+  }
   return '/'
 }

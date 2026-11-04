@@ -50,3 +50,10 @@ describe('/wallets transitions', () => {
     expect(transitionDirection('/wallets', '/', 'POP')).toBe('back')
   })
 })
+
+describe('/wallets/:id transitions', () => {
+  it('list -> wallet is forward, back is back', () => {
+    expect(transitionDirection('/wallets', '/wallets/x', 'PUSH')).toBe('forward')
+    expect(transitionDirection('/wallets/x', '/wallets', 'POP')).toBe('back')
+  })
+})

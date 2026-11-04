@@ -32,11 +32,11 @@ const w = (
   ...over,
 })
 
-function render(props: Parameters<typeof WalletsView>[0]): string {
+function render(props: Omit<Parameters<typeof WalletsView>[0], 'onOpenWallet'>): string {
   return renderToStaticMarkup(
     <I18nextProvider i18n={testI18n}>
       <AppRoot>
-        <WalletsView {...props} />
+        <WalletsView onOpenWallet={() => {}} {...props} />
       </AppRoot>
     </I18nextProvider>,
   ).replace(/\u00a0/g, ' ')
@@ -92,5 +92,12 @@ describe('WalletsView', () => {
   it('loading: status region', () => {
     const html = render({ status: 'loading', wallets: [], onRetry: () => {} })
     expect(html).toContain('role="status"')
+  })
+
+  it('every wallet row is a button', () => {
+    const html = render({ status: 'success', wallets: [w('Alpha', 1000), w('Beta', 5)], onRetry: () => {} })
+    const rows = html.match(/<button[^>]*home-ops-row--clickable[^>]*>/g) ?? []
+    expect(rows).toHaveLength(2)
+    expect(html).toMatch(/<button[^>]*>[^]*Alpha/)
   })
 })

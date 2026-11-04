@@ -23,6 +23,10 @@ type HistoryTransactionListProps = {
   loadingMore?: boolean
   loadMoreError?: boolean
   onLoadMore?: () => void
+  /** Replaces the default amount text (used by the wallet screen). */
+  formatAmount?: (item: HistoryItem) => string
+  /** Replaces the default empty-list hint. */
+  emptyHint?: string
 }
 
 export function HistoryTransactionList({
@@ -34,6 +38,8 @@ export function HistoryTransactionList({
   loadingMore = false,
   loadMoreError = false,
   onLoadMore,
+  formatAmount = formatHistoryTransactionAmount,
+  emptyHint,
 }: HistoryTransactionListProps) {
   const { t } = useTranslation()
 
@@ -52,7 +58,7 @@ export function HistoryTransactionList({
         <div className="home-empty-card">
           <div className="home-empty-card__icon" aria-hidden="true" />
           <div className="home-empty-card__title">{t('history.emptyTitle')}</div>
-          <div className="home-empty-card__hint">{t('history.emptyHint')}</div>
+          <div className="home-empty-card__hint">{emptyHint ?? t('history.emptyHint')}</div>
         </div>
       ) : null}
 
@@ -74,7 +80,7 @@ export function HistoryTransactionList({
                 </div>
                 <div className="home-ops-row__aside">
                   <div className={historyAmountClass(item)}>
-                    {formatHistoryTransactionAmount(item)}
+                    {formatAmount(item)}
                   </div>
                   <div className="home-ops-row__date">
                     {formatTransactionDateShort(item.transaction_date)}

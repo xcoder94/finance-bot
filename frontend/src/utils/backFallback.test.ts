@@ -19,3 +19,10 @@ describe('backFallbackPath /wallets', () => {
     expect(backFallbackPath('/wallets', null)).toBe('/')
   })
 })
+
+describe('backFallbackPath /wallets/:id', () => {
+  it('goes to the wallets list', () => {
+    expect(backFallbackPath('/wallets/x', null)).toBe('/wallets')
+    expect(backFallbackPath('/wallets/x/', null)).toBe('/wallets')
+  })
+})

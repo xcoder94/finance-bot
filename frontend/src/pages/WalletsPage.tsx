@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import type { Wallet } from '../api/transactions'
 import { WalletsView } from '../components/wallets/WalletsView'
 import { useAuthStore } from '../store/authStore'
 import { peekWallets, useDataCacheStore } from '../store/dataCacheStore'
+import { walletOpsPath } from '../utils/walletOps'
 import { loadFreshWallets, subscribeWalletsRefresh } from '../utils/walletsOverview'
 
 type State = { status: 'loading' | 'error' | 'success'; wallets: Wallet[] }
 
 export function WalletsPage() {
+  const navigate = useNavigate()
   const familyId = useAuthStore((state) => state.user?.familyBudgetId) ?? ''
   const homeEpoch = useDataCacheStore((state) => state.homeEpoch)
   const [state, setState] = useState<State>(() => {
@@ -42,6 +45,7 @@ export function WalletsPage() {
 
   return (
     <WalletsView
+      onOpenWallet={(id) => navigate(walletOpsPath(id))}
       status={state.status}
       wallets={state.wallets}
       onRetry={() => {

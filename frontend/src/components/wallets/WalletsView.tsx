@@ -14,9 +14,18 @@ export type WalletsViewProps = {
   status: 'loading' | 'error' | 'success'
   wallets: WalletsOverviewItem[]
   onRetry: () => void
+  onOpenWallet: (id: string) => void
 }
 
-function WalletGroup({ title, wallets }: { title: string; wallets: WalletsOverviewItem[] }) {
+function WalletGroup({
+  title,
+  wallets,
+  onOpenWallet,
+}: {
+  title: string
+  wallets: WalletsOverviewItem[]
+  onOpenWallet: (id: string) => void
+}) {
   const { t } = useTranslation()
   return (
     <section className="wallets-group">
@@ -25,21 +34,26 @@ function WalletGroup({ title, wallets }: { title: string; wallets: WalletsOvervi
       </Text>
       <div className="home-ops-card">
         {wallets.map((wallet) => (
-          <div key={wallet.id} className="home-ops-row">
+          <button
+            key={wallet.id}
+            type="button"
+            className="home-ops-row home-ops-row--clickable"
+            onClick={() => onOpenWallet(wallet.id)}
+          >
             <div className="home-ops-row__main">
               <div className="home-ops-row__title">{getDisplayName(wallet, t)}</div>
             </div>
             <div className="home-ops-row__amount home-ops-row__amount--neutral">
               {formatCurrency(wallet.balance, wallet.currency as Currency)}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
   )
 }
 
-export function WalletsView({ status, wallets, onRetry }: WalletsViewProps) {
+export function WalletsView({ status, wallets, onRetry, onOpenWallet }: WalletsViewProps) {
   const { t } = useTranslation()
   const { shared, personal } = groupWallets(wallets)
 
@@ -74,9 +88,15 @@ export function WalletsView({ status, wallets, onRetry }: WalletsViewProps) {
             ))}
           </div>
           <Text className="wallets-page__hint">{t('wallets.hint')}</Text>
-          {shared.length > 0 ? <WalletGroup title={t('wallets.shared')} wallets={shared} /> : null}
+          {shared.length > 0 ? (
+            <WalletGroup title={t('wallets.shared')} wallets={shared} onOpenWallet={onOpenWallet} />
+          ) : null}
           {personal.length > 0 ? (
-            <WalletGroup title={t('wallets.personal')} wallets={personal} />
+            <WalletGroup
+              title={t('wallets.personal')}
+              wallets={personal}
+              onOpenWallet={onOpenWallet}
+            />
           ) : null}
         </>
       )}
