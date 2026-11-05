@@ -30,6 +30,7 @@ import {
   type WalletOpsController,
   type WalletOpsState,
 } from '../utils/walletOps'
+import { createBlockFetcher, type BlockFetcher, type BlockState } from '../utils/blockFetch'
 import { subscribeWalletsRefresh } from '../utils/walletsOverview'
 
 const CURRENCIES = ['UZS'] as const
@@ -48,11 +49,6 @@ type SelectedMonth = {
   year: number
   month: number
 }
-
-type FetchState<T> =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'success'; data: T }
 
 type ResolvedRange = {
   dateFrom: string
@@ -80,40 +76,28 @@ function getSummaryForCurrency(
   }
 }
 
+/** Fetched block bound to a key: reloads on key change, `refresh` is silent (old data stays visible). */
 function useFetchBlock<T>(fetcher: () => Promise<T>, trigger: unknown, enabled: boolean) {
-  const [state, setState] = useState<FetchState<T>>({ status: 'loading' })
-  const [retryCount, setRetryCount] = useState(0)
+  const [state, setState] = useState<BlockState<T>>({ status: 'loading' })
+  const block = useRef<BlockFetcher | null>(null)
 
   useEffect(() => {
     if (!enabled) {
       return
     }
-
-    let cancelled = false
-    setState({ status: 'loading' })
-
-    void fetcher()
-      .then((data) => {
-        if (!cancelled) {
-          setState({ status: 'success', data })
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setState({ status: 'error' })
-        }
-      })
-
+    const next = createBlockFetcher({ fetcher, onChange: setState })
+    block.current = next
+    void next.load()
     return () => {
-      cancelled = true
+      next.dispose()
+      block.current = null
     }
-  }, [fetcher, trigger, retryCount, enabled])
+  }, [fetcher, trigger, enabled])
 
-  const retry = useCallback(() => {
-    setRetryCount((count) => count + 1)
-  }, [])
+  const retry = useCallback(() => void block.current?.retry(), [])
+  const refresh = useCallback(() => void block.current?.refresh(), [])
 
-  return { state, retry }
+  return { state, retry, refresh }
 }
 
 function BlockError({ onRetry }: { onRetry: () => void }) {
@@ -332,9 +316,15 @@ export function HistoryPage() {
   }, [periodFrom, periodTo])
 
   // Return from the bot: the browser event or the Telegram bridge signal, selected period kept.
+  // The summary above the list is refreshed by the same signal, silently.
+  const refreshSummary = summaryFetch.refresh
   useEffect(
-    () => subscribeWalletsRefresh(document, () => void controller.current?.refresh()),
-    [],
+    () =>
+      subscribeWalletsRefresh(document, () => {
+        void controller.current?.refresh()
+        refreshSummary()
+      }),
+    [refreshSummary],
   )
 
   const historyStatus = range ? list.status : 'idle'

@@ -117,7 +117,12 @@ export function createWalletOpsController({ fetchPage, onChange }: ControllerDep
       } catch {
         if (mine !== seq) return
         // keep what is on screen; a failed background refresh must not wipe the list
-        if (state.loadingMore) emit({ ...state, loadingMore: false })
+        if (state.status === 'loading') {
+          // nothing on screen yet (the first load was superseded): offer a retry, not an endless skeleton
+          emit({ status: 'error', items: [], total: 0, loadingMore: false, loadMoreError: false })
+        } else if (state.loadingMore) {
+          emit({ ...state, loadingMore: false })
+        }
       }
     },
     async loadMore() {
@@ -127,12 +132,17 @@ export function createWalletOpsController({ fetchPage, onChange }: ControllerDep
       try {
         const data = await fetchPage(period, WALLET_OPS_PAGE_SIZE, state.items.length)
         if (mine !== seq) return
-        emit({
-          ...state,
-          items: mergeUniqueById(state.items, data.items),
-          total: data.total_count,
-          loadingMore: false,
-        })
+        const merged = mergeUniqueById(state.items, data.items)
+        if (merged.length === state.items.length && state.items.length < data.total_count) {
+          // The list shifted under us (a record was added elsewhere): the offset points at rows we
+          // already show. Reload from the top with room for one more page instead of freezing.
+          const limit = Math.min(MAX_PAGE, state.items.length + WALLET_OPS_PAGE_SIZE)
+          const fresh = await fetchPage(period, limit, 0)
+          if (mine !== seq) return
+          emit({ ...state, items: fresh.items, total: fresh.total_count, loadingMore: false })
+          return
+        }
+        emit({ ...state, items: merged, total: data.total_count, loadingMore: false })
       } catch {
         if (mine !== seq) return
         emit({ ...state, loadingMore: false, loadMoreError: true })

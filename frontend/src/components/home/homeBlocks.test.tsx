@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import ru from '../../i18n/locales/ru.json'
 import uz from '../../i18n/locales/uz.json'
-import { HomeLeftBlock, HomeOnboardingCard } from './homeBlocks'
+import { balanceSizeClass, HomeLeftBlock, HomeOnboardingCard } from './homeBlocks'
 
 function make(lng: 'ru' | 'uz') {
   const inst = i18n.createInstance()
@@ -75,5 +75,17 @@ describe('HomeLeftBlock without income (dev-fix5)', () => {
     expect(html).toContain('Добавьте доход, чтобы посчитать')
     expect(html).not.toContain('месяц завершён')
     expect(html).toContain('—')
+  })
+})
+
+describe('balanceSizeClass (owner decision: shrink from 15 characters)', () => {
+  it('14 characters stay at the normal size', () => {
+    expect(balanceSizeClass('1 000 000 so\'m')).toBe('')
+    expect(balanceSizeClass('x'.repeat(14))).toBe('')
+  })
+  it('15 and 16 characters step down, 17+ step down more', () => {
+    expect(balanceSizeClass('x'.repeat(15))).toBe(' home-figures-card__balance--long')
+    expect(balanceSizeClass('x'.repeat(16))).toBe(' home-figures-card__balance--long')
+    expect(balanceSizeClass('x'.repeat(17))).toBe(' home-figures-card__balance--xlong')
   })
 })

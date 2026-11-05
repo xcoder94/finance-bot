@@ -17,10 +17,10 @@ export function sumSizeClass(text: string): string {
   return ''
 }
 
-/** Balance card (30px mono): shrink for 8+ digit amounts so the unit stays visible at 360px. */
+/** Balance card (30px mono): shrink from 15 characters of text (owner decision) so the unit stays visible at 360px; the digit count differs by language («so'm» vs «сум»). */
 export function balanceSizeClass(text: string): string {
   if (text.length >= 17) return ' home-figures-card__balance--xlong'
-  if (text.length >= 14) return ' home-figures-card__balance--long'
+  if (text.length >= 15) return ' home-figures-card__balance--long'
   return ''
 }
 

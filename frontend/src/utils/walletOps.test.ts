@@ -228,3 +228,61 @@ describe('a record added between pages', () => {
     expect(shown).toEqual(ids(1, 61))
   })
 })
+
+describe('dev-fix12 r3: stuck states', () => {
+  const range = { dateFrom: 'F1', dateTo: 'T1' }
+  const ids = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => String(from + i))
+  const page = (list: string[], total: number): HistoryResponse => ({ items: list.map((i) => item(i)), total_count: total })
+  const setup = (fetchPage: (r: typeof range, limit: number, offset: number) => Promise<HistoryResponse>) => {
+    const states: WalletOpsState[] = []
+    const ctl = createWalletOpsController({ fetchPage, onChange: (s) => states.push(s) })
+    return { ctl, last: () => states[states.length - 1] }
+  }
+
+  it('B: a record added elsewhere does not freeze "load more" (60 -> 61, offset hits a known row)', async () => {
+    // screen has rows 1..60 of 60; row "0" appears on top: offset 60 returns old row 60, already shown
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce(page(ids(1, 51), 60))
+      .mockResolvedValueOnce(page(ids(51, 61), 61)) // the insert is noticed only here: total 61, 60 shown
+      .mockResolvedValueOnce(page(['60'], 61)) // load more at offset 60: nothing new
+      .mockResolvedValueOnce(page(['0', ...ids(1, 61)], 61)) // follow-up full reload
+    const { ctl, last } = setup(fetchPage)
+    await ctl.setPeriod(range)
+    await ctl.loadMore()
+    await ctl.loadMore()
+    expect(last().items.map((x) => x.id)).toEqual(['0', ...ids(1, 61)])
+    expect(last().total).toBe(61)
+    expect(last().loadingMore).toBe(false)
+  })
+
+  it('B: if the follow-up reload fails, the list stays and the error flag is set', async () => {
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce(page(['1', '2'], 3))
+      .mockResolvedValueOnce(page(['2'], 3))
+      .mockRejectedValueOnce(new Error('x'))
+    const { ctl, last } = setup(fetchPage)
+    await ctl.setPeriod(range)
+    await ctl.loadMore()
+    expect(last()).toMatchObject({ status: 'success', loadingMore: false, loadMoreError: true })
+    expect(last().items).toHaveLength(2)
+  })
+
+  it('V: refresh failing while the first load is pending gives the error state with retry', async () => {
+    let resolveFirst!: (r: HistoryResponse) => void
+    const fetchPage = vi
+      .fn()
+      .mockReturnValueOnce(new Promise<HistoryResponse>((r) => (resolveFirst = r)))
+      .mockRejectedValueOnce(new Error('x'))
+      .mockResolvedValueOnce(page(['1'], 1))
+    const { ctl, last } = setup(fetchPage)
+    const first = ctl.setPeriod(range)
+    await ctl.refresh()
+    resolveFirst(page(['9'], 1))
+    await first
+    expect(last().status).toBe('error')
+    await ctl.retry()
+    expect(last()).toMatchObject({ status: 'success' })
+  })
+})
