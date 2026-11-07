@@ -140,6 +140,7 @@ async def _leader_for_currency(
     cats = await get_expenses_by_category(
         session, family_budget_id, currency, date_from, date_to
     )
+    cats = [c for c in cats if not c.uncategorized]
     if not cats:
         return None
     top = cats[0]

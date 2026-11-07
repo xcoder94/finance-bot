@@ -25,6 +25,7 @@ async def list_transaction_history(
     offset: Annotated[int, Query(ge=0)] = 0,
     expense_category_id: uuid.UUID | None = None,
     wallet_id: uuid.UUID | None = None,
+    uncategorized: bool = False,
 ) -> HistoryResponse:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
@@ -43,6 +44,7 @@ async def list_transaction_history(
         include_created_by,
         expense_category_id,
         wallet_id,
+        uncategorized,
     )
     serialized_items = [
         item.model_dump() if include_created_by else item.model_dump(exclude={"created_by"})

@@ -211,9 +211,15 @@ async def get_history(
     include_created_by: bool,
     expense_category_id: uuid.UUID | None = None,
     wallet_id: uuid.UUID | None = None,
+    uncategorized: bool = False,
 ) -> tuple[list[HistoryItem], int]:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
+    if uncategorized and expense_category_id is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="uncategorized and expense_category_id are mutually exclusive",
+        )
 
     base_filters: tuple = (
         Transaction.family_budget_id == family_budget_id,
@@ -226,6 +232,12 @@ async def get_history(
             *base_filters,
             Transaction.type == "expense",
             Transaction.expense_category_id == expense_category_id,
+        )
+    if uncategorized:
+        base_filters = (
+            *base_filters,
+            Transaction.type == "expense",
+            Transaction.expense_category_id.is_(None),
         )
     if wallet_id is not None:
         base_filters = (
@@ -390,7 +402,7 @@ async def get_expenses_by_category(
     )
 
     rows = (await session.execute(stmt)).all()
-    return [
+    result = [
         CategoryAmount(
             category_id=row.category_id,
             category_name=row.category_name,
@@ -400,6 +412,36 @@ async def get_expenses_by_category(
         )
         for row in rows
     ]
+
+    # Expenses without any category: shown as a separate row so sectors sum to the total.
+    uncategorized_stmt = (
+        select(func.coalesce(func.sum(Transaction.amount), 0))
+        .join(wallet, Transaction.wallet_id == wallet.id)
+        .where(
+            Transaction.family_budget_id == family_budget_id,
+            Transaction.is_deleted.is_(False),
+            Transaction.type == "expense",
+            Transaction.expense_category_id.is_(None),
+            wallet.currency == currency,
+            wallet.is_personal.is_(False),
+            Transaction.transaction_date >= date_from,
+            Transaction.transaction_date <= date_to,
+        )
+    )
+    uncategorized = int(await session.scalar(uncategorized_stmt) or 0)
+    if uncategorized > 0:
+        result.append(
+            CategoryAmount(
+                category_id=None,
+                category_name="",
+                category_translation_key=None,
+                color_index=0,
+                amount=uncategorized,
+                uncategorized=True,
+            )
+        )
+        result.sort(key=lambda c: c.amount, reverse=True)
+    return result
 
 
 async def get_expenses_by_subcategory(

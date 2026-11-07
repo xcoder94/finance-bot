@@ -43,11 +43,12 @@ class HistoryResponse(BaseModel):
 class CategoryAmount(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None  # None only for the "uncategorized" row
     category_name: str
     category_translation_key: str | None = None
     color_index: int
     amount: int = Field(ge=0)
+    uncategorized: bool = False
 
 
 class SubcategoryAmount(BaseModel):
