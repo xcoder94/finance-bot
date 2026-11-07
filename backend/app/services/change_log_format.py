@@ -125,6 +125,14 @@ DEFAULT_ENTITY_UZ: dict[str, str] = {
     "event_gifts": "Sovg'alar", "shopping_leisure": "Xaridlar va dam olish",
     "clothing": "Kiyim", "entertainment": "Ko'ngilochar", "subscriptions": "Obunalar",
     "beauty_care": "Go'zallik va parvarish",
+    "xls_other": "Boshqa", "xls_misc": "Turli xarajatlar",
+    "xls_unplanned": "Rejadan tashqari", "xls_relatives": "Yaqinlarga",
+    "xls_education": "Ta'lim", "xls_travel_leisure": "Sayohat va dam olish",
+    "xls_travel": "Sayohatlar", "xls_sport_rest": "Sport va dam olish",
+    "xls_cigarettes": "Sigaretlar", "xls_gadgets": "Gadjetlar",
+    "xls_utilities_other": "Boshqa kommunal", "xls_taxes": "Soliqlar",
+    "xls_phone_installment": "Telefon nasiyasi", "xls_archive": "Excel arxivi",
+    "xls_opening_balance": "Boshlang'ich qoldiq",
 }
 
 
