@@ -243,3 +243,111 @@ class TestPrefilterReasons:
         )
         assert result.operation is None
         assert result.reason == expected_reason
+
+
+class TestDirectionVerbGuard:
+    """Verb decides the type; a category from the other list is dropped (qarz bug)."""
+
+    def _run(self, text: str, *, expense=(), income=()):  # type: ignore[no-untyped-def]
+        return try_prefilter(
+            text,
+            wallet_names=[],
+            expense_categories=list(expense),
+            income_categories=list(income),
+        )
+
+    def test_toladim_with_income_only_qarz_is_expense_without_category(self) -> None:
+        result = self._run("250000 qarz toladim", income=[_income("Qarz")])
+        op = result.operation
+        assert op is not None and result.reason is None
+        assert op.type == "expense"
+        assert op.amount == 250_000
+        assert op.category is None
+
+    def test_toladim_with_both_lists_picks_expense(self) -> None:
+        result = self._run(
+            "250000 qarz toladim",
+            expense=[_expense("Qarz")],
+            income=[_income("Qarz")],
+        )
+        op = result.operation
+        assert op is not None
+        assert op.type == "expense"
+        assert op.category == "Qarz"
+
+    def test_toladim_with_expense_only_qarz_keeps_category(self) -> None:
+        result = self._run("250000 qarz toladim", expense=[_expense("Qarz")])
+        op = result.operation
+        assert op is not None
+        assert (op.type, op.category, op.comment) == ("expense", "Qarz", "toladim")
+
+    def test_apostrophe_verb_variant(self) -> None:
+        for apos in ("'", "’", "ʻ", "ʼ"):
+            result = self._run(
+                f"250000 qarz to{apos}ladim", income=[_income("Qarz")]
+            )
+            assert result.operation is not None
+            assert result.operation.type == "expense"
+            assert result.operation.category is None
+
+    def test_oldim_with_expense_only_qarz_is_income_without_category(self) -> None:
+        result = self._run("qarz oldim 250000", expense=[_expense("Qarz")])
+        op = result.operation
+        assert op is not None
+        assert op.type == "income"
+        assert op.category is None
+
+    def test_both_lists_oldim_picks_income(self) -> None:
+        result = self._run(
+            "qarz oldim 250000",
+            expense=[_expense("Qarz")],
+            income=[_income("Qarz")],
+        )
+        op = result.operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", "Qarz")
+
+    def test_ru_verb_with_income_dolg(self) -> None:
+        result = self._run("вернул долг 250000", income=[_income("Долг")])
+        op = result.operation
+        assert op is not None
+        assert op.type == "expense"
+        assert op.category is None
+
+    def test_ru_take_debt_with_expense_dolg(self) -> None:
+        result = self._run("взял в долг 250000", expense=[_expense("Долг")])
+        op = result.operation
+        assert op is not None
+        assert op.type == "income"
+        assert op.category is None
+
+    def test_no_verb_no_regression(self) -> None:
+        result = self._run("250000 qarz", income=[_income("Qarz")])
+        op = result.operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", "Qarz")
+
+    def test_both_lists_without_verb_stays_ambiguous(self) -> None:
+        result = self._run(
+            "250000 qarz", expense=[_expense("Qarz")], income=[_income("Qarz")]
+        )
+        assert result.operation is None
+        assert result.reason == "category_ambiguous"
+
+    def test_conflicting_verbs_fall_through(self) -> None:
+        result = self._run(
+            "qarz oldim va berdim 250000", income=[_income("Qarz")]
+        )
+        assert result.operation is None
+
+    def test_verb_inside_other_word_ignored(self) -> None:
+        result = self._run("250000 qarz boldim", income=[_income("Qarz")])
+        op = result.operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", "Qarz")
+
+    def test_same_type_verb_keeps_category(self) -> None:
+        result = self._run("получил 100000 Зарплата", income=[_income("Зарплата")])
+        op = result.operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", "Зарплата")

@@ -232,3 +232,18 @@ async def test_google_api_key_sent_as_header_not_url_query():
 
     assert api_key not in seen["url"]
     assert seen["headers"]["x-goog-api-key"] == api_key
+
+
+def test_prompt_direction_verbs_beat_category_list():
+    static = IMMUTABLE_PARSER_INSTRUCTIONS
+    for phrase in (
+        "qarz berdim",
+        "qarz to'ladim",
+        "qarz oldim",
+        "вернул долг",
+        "взял в долг",
+    ):
+        assert phrase in static
+    assert "even if the named category exists only in the other list" in static
+    assert "category to null" in static
+    assert "even without a marker word" not in static

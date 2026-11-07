@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 from tests.db_helpers import db_address
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import DAILY_MODEL_CALL_LIMIT
@@ -270,3 +271,87 @@ class TestPrefilterHandlerWiring:
             assert message.answer.await_args.args[0] == model_limit_text(
                 DAILY_MODEL_CALL_LIMIT
             )
+
+
+class TestDirectionVerbHandlers:
+    async def _income_qarz(self, session: AsyncSession, budget: FamilyBudget) -> None:
+        from app.models.income_category import IncomeCategory
+
+        session.add(IncomeCategory(family_budget_id=budget.id, name="Qarz"))
+        await session.flush()
+
+    async def test_prefilter_verb_overrides_income_category(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_101_050)
+            await seed_taxi_setup(session, user, budget)
+            await self._income_qarz(session, budget)
+
+            set_parser_override(FailingParser())
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+            message = make_message(
+                telegram_id=user.telegram_id, text="250000 qarz toladim"
+            )
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            message.answer.assert_awaited_once()
+            card = message.answer.await_args.args[0]
+            assert "➖" in card
+            assert "Без категории" in card
+            txn = await session.scalar(
+                select(Transaction).where(Transaction.family_budget_id == budget.id)
+            )
+            assert txn is not None
+            assert txn.type == "expense"
+            assert txn.amount == 250_000
+
+    async def test_model_income_with_expense_only_category_no_crash(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with rollback_session() as session:
+            user, budget = await create_user(session, telegram_id=9_101_051)
+            await seed_taxi_setup(session, user, budget)
+            session.add(ExpenseCategory(family_budget_id=budget.id, name="Qarz"))
+            await session.flush()
+
+            set_parser_override(
+                StubParser(
+                    responses={
+                        "непонятный текст 10000": ParseResponse(
+                            operations=[
+                                ParsedOperation(
+                                    type="income",
+                                    amount=10_000,
+                                    currency="UZS",
+                                    wallet_hint=None,
+                                    category="Qarz",
+                                    comment=None,
+                                )
+                            ]
+                        )
+                    }
+                )
+            )
+            monkeypatch.setattr(
+                "bot.quick_entry.handlers.async_session_factory",
+                SessionFactory(session),
+            )
+            message = make_message(
+                telegram_id=user.telegram_id, text="непонятный текст 10000"
+            )
+            await handle_quick_entry_text(message, SimpleNamespace())
+
+            message.answer.assert_awaited_once()
+            card = message.answer.await_args.args[0]
+            assert "➕" in card
+            assert "Без категории" in card
+            txn = await session.scalar(
+                select(Transaction).where(Transaction.family_budget_id == budget.id)
+            )
+            assert txn is not None
+            assert txn.type == "income"
+            assert txn.income_category_id is None

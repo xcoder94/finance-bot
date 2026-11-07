@@ -273,6 +273,53 @@ class TestResolveCategoryId:
             )
             assert resolved is not None
 
+    async def test_income_op_ignores_same_name_expense_category(self) -> None:
+        async with rollback_session() as session:
+            _, budget = await create_user(session, telegram_id=1_001_020)
+            session.add(ExpenseCategory(family_budget_id=budget.id, name="Qarz"))
+            await session.flush()
+
+            assert (
+                await resolve_category_id(
+                    session, budget.id, op_type="income", category_name="Qarz"
+                )
+                is None
+            )
+
+    async def test_expense_op_ignores_same_name_income_category(self) -> None:
+        async with rollback_session() as session:
+            _, budget = await create_user(session, telegram_id=1_001_021)
+            session.add(IncomeCategory(family_budget_id=budget.id, name="Qarz"))
+            await session.flush()
+
+            assert (
+                await resolve_category_id(
+                    session, budget.id, op_type="expense", category_name="Qarz"
+                )
+                is None
+            )
+
+    async def test_both_types_resolve_to_matching_type(self) -> None:
+        async with rollback_session() as session:
+            _, budget = await create_user(session, telegram_id=1_001_022)
+            exp = ExpenseCategory(family_budget_id=budget.id, name="Qarz")
+            inc = IncomeCategory(family_budget_id=budget.id, name="Qarz")
+            session.add_all([exp, inc])
+            await session.flush()
+
+            assert (
+                await resolve_category_id(
+                    session, budget.id, op_type="expense", category_name="Qarz"
+                )
+                == exp.id
+            )
+            assert (
+                await resolve_category_id(
+                    session, budget.id, op_type="income", category_name="Qarz"
+                )
+                == inc.id
+            )
+
     async def test_podarki_collision_resolved_by_button_choice(self) -> None:
         async with rollback_session() as session:
             _, budget = await create_user(session, telegram_id=1_001_010)

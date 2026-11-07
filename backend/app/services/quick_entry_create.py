@@ -185,15 +185,13 @@ async def resolve_category_id(
             EVENTS_PARENT_NAME,
         )
 
+    # Search only the list of the operation's own type: an id from the other
+    # list would fail validation (404) or leak across types.
+    if op_type == "income":
+        return await _find_income_by_name(session, family_budget_id, name)
+
     sub_id = await _find_expense_sub_by_name(session, family_budget_id, name)
     if sub_id is not None:
         return sub_id
 
-    parent_id = await _find_expense_parent_by_name(session, family_budget_id, name)
-    if parent_id is not None:
-        return parent_id
-
-    if op_type == "income":
-        return await _find_income_by_name(session, family_budget_id, name)
-
-    return None
+    return await _find_expense_parent_by_name(session, family_budget_id, name)

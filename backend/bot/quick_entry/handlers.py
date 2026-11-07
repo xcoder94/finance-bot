@@ -601,7 +601,7 @@ async def _process_parsed_response(
             sign=sign,
             amount=op.amount,
             currency=currency,
-            category_label=_category_label(op.category),
+            category_label=_category_label(op.category if category_id else None),
             comment=comment,
             wallet_name=wallet.name,
             op_date=op_date,

@@ -17,6 +17,7 @@ PrefilterReason = Literal[
     "no_category_match",
     "category_ambiguous",
     "wallet_ambiguous",
+    "type_conflict",
     "prefilter_disabled",
 ]
 
@@ -34,6 +35,40 @@ _TRANSFER_SIGNALS: tuple[str, ...] = (
     "exchange",
     "по курсу",
 )
+
+# Direction verbs: the verb decides the operation type, not the category list.
+_EXPENSE_VERBS: tuple[str, ...] = (
+    "to'ladim",
+    "toladim",
+    "tuladim",
+    "berdim",
+    "qaytardim",
+    "chiqim",
+    "вернул",
+    "вернула",
+    "отдал",
+    "отдала",
+    "дал в долг",
+    "дала в долг",
+    "заплатил",
+    "заплатила",
+    "потратил",
+    "потратила",
+    "расход",
+)
+_INCOME_VERBS: tuple[str, ...] = (
+    "oldim",
+    "keldi",
+    "kirim",
+    "взял",
+    "взяла",
+    "получил",
+    "получила",
+    "приход",
+    "доход",
+)
+
+_APOSTROPHES = str.maketrans({"\u2019": "'", "\u02bc": "'", "\u02bb": "'", "\u2018": "'", "`": "'"})
 
 _MULTI_OP_CONNECTORS: tuple[str, ...] = (" и ", " а также ")
 
@@ -220,6 +255,20 @@ def _unique_categories(matches: list[_CategoryMatch]) -> list[_CategoryMatch]:
     return unique
 
 
+def _verb_type(text: str) -> Literal["expense", "income", "conflict"] | None:
+    """Direction implied by the verb; None if no verb; "conflict" if both kinds."""
+    normalized = text.translate(_APOSTROPHES)
+    has_expense = any(_find_term_spans(normalized, v) for v in _EXPENSE_VERBS)
+    has_income = any(_find_term_spans(normalized, v) for v in _INCOME_VERBS)
+    if has_expense and has_income:
+        return "conflict"
+    if has_expense:
+        return "expense"
+    if has_income:
+        return "income"
+    return None
+
+
 def _match_wallets(text: str, wallet_names: list[str]) -> list[str]:
     folded = text.casefold()
     matched: list[str] = []
@@ -274,6 +323,15 @@ def try_prefilter(
     )
     resolved = _unique_categories(expense_matches + income_matches)
 
+    verb_type = _verb_type(text)
+    if verb_type == "conflict":
+        return PrefilterResult(operation=None, reason="type_conflict")
+    if verb_type is not None and len(resolved) == 2:
+        # Same category name in both lists: the verb picks the list.
+        by_type = [m for m in resolved if m.op_type == verb_type]
+        if len(by_type) == 1 and resolved[0].category.name == resolved[1].category.name:
+            resolved = by_type
+
     if len(resolved) != 1:
         reason: PrefilterReason = (
             "no_category_match" if len(resolved) == 0 else "category_ambiguous"
@@ -285,15 +343,24 @@ def try_prefilter(
     if len(wallet_hits) > 1:
         return PrefilterResult(operation=None, reason="wallet_ambiguous")
 
-    comment = _build_comment(text, amount.span, [match.span])
+    if verb_type is not None and verb_type != match.op_type:
+        # Verb contradicts the category's type: the verb wins, category dropped
+        # (it stays in the comment text).
+        op_type: Literal["expense", "income"] = verb_type
+        category_name: str | None = None
+        comment = _build_comment(text, amount.span, [])
+    else:
+        op_type = match.op_type
+        category_name = match.category.name
+        comment = _build_comment(text, amount.span, [match.span])
 
     return PrefilterResult(
         operation=ParsedOperation(
-            type=match.op_type,
+            type=op_type,
             amount=amount.value,
             currency=amount.currency,
             wallet_hint=wallet_hits[0] if wallet_hits else None,
-            category=match.category.name,
+            category=category_name,
             comment=comment,
         ),
         reason=None,
