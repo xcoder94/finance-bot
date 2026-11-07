@@ -1,5 +1,5 @@
 import { OTHER_CATEGORY_KEY, UNCATEGORIZED_KEY } from './analyticsConstants'
-import { OTHER_CATEGORY_COLOR_INDEX, getColorByIndex } from './chartColors'
+import { UNCATEGORIZED_COLOR, getColorByIndex } from './chartColors'
 
 export type HistoryCategoryFilter = {
   id: string
@@ -24,7 +24,7 @@ export function historyFilterForUncategorized(name: string): HistoryCategoryFilt
   return {
     id: UNCATEGORIZED_KEY,
     name,
-    color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+    color: UNCATEGORIZED_COLOR,
     uncategorized: true,
   }
 }

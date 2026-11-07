@@ -10,6 +10,7 @@ import {
   getCategoryColor,
   getColorByIndex,
   OTHER_CATEGORY_COLOR_INDEX,
+  UNCATEGORIZED_COLOR,
 } from './chartColors'
 
 export type DonutSlice = {
@@ -245,7 +246,7 @@ export function prepareDonutSlices(
       key: UNCATEGORIZED_KEY,
       name: t('analytics.uncategorized'),
       value: uncategorizedAmount,
-      color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+      color: UNCATEGORIZED_COLOR,
     })
   }
   if (otherAmount > 0) {

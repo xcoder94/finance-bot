@@ -5,6 +5,8 @@ import { prepareDonutSlices } from './analyticsCharts'
 import { UNCATEGORIZED_KEY } from './analyticsConstants'
 import { extendCategoryColorMap, mergeCategoryIds } from './analyticsChartsTab'
 import {
+  CHART_CATEGORY_COLORS,
+  UNCATEGORIZED_COLOR,
   getColorByIndex,
   OTHER_CATEGORY_COLOR_INDEX,
   stableColorIndexFromCategoryId,
@@ -70,7 +72,8 @@ describe('prepareDonutSlices uncategorized', () => {
     expect(slices.reduce((s, x) => s + x.value, 0)).toBe(1000)
     const u = slices.find((x) => x.key === UNCATEGORIZED_KEY)
     expect(u).toMatchObject({ name: 'analytics.uncategorized', value: 300 })
-    expect(u?.color).toBe(getColorByIndex(OTHER_CATEGORY_COLOR_INDEX))
+    expect(u?.color).toBe(UNCATEGORIZED_COLOR)
+    expect(CHART_CATEGORY_COLORS).not.toContain(u?.color)
   })
 
   it('has no uncategorized slice when none', () => {

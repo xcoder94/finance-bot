@@ -10,6 +10,7 @@ export const CHART_CATEGORY_COLORS = [
 ] as const
 
 export const OTHER_CATEGORY_COLOR_INDEX = 8
+export const UNCATEGORIZED_COLOR = 'var(--app-category-color-neutral)'
 
 export function mergeStoredCategoryColorIndices(
   categories: Array<{ id: string; color_index?: number }>,
