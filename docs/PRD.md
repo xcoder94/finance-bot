@@ -1281,7 +1281,9 @@ button and no floating "+".
 
 ### 17.2 Home
 
-Top to bottom: budget name, month switch, currency switch UZS/USD, three
+> **ЧЕРНОВИК MVP3 (2026-10-31, analyst; ждёт утверждения хозяина).** Currency switch removed: Home shows UZS only. Reason — production data: 0 operations on USD wallets, 18 USD wallets all empty; the switch filtered nothing. This deliberately reverses the earlier decision to keep the switch. Existing USD wallets keep working; nothing is converted.
+
+Top to bottom: budget name, month switch, ~~currency switch UZS/USD~~ (removed, MVP3 draft), three
 figures (`Доход`, `Расход`, `Остаток`), three action buttons (`Доход`,
 `Расход`, `Перевод`), recent operations block.
 
@@ -1312,7 +1314,9 @@ a tab of the same name inside a section of the same name does not read.
 
 **The period filter is shared by both tabs.** Switching tabs does not reset it.
 
-**Currency switch UZS/USD.** The `Графики` tab carries a currency switch,
+> **ЧЕРНОВИК MVP3 (2026-10-31, analyst; ждёт утверждения хозяина).** The currency switch on `Графики` is removed together with the one on Home (17.2). `Графики` counts UZS wallets only. `История` still lists every operation in its own currency. The paragraphs below marked ~~struck~~ are superseded.
+
+~~**Currency switch UZS/USD.**~~ (superseded) The `Графики` tab carries a currency switch,
 identical in appearance to the one on Home. The design does not show this
 control on this screen; it is an approved deviation, not an invention.
 
@@ -1344,8 +1348,7 @@ is not possible — only through a subcategory.
 1. `Доход и расход, 12 месяцев` — twelve pairs of bars, income and expense,
    one pair per month. The block obeys the month switch: it ends with the
    selected month and reaches eleven months back. Selecting March 2026 shows
-   April 2025 through March 2026. Unit label on the right: `млн сум` in UZS,
-   `$` in USD with no scaling — thousands of dollars are shown as they are.
+   April 2025 through March 2026. Unit label on the right: `млн сум`. ~~`$` in USD with no scaling~~ (MVP3 draft: USD view removed).
 2. Two tiles side by side. `Средний расход в день` — the expense of the
    selected month divided by the days already elapsed in it: the full length
    for a finished month, the 1st through today (Tashkent) for the current one.
@@ -1423,7 +1426,7 @@ subcategories, with the option to stop at the parent.
 secondary-styled `Удалить` button at the bottom (not in a row), and the
 `Изменения` block below the fields, per section 14.2.
 
-**Entity forms in settings:** wallet (name 30 characters, currency UZS/USD);
+**Entity forms in settings:** wallet (name 30 characters, ~~currency UZS/USD~~ — MVP3 draft: a new wallet is always UZS; an existing USD wallet shows its currency as a label);
 expense category (name 30 characters — when creating a subcategory the parent
 is already fixed by the screen it was opened from); a subcategory screen inside
 each parent with list, add and delete; one shared delete-confirmation sheet for
@@ -1458,7 +1461,7 @@ failed-entry screen, limit messages, and a maximum-length category name.
    period. Press back: the subcategory chart appears again and the filter is
    cleared.
 7. Tap "Другое" on the chart — nothing happens.
-8. On `Графики`, switch the currency to `USD`: the donut, the twelve-month
+8. ~~(superseded by MVP3 draft)~~ MVP3 draft replacement: on Home and on `Графики` there is no currency switch; `История` lists UZS and USD operations each in its own currency. Old text: On `Графики`, switch the currency to `USD`: the donut, the twelve-month
    block and both tiles recount on USD wallets only, and no figure equals a
    UZS figure divided by a rate. Switch to `История` — operations of both
    currencies are listed there regardless of the switch.
