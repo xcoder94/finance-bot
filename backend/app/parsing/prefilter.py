@@ -57,16 +57,21 @@ _EXPENSE_VERBS: tuple[str, ...] = (
     "расход",
 )
 _INCOME_VERBS: tuple[str, ...] = (
+    "kirim",
+    "приход",
+    "доход",
+)
+# Generic verbs ("bought/took/came/received") say nothing about direction on their
+# own: "taksi oldim" is a purchase. They count as income only in a debt context.
+_DEBT_INCOME_VERBS: tuple[str, ...] = (
     "oldim",
     "keldi",
-    "kirim",
     "взял",
     "взяла",
     "получил",
     "получила",
-    "приход",
-    "доход",
 )
+_DEBT_MARKERS: tuple[str, ...] = ("qarz", "долг")
 
 _APOSTROPHES = str.maketrans({"\u2019": "'", "\u02bc": "'", "\u02bb": "'", "\u2018": "'", "`": "'"})
 
@@ -255,11 +260,18 @@ def _unique_categories(matches: list[_CategoryMatch]) -> list[_CategoryMatch]:
     return unique
 
 
+def _has_debt_context(text: str) -> bool:
+    folded = text.casefold()
+    return any(marker in folded for marker in _DEBT_MARKERS)
+
+
 def _verb_type(text: str) -> Literal["expense", "income", "conflict"] | None:
     """Direction implied by the verb; None if no verb; "conflict" if both kinds."""
     normalized = text.translate(_APOSTROPHES)
     has_expense = any(_find_term_spans(normalized, v) for v in _EXPENSE_VERBS)
     has_income = any(_find_term_spans(normalized, v) for v in _INCOME_VERBS)
+    if not has_income and _has_debt_context(normalized):
+        has_income = any(_find_term_spans(normalized, v) for v in _DEBT_INCOME_VERBS)
     if has_expense and has_income:
         return "conflict"
     if has_expense:
@@ -331,6 +343,23 @@ def try_prefilter(
         by_type = [m for m in resolved if m.op_type == verb_type]
         if len(by_type) == 1 and resolved[0].category.name == resolved[1].category.name:
             resolved = by_type
+
+    if not resolved and verb_type in ("expense", "income") and _has_debt_context(text):
+        # Debt phrase ("qarzga oldim", "qarzni qaytardim"): verb decides, no category.
+        debt_wallets = _match_wallets(text, wallet_names)
+        if len(debt_wallets) > 1:
+            return PrefilterResult(operation=None, reason="wallet_ambiguous")
+        return PrefilterResult(
+            operation=ParsedOperation(
+                type=verb_type,
+                amount=amount.value,
+                currency=amount.currency,
+                wallet_hint=debt_wallets[0] if debt_wallets else None,
+                category=None,
+                comment=_build_comment(text, amount.span, []),
+            ),
+            reason=None,
+        )
 
     if len(resolved) != 1:
         reason: PrefilterReason = (

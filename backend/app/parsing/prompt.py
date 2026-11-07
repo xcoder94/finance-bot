@@ -29,6 +29,8 @@ IMMUTABLE_PARSER_INSTRUCTIONS = (
     "ойлик, маош, зарплата, зп, аванс, оклад, qarz oldim, qarzga oldim, взял в долг → type income. "
     "Expense markers: chiqim, расход, потратил, потратила, заплатил, заплатила, qarz berdim, "
     "qarz to'ladim, qarzni to'ladim, qarz qaytardim, вернул долг, отдал долг, дал в долг → type expense. "
+    "Plain oldim / keldi / взял / взяла without a debt word (qarz, долг) are NOT direction markers: "
+    "«taksi oldim», «взял такси», «kiyim oldim» are purchases, type expense with the matching category. "
     "When an income marker is present, never default to expense. "
     "A direction marker decides the type even if the named category exists only in the other list; "
     "then set category to null. "

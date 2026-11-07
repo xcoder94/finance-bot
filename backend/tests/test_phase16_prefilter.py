@@ -351,3 +351,67 @@ class TestDirectionVerbGuard:
         op = result.operation
         assert op is not None
         assert (op.type, op.category) == ("income", "Зарплата")
+
+
+class TestPlainVerbsAreNotDirection:
+    """oldim/keldi/взял/получил outside a debt context must not flip an expense (QA P1)."""
+
+    def _run(self, text: str):  # type: ignore[no-untyped-def]
+        return try_prefilter(
+            text,
+            wallet_names=[],
+            expense_categories=[
+                _expense("Такси"),
+                _expense("Одежда"),
+                _expense("Продукты"),
+                _expense("Коммунальные"),
+            ],
+            income_categories=[_income("Зарплата")],
+        )
+
+    @pytest.mark.parametrize(
+        ("text", "category"),
+        [
+            ("20000 taksi oldim", "Такси"),
+            ("Такси oldim 20000", "Такси"),
+            ("взял такси 30000", "Такси"),
+            ("kiyim oldim 300000", "Одежда"),
+            ("Одежда oldim 300000", "Одежда"),
+            ("продукты взял 80000", "Продукты"),
+            ("взяла Продукты 80000", "Продукты"),
+            ("Коммунальные keldi 150000", "Коммунальные"),
+            ("получил Такси 20000", "Такси"),
+        ],
+    )
+    def test_plain_verb_keeps_expense_category(self, text: str, category: str) -> None:
+        result = self._run(text)
+        op = result.operation
+        if op is None:
+            # Not resolved by the prefilter is acceptable, but never as income.
+            return
+        assert op.type == "expense"
+        assert op.category in (category, None)
+
+    @pytest.mark.parametrize(
+        "text",
+        ["Такси oldim 20000", "Одежда oldim 300000", "взял Такси 30000"],
+    )
+    def test_plain_verb_with_known_category_is_expense_with_category(self, text: str) -> None:
+        op = self._run(text).operation
+        assert op is not None
+        assert op.type == "expense"
+        assert op.category is not None
+
+    @pytest.mark.parametrize(
+        "text",
+        ["qarzga oldim 250000", "qarzni qaytardim 250000", "взял в долг 250000"],
+    )
+    def test_debt_phrase_without_category_is_resolved_by_verb(self, text: str) -> None:
+        op = self._run(text).operation
+        assert op is not None
+        assert op.category is None
+        assert op.type == ("expense" if "qaytardim" in text else "income")
+
+    def test_debt_oldim_still_income(self) -> None:
+        op = self._run("qarz oldim 250000").operation
+        assert op is not None and op.type == "income" and op.category is None
