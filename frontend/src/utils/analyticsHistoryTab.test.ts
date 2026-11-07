@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { historyFilterForUncategorized } from './analyticsDrill'
+import { historyFilterAfterTabSwitch } from './analyticsTabState'
 import { CHART_CATEGORY_COLORS } from './chartColors'
 import {
   buildAnalyticsHistoryFetchKey,
   getAnalyticsHistoryExpenseCategoryId,
+  isAnalyticsHistoryUncategorized,
 } from './analyticsHistoryTab'
 
 describe('buildAnalyticsHistoryFetchKey', () => {
@@ -37,5 +40,21 @@ describe('getAnalyticsHistoryExpenseCategoryId', () => {
 
   it('returns undefined when filter is cleared', () => {
     expect(getAnalyticsHistoryExpenseCategoryId(null)).toBeUndefined()
+  })
+})
+
+describe('uncategorized filter', () => {
+  const filter = historyFilterForUncategorized('Без категории')
+
+  it('has no category id, flags uncategorized, own fetch key', () => {
+    expect(getAnalyticsHistoryExpenseCategoryId(filter)).toBeUndefined()
+    expect(isAnalyticsHistoryUncategorized(filter)).toBe(true)
+    expect(isAnalyticsHistoryUncategorized(null)).toBe(false)
+    expect(buildAnalyticsHistoryFetchKey('r', filter)).toBe('r|uncategorized')
+  })
+
+  it('survives switching to history tab and is cleared on charts', () => {
+    expect(historyFilterAfterTabSwitch(filter, 'history')).toBe(filter)
+    expect(historyFilterAfterTabSwitch(filter, 'charts')).toBeNull()
   })
 })

@@ -1,10 +1,11 @@
-import { OTHER_CATEGORY_KEY } from './analyticsConstants'
-import { getColorByIndex } from './chartColors'
+import { OTHER_CATEGORY_KEY, UNCATEGORIZED_KEY } from './analyticsConstants'
+import { OTHER_CATEGORY_COLOR_INDEX, getColorByIndex } from './chartColors'
 
 export type HistoryCategoryFilter = {
   id: string
   name: string
   color: string
+  uncategorized?: boolean
 }
 
 export type ClearHistoryFilterOptions = {
@@ -13,6 +14,19 @@ export type ClearHistoryFilterOptions = {
 
 export function isOtherCategoryKey(key: string): boolean {
   return key === OTHER_CATEGORY_KEY
+}
+
+export function isUncategorizedKey(key: string): boolean {
+  return key === UNCATEGORIZED_KEY
+}
+
+export function historyFilterForUncategorized(name: string): HistoryCategoryFilter {
+  return {
+    id: UNCATEGORIZED_KEY,
+    name,
+    color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+    uncategorized: true,
+  }
 }
 
 export function shouldIgnoreDonutTap(key: string): boolean {

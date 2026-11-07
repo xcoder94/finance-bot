@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next'
 
 import type { CategoryAmount, SubcategoryAmount, TrendEntry } from '../api/analytics'
-import { OTHER_CATEGORY_KEY } from './analyticsConstants'
+import { OTHER_CATEGORY_KEY, UNCATEGORIZED_KEY } from './analyticsConstants'
 import {
   resolveCategoryAmountDisplayName,
   resolveSubcategoryAmountDisplayName,
@@ -51,7 +51,10 @@ export function buildParentCategoryCards(
   t: TFunction,
   displayNameById?: Map<string, string>,
 ): ParentCategoryCard[] {
-  const withAmount = entries.filter((entry) => entry.amount > 0)
+  const withAmount = entries.filter(
+    (entry): entry is CategoryAmount & { category_id: string } =>
+      entry.amount > 0 && !entry.uncategorized && entry.category_id !== null,
+  )
   const cards: ParentCategoryCard[] = []
   let otherAmount = 0
   const otherParentIds: string[] = []
@@ -205,22 +208,30 @@ export function prepareDonutSlices(
   t: TFunction,
   displayNameById?: Map<string, string>,
 ): DonutSlice[] {
-  const withAmount = entries.filter((entry) => entry.amount > 0)
-  if (withAmount.length === 0) {
+  const positive = entries.filter((entry) => entry.amount > 0)
+  if (positive.length === 0) {
     return []
   }
+  const withAmount = positive.filter(
+    (entry): entry is CategoryAmount & { category_id: string } =>
+      !entry.uncategorized && entry.category_id !== null,
+  )
+  const uncategorizedAmount = positive
+    .filter((entry) => entry.uncategorized || entry.category_id === null)
+    .reduce((sum, entry) => sum + entry.amount, 0)
 
   const slices = new Map<string, DonutSlice>()
   let otherAmount = 0
 
   for (const entry of withAmount) {
-    const orderIndex = orderedCategoryIds.indexOf(entry.category_id)
+    const categoryId = entry.category_id
+    const orderIndex = orderedCategoryIds.indexOf(categoryId)
     if (orderIndex >= 0 && orderIndex < 8) {
-      slices.set(entry.category_id, {
-        key: entry.category_id,
+      slices.set(categoryId, {
+        key: categoryId,
         name: resolveCategoryAmountDisplayName(entry, displayNameById, t),
         value: entry.amount,
-        color: getCategoryColor(entry.category_id, colorMap),
+        color: getCategoryColor(categoryId, colorMap),
       })
       continue
     }
@@ -229,6 +240,14 @@ export function prepareDonutSlices(
   }
 
   const result = Array.from(slices.values())
+  if (uncategorizedAmount > 0) {
+    result.push({
+      key: UNCATEGORIZED_KEY,
+      name: t('analytics.uncategorized'),
+      value: uncategorizedAmount,
+      color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+    })
+  }
   if (otherAmount > 0) {
     result.push({
       key: OTHER_CATEGORY_KEY,

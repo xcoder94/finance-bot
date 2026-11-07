@@ -78,3 +78,36 @@ describe('fetchHistoryPage wallet_id', () => {
     expect((await run()).has('wallet_id')).toBe(false)
   })
 })
+
+describe('fetchHistoryPage uncategorized', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  async function call(expenseCategoryId?: string, uncategorized?: boolean) {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total_count: 0 }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await fetchHistoryPage('2026-08-01T00:00:00.000+05:00', '2026-08-31T23:59:59.999+05:00', 20, 0, expenseCategoryId, undefined, uncategorized)
+    const [url] = fetchMock.mock.calls[0] as [string]
+    return new URL(url, 'http://localhost').searchParams
+  }
+
+  it('sends uncategorized=true without expense_category_id', async () => {
+    const params = await call(undefined, true)
+    expect(params.get('uncategorized')).toBe('true')
+    expect(params.get('expense_category_id')).toBeNull()
+  })
+
+  it('never sends both (API would answer 422)', async () => {
+    const params = await call('cat-1', true)
+    expect(params.get('uncategorized')).toBeNull()
+    expect(params.get('expense_category_id')).toBe('cat-1')
+  })
+
+  it('omits uncategorized by default', async () => {
+    expect((await call()).get('uncategorized')).toBeNull()
+  })
+})

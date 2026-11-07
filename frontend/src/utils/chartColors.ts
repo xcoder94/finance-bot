@@ -13,7 +13,7 @@ export const OTHER_CATEGORY_COLOR_INDEX = 8
 
 export function mergeStoredCategoryColorIndices(
   categories: Array<{ id: string; color_index?: number }>,
-  amounts: Array<{ color_index?: number; [key: string]: string | number | null | undefined }>,
+  amounts: Array<{ color_index?: number; [key: string]: string | number | boolean | null | undefined }>,
   amountIdKey: string,
 ): Map<string, number> {
   const map = new Map<string, number>()

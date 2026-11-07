@@ -8,6 +8,7 @@ import { useAnalyticsContext } from '../../contexts/AnalyticsContext'
 import {
   buildAnalyticsHistoryFetchKey,
   getAnalyticsHistoryExpenseCategoryId,
+  isAnalyticsHistoryUncategorized,
 } from '../../utils/analyticsHistoryTab'
 import { applyClearHistoryFilter } from '../../utils/analyticsTabState'
 import { editRouteForItem } from '../../utils/editRouteForItem'
@@ -54,6 +55,8 @@ export function AnalyticsHistoryTab() {
     [historyCategoryFilter],
   )
 
+  const uncategorized = isAnalyticsHistoryUncategorized(historyCategoryFilter)
+
   useEffect(() => {
     if (!range || !rangeFetchEnabled) {
       setHistoryItems([])
@@ -74,6 +77,8 @@ export function AnalyticsHistoryTab() {
       HISTORY_PAGE_SIZE,
       0,
       expenseCategoryId,
+      undefined,
+      uncategorized,
     )
       .then((data) => {
         if (!cancelled) {
@@ -91,7 +96,7 @@ export function AnalyticsHistoryTab() {
     return () => {
       cancelled = true
     }
-  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, historyRetryCount])
+  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, historyRetryCount])
 
   const handleLoadMore = async () => {
     if (!range || loadingMore || historyItems.length >= historyTotal) {
@@ -107,6 +112,8 @@ export function AnalyticsHistoryTab() {
         HISTORY_PAGE_SIZE,
         historyItems.length,
         expenseCategoryId,
+        undefined,
+        uncategorized,
       )
       setHistoryItems((current) => [...current, ...data.items])
       setHistoryTotal(data.total_count)

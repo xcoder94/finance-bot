@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TFunction } from 'i18next'
 
 import { prepareDonutSlices } from './analyticsCharts'
+import { UNCATEGORIZED_KEY } from './analyticsConstants'
 import { extendCategoryColorMap, mergeCategoryIds } from './analyticsChartsTab'
 import {
   getColorByIndex,
@@ -47,5 +48,33 @@ describe('prepareDonutSlices soft-deleted categories', () => {
       value: 500,
     })
     expect(slices[0].color).not.toBe(getColorByIndex(OTHER_CATEGORY_COLOR_INDEX))
+  })
+})
+
+describe('prepareDonutSlices uncategorized', () => {
+  const t = ((key: string) => key) as TFunction
+  const catId = '6ba7b812-9dad-11d1-80b4-00c04fd430c8'
+  const entries = [
+    { category_id: catId, category_name: 'Food', category_translation_key: null, amount: 700 },
+    {
+      category_id: null,
+      category_name: '',
+      category_translation_key: null,
+      amount: 300,
+      uncategorized: true,
+    },
+  ]
+
+  it('adds a grey slice so the sum equals the total', () => {
+    const slices = prepareDonutSlices(entries, [catId], extendCategoryColorMap([catId], []), 'Другое', t)
+    expect(slices.reduce((s, x) => s + x.value, 0)).toBe(1000)
+    const u = slices.find((x) => x.key === UNCATEGORIZED_KEY)
+    expect(u).toMatchObject({ name: 'analytics.uncategorized', value: 300 })
+    expect(u?.color).toBe(getColorByIndex(OTHER_CATEGORY_COLOR_INDEX))
+  })
+
+  it('has no uncategorized slice when none', () => {
+    const slices = prepareDonutSlices([entries[0]], [catId], extendCategoryColorMap([catId], []), 'Другое', t)
+    expect(slices.map((x) => x.key)).toEqual([catId])
   })
 })

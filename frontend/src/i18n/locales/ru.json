@@ -348,6 +348,7 @@
     "tabHistory": "История",
     "sharedPeriodHint": "Период общий для обеих вкладок",
     "expensesByCategory": "Расходы по категориям",
+    "uncategorized": "Без категории",
     "incomeByCategory": "Доходы по категориям",
     "monthlyTrend": "Доход и расход по месяцам",
     "trendTitle": "Доход и расход, 12 месяцев",

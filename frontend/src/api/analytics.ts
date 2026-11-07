@@ -6,7 +6,8 @@ export type { SummaryResponse }
 export { fetchSummaryForRange }
 
 export type CategoryAmount = {
-  category_id: string
+  category_id: string | null
+  uncategorized?: boolean
   category_name: string
   category_translation_key: string | null
   color_index?: number

@@ -29,6 +29,8 @@ import {
 import { twelveMonthKeysEndingAt } from '../../utils/analyticsPeriod'
 import {
   historyFilterAfterSubcategoryTap,
+  historyFilterForUncategorized,
+  isUncategorizedKey,
   shouldIgnoreDonutTap,
 } from '../../utils/analyticsDrill'
 import {
@@ -194,7 +196,7 @@ export function AnalyticsChartsTab() {
     }
     const apiCategoryIds = expensesFetch.state.data
       .filter((entry) => entry.amount > 0)
-      .map((entry) => entry.category_id)
+      .flatMap((entry) => (entry.category_id === null ? [] : [entry.category_id]))
     const orderedParentIds = mergeCategoryIds(categoryMaps.expenseParentIds, apiCategoryIds)
     const storedColorIndices = mergeStoredCategoryColorIndices(
       categoryMaps.expenseCategories.filter((category) => category.parent_id === null),
@@ -312,6 +314,15 @@ export function AnalyticsChartsTab() {
 
   const handleSliceActivate = useCallback(
     (key: string) => {
+      if (isUncategorizedKey(key)) {
+        if (drillParent) {
+          return
+        }
+        setHistoryCategoryFilter(historyFilterForUncategorized(t('analytics.uncategorized')))
+        setActiveTab('history')
+        return
+      }
+
       if (shouldIgnoreDonutTap(key)) {
         return
       }
@@ -337,6 +348,7 @@ export function AnalyticsChartsTab() {
       setActiveTab('history')
     },
     [
+      t,
       drillParent,
       parentSlices,
       drillSlices,
