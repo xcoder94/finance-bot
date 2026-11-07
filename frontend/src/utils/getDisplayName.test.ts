@@ -50,3 +50,31 @@ describe('analytics amount names', () => {
     expect(resolveSubcategoryAmountDisplayName({ ...base, subcategory_name: 'Аренда' }, undefined, i18next.t)).toBe(i18next.t('defaultEntities.rent'))
   })
 })
+
+// import-xlsx: entities created by the Excel import carry xls_* keys and must localize like seeded ones.
+describe('xls_* import entities', () => {
+  afterEach(async () => {
+    await i18next.changeLanguage('ru')
+  })
+
+  const cases = [
+    { key: 'xls_cigarettes', ru: 'Сигареты', uz: 'Sigaretlar' },
+    { key: 'xls_archive', ru: 'Архив Excel', uz: 'Excel arxivi' },
+    { key: 'xls_opening_balance', ru: 'Начальный остаток', uz: "Boshlang'ich qoldiq" },
+    { key: 'xls_education', ru: 'Образование', uz: "Ta'lim" },
+  ]
+
+  for (const c of cases) {
+    it(`${c.key} shows ru and uz translation`, async () => {
+      await i18next.changeLanguage('ru')
+      expect(getDisplayName({ name: c.ru, translation_key: c.key }, i18next.t)).toBe(c.ru)
+      await i18next.changeLanguage('uz')
+      expect(getDisplayName({ name: c.ru, translation_key: c.key }, i18next.t)).toBe(c.uz)
+    })
+
+    it(`${c.key} renamed keeps the user name`, async () => {
+      await i18next.changeLanguage('uz')
+      expect(getDisplayName({ name: 'Моё имя', translation_key: c.key }, i18next.t)).toBe('Моё имя')
+    })
+  }
+})
