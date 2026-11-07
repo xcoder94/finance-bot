@@ -356,6 +356,7 @@ async def get_expenses_by_category(
     expense_parent = aliased(ExpenseCategory)
     wallet = aliased(Wallet)
 
+    # Expense booked directly on a parent (no subcategory) belongs to that parent itself.
     stmt = (
         select(
             expense_parent.id.label("category_id"),
@@ -366,7 +367,10 @@ async def get_expenses_by_category(
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
         .join(expense_sub, Transaction.expense_category_id == expense_sub.id)
-        .join(expense_parent, expense_sub.parent_id == expense_parent.id)
+        .join(
+            expense_parent,
+            expense_parent.id == func.coalesce(expense_sub.parent_id, expense_sub.id),
+        )
         .where(
             Transaction.family_budget_id == family_budget_id,
             Transaction.is_deleted.is_(False),
@@ -431,7 +435,10 @@ async def get_expenses_by_subcategory(
             Transaction.type == "expense",
             wallet.currency == currency,
             wallet.is_personal.is_(False),
-            expense_sub.parent_id == parent_category_id,
+            or_(
+                expense_sub.parent_id == parent_category_id,
+                expense_sub.id == parent_category_id,
+            ),
             Transaction.transaction_date >= date_from,
             Transaction.transaction_date <= date_to,
         )
