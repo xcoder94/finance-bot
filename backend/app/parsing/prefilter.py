@@ -71,7 +71,12 @@ _DEBT_INCOME_VERBS: tuple[str, ...] = (
     "получил",
     "получила",
 )
-_DEBT_MARKERS: tuple[str, ...] = ("qarz", "долг")
+# Debt word only at the start of a word ("qarz*", "долг" + case ending): "надолго",
+# "задолго", "долговечный" are not debt context.
+_DEBT_RE = re.compile(
+    r"(?<!\w)(?:qarz\w*|долг(?:а|у|ом|е|и|ов|ам|ами|ах)?(?!\w))",
+    re.IGNORECASE,
+)
 
 _APOSTROPHES = str.maketrans({"\u2019": "'", "\u02bc": "'", "\u02bb": "'", "\u2018": "'", "`": "'"})
 
@@ -261,16 +266,35 @@ def _unique_categories(matches: list[_CategoryMatch]) -> list[_CategoryMatch]:
 
 
 def _has_debt_context(text: str) -> bool:
-    folded = text.casefold()
-    return any(marker in folded for marker in _DEBT_MARKERS)
+    return _DEBT_RE.search(text.casefold()) is not None
 
 
-def _verb_type(text: str) -> Literal["expense", "income", "conflict"] | None:
-    """Direction implied by the verb; None if no verb; "conflict" if both kinds."""
+def _is_debt_category(
+    category: PrefilterCategory,
+    by_id: dict[object, PrefilterCategory],
+) -> bool:
+    """The debt category itself (Qarz/Долг and variants) or any of its subcategories."""
+    current: PrefilterCategory | None = category
+    for _ in range(8):
+        if current is None:
+            return False
+        if _has_debt_context(current.name):
+            return True
+        current = by_id.get(current.parent_id) if current.parent_id is not None else None
+    return False
+
+
+def _verb_type(
+    text: str, *, include_generic: bool = True
+) -> Literal["expense", "income", "conflict"] | None:
+    """Direction implied by the verb; None if no verb; "conflict" if both kinds.
+
+    include_generic=False ignores oldim/keldi/взял...: only explicit direction verbs.
+    """
     normalized = text.translate(_APOSTROPHES)
     has_expense = any(_find_term_spans(normalized, v) for v in _EXPENSE_VERBS)
     has_income = any(_find_term_spans(normalized, v) for v in _INCOME_VERBS)
-    if not has_income and _has_debt_context(normalized):
+    if include_generic and not has_income and _has_debt_context(normalized):
         has_income = any(_find_term_spans(normalized, v) for v in _DEBT_INCOME_VERBS)
     if has_expense and has_income:
         return "conflict"
@@ -372,7 +396,20 @@ def try_prefilter(
     if len(wallet_hits) > 1:
         return PrefilterResult(operation=None, reason="wallet_ambiguous")
 
-    if verb_type is not None and verb_type != match.op_type:
+    generic_only = verb_type is not None and _verb_type(text, include_generic=False) != verb_type
+    all_categories = {c.id: c for c in (*expense_categories, *income_categories)}
+    if (
+        verb_type is not None
+        and verb_type != match.op_type
+        and generic_only
+        and not _is_debt_category(match.category, all_categories)
+    ):
+        # Credit purchase ("qarzga taksi oldim"): the generic verb does not override
+        # an ordinary category, same as without the debt word.
+        op_type = match.op_type
+        category_name = match.category.name
+        comment = _build_comment(text, amount.span, [match.span])
+    elif verb_type is not None and verb_type != match.op_type:
         # Verb contradicts the category's type: the verb wins, category dropped
         # (it stays in the comment text).
         op_type: Literal["expense", "income"] = verb_type

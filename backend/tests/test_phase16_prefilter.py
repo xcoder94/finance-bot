@@ -415,3 +415,74 @@ class TestPlainVerbsAreNotDirection:
     def test_debt_oldim_still_income(self) -> None:
         op = self._run("qarz oldim 250000").operation
         assert op is not None and op.type == "income" and op.category is None
+
+
+class TestDebtContextRound2:
+    """QA round 2: purchase on credit stays an expense; debt word only at word start."""
+
+    def _run(self, text: str, extra_expense=(), extra_income=()):  # type: ignore[no-untyped-def]
+        return try_prefilter(
+            text,
+            wallet_names=[],
+            expense_categories=[
+                _expense("Такси"),
+                _expense("Taksi"),
+                _expense("Telefon"),
+                *extra_expense,
+            ],
+            income_categories=[_income("Зарплата"), *extra_income],
+        )
+
+    @pytest.mark.parametrize(
+        ("text", "category"),
+        [
+            ("qarzga telefon oldim 3000000", "Telefon"),
+            ("telefon qarzga oldim 3000000", "Telefon"),
+            ("qarzga taksi oldim 20000", "Taksi"),
+            ("в долг такси взял 20000", "Такси"),
+        ],
+    )
+    def test_credit_purchase_with_ordinary_category_is_expense(
+        self, text: str, category: str
+    ) -> None:
+        op = self._run(text).operation
+        assert op is not None
+        assert (op.type, op.category) == ("expense", category)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "взял такси надолго 200000",
+            "задолго такси взял 200000",
+            "долговечный такси взял 200000",
+        ],
+    )
+    def test_debt_word_inside_word_is_not_debt_context(self, text: str) -> None:
+        op = self._run(text).operation
+        assert op is not None
+        assert (op.type, op.category) == ("expense", "Такси")
+
+    @pytest.mark.parametrize("text", ["взял надолго 200000", "oldim nodolg 5000"])
+    def test_inside_word_no_category_not_resolved_as_debt(self, text: str) -> None:
+        assert self._run(text).operation is None
+
+    def test_debt_category_still_follows_verb(self) -> None:
+        op = self._run(
+            "qarz oldim 250000", extra_expense=[_expense("Qarz")]
+        ).operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", None)
+
+    def test_debt_subcategory_follows_verb(self) -> None:
+        parent = _expense("Qarz")
+        sub = _expense("Rassrochka", parent_id=parent.id)
+        op = self._run("qarzga rassrochka oldim 100000", extra_expense=[parent, sub]).operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", None)
+
+    def test_debt_variant_name_follows_verb(self) -> None:
+        op = self._run(
+            "взял долги 100000", extra_expense=[_expense("Долги")]
+        ).operation
+        assert op is not None
+        assert (op.type, op.category) == ("income", None)
