@@ -9,7 +9,7 @@ import {
 } from '../../store/analyticsShellStore'
 import type { HistoryCategoryFilter } from '../../utils/analyticsDrill'
 import {
-  switchAnalyticsTab,
+  historyFilterAfterTabSwitch,
   type AnalyticsShellState,
   type AnalyticsTab,
   type DrillParent,
@@ -82,14 +82,10 @@ export function AnalyticsLayout() {
     setPersistedShell(buildShellState())
   }, [buildShellState, setPersistedShell])
 
-  const setActiveTab = useCallback(
-    (tab: AnalyticsTab) => {
-      const next = switchAnalyticsTab(buildShellState(), tab)
-      setActiveTabState(next.activeTab)
-      setHistoryCategoryFilter(next.historyCategoryFilter)
-    },
-    [buildShellState],
-  )
+  const setActiveTab = useCallback((tab: AnalyticsTab) => {
+    setActiveTabState(tab)
+    setHistoryCategoryFilter((current) => historyFilterAfterTabSwitch(current, tab))
+  }, [])
 
   const { range, rangeOrderInvalid } = useResolvedRange(
     periodTab,

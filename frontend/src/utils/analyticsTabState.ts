@@ -68,3 +68,14 @@ export function applyClearHistoryFilter(
 
   return next
 }
+
+/**
+ * Next history filter after a tab switch. Takes the CURRENT filter (use in a functional
+ * state updater) so a filter set in the same tick as the switch is not overwritten.
+ */
+export function historyFilterAfterTabSwitch(
+  current: HistoryCategoryFilter | null,
+  tab: AnalyticsTab,
+): HistoryCategoryFilter | null {
+  return tab === 'charts' ? null : current
+}
