@@ -147,43 +147,6 @@ export function AnalyticsLayout() {
   return (
     <AnalyticsProvider value={contextValue}>
       <div className="page-content home-page analytics-page">
-        <div className="home-header">
-          <div className="home-header__info">
-            <h1 className="home-header__title">{t('analytics.title')}</h1>
-          </div>
-        </div>
-
-        <div className="analytics-toolbar">
-          <div className="analytics-tabs" role="tablist" aria-label={t('analytics.title')}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'charts'}
-              className={
-                activeTab === 'charts'
-                  ? 'analytics-tabs__btn analytics-tabs__btn--active'
-                  : 'analytics-tabs__btn'
-              }
-              onClick={() => setActiveTab('charts')}
-            >
-              {t('analytics.tabCharts')}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'history'}
-              className={
-                activeTab === 'history'
-                  ? 'analytics-tabs__btn analytics-tabs__btn--active'
-                  : 'analytics-tabs__btn'
-              }
-              onClick={() => setActiveTab('history')}
-            >
-              {t('analytics.tabHistory')}
-            </button>
-          </div>
-        </div>
-
         <div className="analytics-page__period">
           <PeriodFilterControls
             periodTab={periodTab}
@@ -196,6 +159,36 @@ export function AnalyticsLayout() {
             onRangeToChange={setRangeTo}
             rangeOrderInvalid={rangeOrderInvalid}
             periodHint={t('analytics.sharedPeriodHint')}
+            leading={
+              <div className="analytics-tabs" role="tablist" aria-label={t('analytics.title')}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'charts'}
+                  className={
+                    activeTab === 'charts'
+                      ? 'analytics-tabs__btn analytics-tabs__btn--active'
+                      : 'analytics-tabs__btn'
+                  }
+                  onClick={() => setActiveTab('charts')}
+                >
+                  {t('analytics.tabCharts')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'history'}
+                  className={
+                    activeTab === 'history'
+                      ? 'analytics-tabs__btn analytics-tabs__btn--active'
+                      : 'analytics-tabs__btn'
+                  }
+                  onClick={() => setActiveTab('history')}
+                >
+                  {t('analytics.tabHistory')}
+                </button>
+              </div>
+            }
           />
         </div>
 

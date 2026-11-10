@@ -18,6 +18,8 @@ export type DonutSlice = {
   name: string
   value: number
   color: string
+  /** Same slice in the previous period (undefined = no comparison, e.g. «Другое»). */
+  prev?: number
 }
 
 export type ParentCategoryCard = {
@@ -31,6 +33,7 @@ export type SubcategoryDisplayEntry = {
   subcategory_id: string
   subcategory_name: string
   amount: number
+  prev_amount?: number
   parent_id?: string
   parent_name?: string
   display_name: string
@@ -132,6 +135,7 @@ export function prepareSubcategoryDonutSlices(
         name: entry.display_name,
         value: entry.amount,
         color: getCategoryColor(entry.subcategory_id, colorMap),
+        prev: entry.prev_amount ?? 0,
       })
       continue
     }
@@ -174,6 +178,7 @@ export function buildSubcategoryDisplayEntries(
         subcategory_id: item.subcategory_id,
         subcategory_name: item.subcategory_name,
         amount: item.amount,
+        prev_amount: item.prev_amount ?? 0,
         parent_id: parentId,
         parent_name: resolvedParentName,
         display_name:
@@ -233,6 +238,7 @@ export function prepareDonutSlices(
         name: resolveCategoryAmountDisplayName(entry, displayNameById, t),
         value: entry.amount,
         color: getCategoryColor(categoryId, colorMap),
+        prev: entry.prev_amount ?? 0,
       })
       continue
     }
@@ -247,6 +253,9 @@ export function prepareDonutSlices(
       name: t('analytics.uncategorized'),
       value: uncategorizedAmount,
       color: UNCATEGORIZED_COLOR,
+      prev: positive
+        .filter((entry) => entry.uncategorized || entry.category_id === null)
+        .reduce((sum, entry) => sum + (entry.prev_amount ?? 0), 0),
     })
   }
   if (otherAmount > 0) {

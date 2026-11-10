@@ -81,3 +81,38 @@ describe('prepareDonutSlices uncategorized', () => {
     expect(slices.map((x) => x.key)).toEqual([catId])
   })
 })
+
+describe('prepareDonutSlices previous-period amounts', () => {
+  const t = ((key: string) => key) as TFunction
+  const a = '6ba7b812-9dad-11d1-80b4-00c04fd430c8'
+  const b = '6ba7b813-9dad-11d1-80b4-00c04fd430c8'
+
+  it('carries prev_amount per slice; 0 stays 0 (new)', () => {
+    const slices = prepareDonutSlices(
+      [
+        { category_id: a, category_name: 'Food', category_translation_key: null, amount: 700, prev_amount: 500 },
+        { category_id: b, category_name: 'Fun', category_translation_key: null, amount: 300, prev_amount: 0 },
+        { category_id: null, category_name: '', category_translation_key: null, amount: 100, prev_amount: 50, uncategorized: true },
+      ],
+      [a, b],
+      extendCategoryColorMap([a, b], []),
+      'Другое',
+      t,
+    )
+    expect(slices.find((x) => x.key === a)?.prev).toBe(500)
+    expect(slices.find((x) => x.key === b)?.prev).toBe(0)
+    expect(slices.find((x) => x.key === UNCATEGORIZED_KEY)?.prev).toBe(50)
+  })
+
+  it('the aggregated «Другое» slice has no comparison', () => {
+    const ids = Array.from({ length: 9 }, (_, i) => `id-${i}`)
+    const slices = prepareDonutSlices(
+      ids.map((id) => ({ category_id: id, category_name: id, category_translation_key: null, amount: 100, prev_amount: 10 })),
+      ids,
+      extendCategoryColorMap(ids, []),
+      'Другое',
+      t,
+    )
+    expect(slices.find((x) => x.key === 'other')?.prev).toBeUndefined()
+  })
+})

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { SegmentedControl, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
@@ -23,6 +23,8 @@ type PeriodFilterControlsProps = {
   onRangeToChange: (value: string) => void
   rangeOrderInvalid: boolean
   periodHint?: string
+  /** Rendered in the same row as the month switch (compact header). */
+  leading?: ReactNode
 }
 
 export function PeriodFilterControls({
@@ -36,6 +38,7 @@ export function PeriodFilterControls({
   onRangeToChange,
   rangeOrderInvalid,
   periodHint,
+  leading,
 }: PeriodFilterControlsProps) {
   const { t } = useTranslation()
   const [rangeInitialized, setRangeInitialized] = useState(false)
@@ -50,45 +53,65 @@ export function PeriodFilterControls({
     onPeriodTabChange(tab)
   }
 
+  const modeSwitch = (
+    <div className="segmented-control-wrap analytics-page__period-tabs">
+      <SegmentedControl>
+        <SegmentedControl.Item
+          selected={periodTab === 'month'}
+          onClick={() => handlePeriodTabChange('month')}
+        >
+          {t('history.tabMonth')}
+        </SegmentedControl.Item>
+        <SegmentedControl.Item
+          selected={periodTab === 'range'}
+          onClick={() => handlePeriodTabChange('range')}
+        >
+          {t('history.tabRange')}
+        </SegmentedControl.Item>
+      </SegmentedControl>
+    </div>
+  )
+
+  const monthBar = (
+    <div className="home-month-bar analytics-page__month-bar">
+      <MonthArrow direction="prev" label={t('home.previousMonth')} onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, -1))} />
+      <div className="analytics-page__month-label-wrap">
+        <div className="home-month-bar__label">{formatMonthLabel(selectedMonth)}</div>
+        {periodHint && !leading ? (
+          <Text className="analytics-page__period-hint">{periodHint}</Text>
+        ) : null}
+      </div>
+      <MonthArrow direction="next" label={t('home.nextMonth')} onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, 1))} />
+    </div>
+  )
+
+  const rangeFields = (
+    <DateRangeFields
+      rangeFrom={rangeFrom}
+      rangeTo={rangeTo}
+      onRangeFromChange={onRangeFromChange}
+      onRangeToChange={onRangeToChange}
+      rangeOrderInvalid={rangeOrderInvalid}
+    />
+  )
+
+  if (leading) {
+    return (
+      <>
+        <div className="analytics-page__head-row">
+          <div className="analytics-page__head-lead">{leading}</div>
+          {periodTab === 'month' ? monthBar : null}
+        </div>
+        {modeSwitch}
+        {periodTab === 'range' ? rangeFields : null}
+      </>
+    )
+  }
+
   return (
     <>
-      <div className="segmented-control-wrap analytics-page__period-tabs">
-        <SegmentedControl>
-          <SegmentedControl.Item
-            selected={periodTab === 'month'}
-            onClick={() => handlePeriodTabChange('month')}
-          >
-            {t('history.tabMonth')}
-          </SegmentedControl.Item>
-          <SegmentedControl.Item
-            selected={periodTab === 'range'}
-            onClick={() => handlePeriodTabChange('range')}
-          >
-            {t('history.tabRange')}
-          </SegmentedControl.Item>
-        </SegmentedControl>
-      </div>
-
-      {periodTab === 'month' ? (
-        <div className="home-month-bar analytics-page__month-bar">
-          <MonthArrow direction="prev" label={t('home.previousMonth')} onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, -1))} />
-          <div className="analytics-page__month-label-wrap">
-            <div className="home-month-bar__label">{formatMonthLabel(selectedMonth)}</div>
-            {periodHint ? (
-              <Text className="analytics-page__period-hint">{periodHint}</Text>
-            ) : null}
-          </div>
-          <MonthArrow direction="next" label={t('home.nextMonth')} onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, 1))} />
-        </div>
-      ) : (
-        <DateRangeFields
-          rangeFrom={rangeFrom}
-          rangeTo={rangeTo}
-          onRangeFromChange={onRangeFromChange}
-          onRangeToChange={onRangeToChange}
-          rangeOrderInvalid={rangeOrderInvalid}
-        />
-      )}
+      {modeSwitch}
+      {periodTab === 'month' ? monthBar : rangeFields}
     </>
   )
 }

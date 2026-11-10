@@ -12,6 +12,18 @@ export type CategoryAmount = {
   category_translation_key: string | null
   color_index?: number
   amount: number
+  /** Same category in the previous period; 0 = new. */
+  prev_amount?: number
+  /** Income only: share of the period income, 0..100, one decimal. */
+  share_percent?: number
+}
+
+export type ExpenseComparison = {
+  currency: string
+  total: number
+  prev_total: number
+  prev_date_from: string
+  prev_date_to: string
 }
 
 export type TrendEntry = {
@@ -27,6 +39,7 @@ export type SubcategoryAmount = {
   subcategory_translation_key: string | null
   color_index?: number
   amount: number
+  prev_amount?: number
 }
 
 async function apiGet<T>(url: string): Promise<T> {
@@ -93,4 +106,17 @@ export async function fetchExpensesBySubcategory(
     date_to: dateTo,
   })
   return apiGet<SubcategoryAmount[]>(`/api/v1/analytics/expenses-by-subcategory?${params}`)
+}
+
+export async function fetchExpenseComparison(
+  currency: string,
+  dateFrom: string,
+  dateTo: string,
+): Promise<ExpenseComparison> {
+  const params = new URLSearchParams({
+    currency,
+    date_from: dateFrom,
+    date_to: dateTo,
+  })
+  return apiGet<ExpenseComparison>(`/api/v1/analytics/expense-comparison?${params}`)
 }

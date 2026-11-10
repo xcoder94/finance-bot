@@ -1,15 +1,18 @@
 import { sumUnit } from '../../utils/currencyUnit'
 import { useCallback, useMemo } from 'react'
-import { Spinner, Text } from '@telegram-apps/telegram-ui'
+import { Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
 import {
+  fetchExpenseComparison,
   fetchExpensesByCategory,
+  fetchIncomeByCategory,
   fetchExpensesBySubcategory,
   fetchSummaryForRange,
   fetchTrend,
   type SummaryResponse,
 } from '../../api/analytics'
+import { fetchPersonalSummary } from '../../api/home'
 import { fetchExpenseCategories } from '../../api/transactions'
 import { BlockError, useFetchBlock } from '../../components/analytics/analyticsShared'
 import { CategoryDonutChart } from '../../components/analytics/CategoryDonutChart'
@@ -17,7 +20,7 @@ import { TrendChart } from '../../components/analytics/TrendChart'
 import { WeekdayBarChart } from '../../components/analytics/WeekdayBarChart'
 import { useAnalyticsContext } from '../../contexts/AnalyticsContext'
 import { useAuthStore } from '../../store/authStore'
-import { getCachedExpenseCategories } from '../../store/dataCacheStore'
+import { getCachedExpenseCategories, getCachedPersonalSummary } from '../../store/dataCacheStore'
 import type { PerCurrencySummary } from '../../api/home'
 import {
   buildSubcategoryDisplayEntries,
@@ -41,9 +44,19 @@ import {
   isChartsTabEmpty,
   mergeCategoryIds,
 } from '../../utils/analyticsChartsTab'
-import { OTHER_CATEGORY_COLOR_INDEX, resolveEffectiveColorIndices } from '../../utils/chartColors'
+import {
+  getColorByIndex,
+  OTHER_CATEGORY_COLOR_INDEX,
+  resolveEffectiveColorIndices,
+} from '../../utils/chartColors'
+import {
+  buildComparisonLine,
+  buildHeadline,
+  formatSharePercent,
+  rangeLengthDays,
+} from '../../utils/analyticsComparison'
 import { dayWordRu } from '../../utils/dayCountLabel'
-import { buildDisplayNameById } from '../../utils/getDisplayName'
+import { buildDisplayNameById, resolveCategoryAmountDisplayName } from '../../utils/getDisplayName'
 import {
   chooseTrendAxisScale,
   formatTrendAxisTick,
@@ -68,8 +81,19 @@ function getSummaryEntry(
   }
 }
 
-function formatMostExpensiveAmount(amount: number): string {
-  return `${formatAnalyticsAmountDigits(amount)} ${sumUnit()}`
+function BlockSkeleton({ height = 120 }: { height?: number }) {
+  const { t } = useTranslation()
+
+  return (
+    <div
+      className="analytics-charts-skeleton__block"
+      style={{ height }}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="visually-hidden">{t('home.loading')}</span>
+    </div>
+  )
 }
 
 function ChartsSkeleton() {
@@ -91,8 +115,25 @@ function ChartsSkeleton() {
   )
 }
 
-function ChartsEmptyCard({ monthLabel }: { monthLabel: string }) {
+function ChartsEmptyCard({
+  monthLabel,
+  personalOnly,
+}: {
+  monthLabel: string
+  personalOnly: boolean
+}) {
   const { t } = useTranslation()
+
+  if (personalOnly) {
+    return (
+      <div className="analytics-charts-tab">
+        <div className="analytics-charts-empty">
+          <div className="analytics-charts-empty__icon" aria-hidden="true" />
+          <Text className="analytics-charts-empty__hint">{t('analytics.personalOnly')}</Text>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="analytics-charts-tab">
@@ -117,6 +158,7 @@ export function AnalyticsChartsTab() {
     rangeFetchEnabled,
     fetchKey,
     rangeKey,
+    periodTab,
     drillParent,
     setDrillParent,
     setHistoryCategoryFilter,
@@ -146,6 +188,30 @@ export function AnalyticsChartsTab() {
         return Promise.reject(new Error('invalid range'))
       }
       return fetchExpensesByCategory(currency, range.dateFrom, range.dateTo)
+    }, [range, currency]),
+    fetchKey,
+    rangeFetchEnabled,
+    false,
+  )
+
+  const comparisonFetch = useFetchBlock(
+    useCallback(() => {
+      if (!range) {
+        return Promise.reject(new Error('invalid range'))
+      }
+      return fetchExpenseComparison(currency, range.dateFrom, range.dateTo)
+    }, [range, currency]),
+    fetchKey,
+    rangeFetchEnabled,
+    false,
+  )
+
+  const incomeFetch = useFetchBlock(
+    useCallback(() => {
+      if (!range) {
+        return Promise.reject(new Error('invalid range'))
+      }
+      return fetchIncomeByCategory(currency, range.dateFrom, range.dateTo)
     }, [range, currency]),
     fetchKey,
     rangeFetchEnabled,
@@ -380,6 +446,24 @@ export function AnalyticsChartsTab() {
   const sharesMonthLabel = formatMonthLabel(selectedMonth)
   const chartsEmpty = isChartsTabEmpty(expenseTotal, parentSlices.length)
 
+  const personalCheckEnabled =
+    !coreLoading && !coreError && chartsEmpty && periodTab === 'month'
+  const personalFetch = useFetchBlock(
+    useCallback(
+      () =>
+        getCachedPersonalSummary(familyId, selectedMonth.year, selectedMonth.month, () =>
+          fetchPersonalSummary(selectedMonth.year, selectedMonth.month),
+        ),
+      [familyId, selectedMonth],
+    ),
+    `${selectedMonth.year}-${selectedMonth.month}`,
+    personalCheckEnabled,
+    false,
+  )
+  const personalOnly =
+    personalFetch.state.status === 'success' &&
+    personalFetch.state.data.by_currency.some((row) => row.expense > 0 || row.income > 0)
+
   if (coreLoading) {
     return <ChartsSkeleton />
   }
@@ -402,44 +486,91 @@ export function AnalyticsChartsTab() {
   }
 
   if (chartsEmpty) {
-    return <ChartsEmptyCard monthLabel={emptyMonthLabel} />
+    return <ChartsEmptyCard monthLabel={emptyMonthLabel} personalOnly={personalOnly} />
   }
 
-  const mostExpensiveWeekdayLabel =
-    summaryEntry.most_expensive_weekday === null
-      ? '—'
-      : weekdayLabels[summaryEntry.most_expensive_weekday] ?? '—'
-
-  const avgDailyCaptionKey = 'analytics.avgDailyCaption'
-
-  const drillHint = drillParent ? t('analytics.drillHintSubcategory') : t('analytics.drillHintRoot')
+  const hasOtherSlice = donutSlices.some((slice) => slice.key === 'other')
+  const rootHint = drillParent ? null : t('analytics.hintRoot')
 
   const donutLoading = drillParent !== null && subcategoriesFetch.state.status === 'loading'
   const donutError = drillParent !== null && subcategoriesFetch.state.status === 'error'
 
+  const headline = buildHeadline({
+    periodTab,
+    selectedMonth,
+    amount: `${formatAnalyticsAmountDigits(expenseTotal)} ${sumUnit()}`,
+  })
+  const comparisonLine =
+    comparisonFetch.state.status === 'success' && range
+      ? buildComparisonLine({
+          total: comparisonFetch.state.data.total,
+          prevTotal: comparisonFetch.state.data.prev_total,
+          periodTab,
+          selectedMonth,
+          rangeDays: rangeLengthDays(range.dateFrom, range.dateTo),
+        })
+      : null
+
+  const incomeRows =
+    incomeFetch.state.status === 'success'
+      ? incomeFetch.state.data.filter((entry) => entry.amount > 0)
+      : []
+
+  const openParentHistory = () => {
+    if (!drillParent) {
+      return
+    }
+    const slice = parentSlices.find((item) => item.key === drillParent.id)
+    setHistoryCategoryFilter({
+      id: drillParent.id,
+      name: drillParent.name,
+      color: slice?.color ?? getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+    })
+    setActiveTab('history')
+  }
+
   return (
     <div className="analytics-charts-tab">
+      <header className="analytics-charts-headline">
+        <Text weight="2" className="analytics-charts-headline__title">
+          {headline}
+        </Text>
+        {comparisonLine ? (
+          <Text className="analytics-charts-headline__compare">{comparisonLine}</Text>
+        ) : null}
+      </header>
+
       <section className="analytics-charts-donut-card">
         {drillParent ? (
           <div className="analytics-charts-donut-card__drill">
-            <div className="analytics-charts-donut-card__drill-head">
+            <nav className="analytics-charts-donut-card__drill-head" aria-label="breadcrumb">
               <button
                 type="button"
-                className="analytics-charts-donut-card__back"
+                className="analytics-charts-donut-card__crumb"
                 onClick={() => setDrillParent(null)}
               >
-                ‹
+                {t('analytics.allExpenses')}
               </button>
+              <span className="analytics-charts-donut-card__crumb-sep" aria-hidden="true">
+                /
+              </span>
               <Text weight="2" className="analytics-charts-donut-card__drill-name">
                 {drillParent.name}
               </Text>
-            </div>
+            </nav>
             <Text weight="2" className="analytics-charts-donut-card__drill-sum">
               {formatAnalyticsAmountDigits(drillTotal)}
             </Text>
             <Text className="analytics-charts-donut-card__shares">
               {t('analytics.sharesInside', { month: sharesMonthLabel })}
             </Text>
+            <button
+              type="button"
+              className="analytics-charts-donut-card__all-ops"
+              onClick={openParentHistory}
+            >
+              {t('analytics.allOpsOf', { name: drillParent.name })}
+            </button>
           </div>
         ) : (
           <Text weight="2" className="analytics-charts-donut-card__title">
@@ -450,30 +581,64 @@ export function AnalyticsChartsTab() {
         {donutError ? (
           <BlockError onRetry={subcategoriesFetch.retry} />
         ) : donutLoading ? (
-          <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
-            <span className="visually-hidden">{t('home.loading')}</span>
-          </div>
+          <BlockSkeleton height={240} />
         ) : (
           <CategoryDonutChart
             slices={donutSlices}
-            compact
-            layout="horizontal"
             onSliceActivate={handleSliceActivate}
             centerLabel={t('home.expense')}
           />
         )}
 
-        <Text className="analytics-charts-donut-card__hint">{drillHint}</Text>
+        {rootHint ? (
+          <Text className="analytics-charts-donut-card__hint">{rootHint}</Text>
+        ) : null}
+        {hasOtherSlice ? (
+          <Text className="analytics-charts-donut-card__hint">{t('analytics.hintOther')}</Text>
+        ) : null}
       </section>
+
+      {incomeRows.length > 0 ? (
+        <section className="analytics-charts-block analytics-income-block">
+          <Text weight="2" className="analytics-charts-block__title">
+            {t('analytics.incomeByCategory')}
+          </Text>
+          <div className="analytics-income-list">
+            {incomeRows.map((entry) => (
+              <div
+                key={entry.category_id ?? entry.category_name}
+                className="analytics-donut__legend-item analytics-income-row"
+              >
+                <span
+                  className="analytics-donut__legend-dot"
+                  style={{ backgroundColor: getColorByIndex(entry.color_index ?? 1) }}
+                />
+                <span className="analytics-donut__legend-name" title={entry.category_name}>
+                  {entry.category_id
+                    ? resolveCategoryAmountDisplayName(
+                        { ...entry, category_id: entry.category_id },
+                        undefined,
+                        t,
+                      )
+                    : entry.category_name}
+                </span>
+                <span className="analytics-donut__legend-amount">
+                  {formatAnalyticsAmountDigits(entry.amount)}
+                </span>
+                <span className="analytics-donut__legend-percent">
+                  {formatSharePercent(entry.share_percent ?? 0)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="analytics-charts-block">
         {trendFetch.state.status === 'error' ? (
           <BlockError onRetry={trendFetch.retry} />
         ) : trendFetch.state.status === 'loading' ? (
-          <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
-          </div>
+          <BlockSkeleton height={150} />
         ) : (
           <TrendChart
             rows={trendRows}
@@ -490,34 +655,16 @@ export function AnalyticsChartsTab() {
         <div className="analytics-charts-tile">
           <Text className="analytics-charts-tile__label">{t('analytics.avgDaily')}</Text>
           {summaryFetch.state.status === 'loading' ? (
-            <Spinner size="s" />
+            <BlockSkeleton height={36} />
           ) : (
             <>
               <Text weight="2" className="analytics-charts-tile__value">
                 {formatAnalyticsAmountDigits(summaryEntry.average_daily_expense)}
               </Text>
               <Text className="analytics-charts-tile__caption">
-                {t(avgDailyCaptionKey, {
+                {t('analytics.avgDailyCaption', {
                   count: elapsedDays,
                   dayWord: dayWordRu(elapsedDays),
-                })}
-              </Text>
-            </>
-          )}
-        </div>
-
-        <div className="analytics-charts-tile">
-          <Text className="analytics-charts-tile__label">{t('analytics.mostExpensiveDay')}</Text>
-          {summaryFetch.state.status === 'loading' ? (
-            <Spinner size="s" />
-          ) : (
-            <>
-              <Text weight="2" className="analytics-charts-tile__value">
-                {mostExpensiveWeekdayLabel}
-              </Text>
-              <Text className="analytics-charts-tile__caption">
-                {t('analytics.mostExpensiveCaption', {
-                  amount: formatMostExpensiveAmount(summaryEntry.most_expensive_weekday_average),
                 })}
               </Text>
             </>
@@ -532,9 +679,7 @@ export function AnalyticsChartsTab() {
         {summaryFetch.state.status === 'error' ? (
           <BlockError onRetry={summaryFetch.retry} />
         ) : summaryFetch.state.status === 'loading' ? (
-          <div className="home-block-loading" role="status" aria-live="polite">
-            <Spinner size="m" aria-hidden="true" />
-          </div>
+          <BlockSkeleton height={120} />
         ) : (
           <WeekdayBarChart rows={weekdayRows} barColor="var(--acc)" />
         )}
