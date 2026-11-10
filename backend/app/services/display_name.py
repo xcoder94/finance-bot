@@ -9,6 +9,8 @@ and seed-only extras (cascade keywords) no longer apply.
 from __future__ import annotations
 
 from app.services.budget_seed import (
+    LEGACY_SEED_EXPENSE_CATEGORIES,
+    LEGACY_SEED_INCOME_CATEGORIES,
     SEED_EXPENSE_CATEGORIES,
     SEED_INCOME_CATEGORIES,
     SEED_WALLETS,
@@ -16,13 +18,20 @@ from app.services.budget_seed import (
 
 
 def build_seed_name_by_key() -> dict[str, str]:
+    """translation_key -> seeded RU name, for the current set AND the pre-U7 set (old budgets).
+
+    A key that exists in both sets has the same name in both (guarded by a test)."""
     seed: dict[str, str] = {}
-    for name, key in SEED_INCOME_CATEGORIES:
-        seed[key] = name
-    for parent_name, (parent_key, sub_entries) in SEED_EXPENSE_CATEGORIES.items():
-        seed[parent_key] = parent_name
-        for sub_name, sub_key in sub_entries:
-            seed[sub_key] = sub_name
+    for income, expense in (
+        (LEGACY_SEED_INCOME_CATEGORIES, LEGACY_SEED_EXPENSE_CATEGORIES),
+        (SEED_INCOME_CATEGORIES, SEED_EXPENSE_CATEGORIES),
+    ):
+        for name, key in income:
+            seed[key] = name
+        for parent_name, (parent_key, sub_entries) in expense.items():
+            seed[parent_key] = parent_name
+            for sub_name, sub_key in sub_entries:
+                seed[sub_key] = sub_name
     for name, _currency, key in SEED_WALLETS:
         seed[key] = name
     return seed
@@ -72,6 +81,21 @@ SEED_NAMES_UZ: dict[str, str] = {
     "entertainment": "Ko'ngilochar",
     "subscriptions": "Obunalar",
     "beauty_care": "Go'zallik va parvarish",
+    # keys of the set seeded into new budgets (PRD-ux U7; not yet in the app's uz.json)
+    "cafes_delivery": "Kafe va yetkazib berish",
+    "taxi_transit": "Taksi va yo'l haqi",
+    "car": "Avtomobil",
+    "utilities_telecom": "Kommunal va aloqa",
+    "home_repairs": "Ta'mir va uy jihozlari",
+    "kids_learning": "O'qish va to'garaklar",
+    "drugstore": "Dorixona",
+    "doctors": "Shifokorlar",
+    "toi_gifts": "To'ylar va sovg'alar",
+    "family_help": "Yaqinlarga yordam",
+    "personal_leisure": "Shaxsiy va dam olish",
+    "fun_subscriptions": "Ko'ngilochar va obunalar",
+    "business_side_job": "Biznes va qo'shimcha ish",
+    "transfers_gifts": "O'tkazmalar va sovg'alar",
 }
 
 

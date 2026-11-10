@@ -266,9 +266,9 @@ class TestSeedDataCopy:
 
                 counts = await count_seed_rows(session, budget_id)
                 assert counts["wallets"] == 2
-                assert counts["income_categories"] == 5
+                assert counts["income_categories"] == 4
                 assert counts["expense_top_level"] == 7
-                assert counts["expense_subcategories"] == 23
+                assert counts["expense_subcategories"] == 17
                 assert counts["expense_subcategories"] == EXPECTED_EXPENSE_SUBCATEGORY_COUNT
 
                 wallet_stmt = select(Wallet).where(
@@ -288,7 +288,7 @@ class TestSeedDataCopy:
                 events_parent = await session.scalar(
                     select(ExpenseCategory).where(
                         ExpenseCategory.family_budget_id == budget_id,
-                        ExpenseCategory.name == "События и тои",
+                        ExpenseCategory.name == "Тои и подарки",
                         ExpenseCategory.parent_id.is_(None),
                     )
                 )

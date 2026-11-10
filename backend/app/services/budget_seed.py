@@ -10,7 +10,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.category_colors import assign_category_color
 
-SEED_INCOME_CATEGORIES: list[tuple[str, str]] = [
+LEGACY_SEED_INCOME_CATEGORIES: list[tuple[str, str]] = [
     ("Зарплата", "salary"),
     ("Подработка", "side_job"),
     ("Подарки", "gifts"),
@@ -18,7 +18,7 @@ SEED_INCOME_CATEGORIES: list[tuple[str, str]] = [
     ("Прочее", "income_other"),
 ]
 
-SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
+LEGACY_SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
     "Еда": (
         "food",
         [
@@ -79,6 +79,71 @@ SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
     ),
 }
 
+# Set seeded into NEW budgets (PRD-ux U7): 7 parents / 17 subcategories / 4 income.
+# Budgets created earlier keep the LEGACY_* set (PRD §15.5, no migration); their translation
+# keys stay known to display_name and the cascade keywords.
+SEED_INCOME_CATEGORIES: list[tuple[str, str]] = [
+    ("Зарплата", "salary"),
+    ("Бизнес и подработка", "business_side_job"),
+    ("Переводы и подарки", "transfers_gifts"),
+    ("Прочее", "income_other"),
+]
+
+SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
+    "Еда": (
+        "food",
+        [
+            ("Продукты", "groceries"),
+            ("Кафе и доставка", "cafes_delivery"),
+        ],
+    ),
+    "Транспорт": (
+        "transport",
+        [
+            ("Такси и проезд", "taxi_transit"),
+            ("Автомобиль", "car"),
+        ],
+    ),
+    "Дом": (
+        "home",
+        [
+            ("Аренда", "rent"),
+            ("Коммуналка и связь", "utilities_telecom"),
+            ("Ремонт и вещи для дома", "home_repairs"),
+        ],
+    ),
+    "Дети": (
+        "children",
+        [
+            ("Учёба и кружки", "kids_learning"),
+            ("Детские товары", "kids_goods"),
+        ],
+    ),
+    "Здоровье": (
+        "health",
+        [
+            ("Аптека", "drugstore"),
+            ("Врачи", "doctors"),
+        ],
+    ),
+    "Тои и подарки": (
+        "toi_gifts",
+        [
+            ("Тои и маърака", "toi_celebrations"),
+            ("Подарки", "event_gifts"),
+            ("Помощь родным", "family_help"),
+        ],
+    ),
+    "Личное и досуг": (
+        "personal_leisure",
+        [
+            ("Одежда", "clothing"),
+            ("Красота и уход", "beauty_care"),
+            ("Развлечения и подписки", "fun_subscriptions"),
+        ],
+    ),
+}
+
 PROTECTED_EXPENSE_PARENT_KEYS = frozenset({"food", "home", "health"})
 
 SEED_WALLETS: list[tuple[str, str, str]] = [
@@ -100,9 +165,13 @@ async def assign_default_card_uzs(session: AsyncSession, user: User) -> None:
 
 
 async def copy_seed_categories_only(
-    session: AsyncSession, family_budget_id: uuid.UUID
+    session: AsyncSession, family_budget_id: uuid.UUID, *, legacy: bool = False
 ) -> None:
-    for name, translation_key in SEED_INCOME_CATEGORIES:
+    """Seed the categories of a new budget. `legacy=True` seeds the pre-U7 set (tests of
+    old budgets only; production code always seeds the current set)."""
+    income_seed = LEGACY_SEED_INCOME_CATEGORIES if legacy else SEED_INCOME_CATEGORIES
+    expense_seed = LEGACY_SEED_EXPENSE_CATEGORIES if legacy else SEED_EXPENSE_CATEGORIES
+    for name, translation_key in income_seed:
         session.add(
             IncomeCategory(
                 family_budget_id=family_budget_id,
@@ -114,7 +183,7 @@ async def copy_seed_categories_only(
             )
         )
 
-    for parent_name, (parent_key, sub_entries) in SEED_EXPENSE_CATEGORIES.items():
+    for parent_name, (parent_key, sub_entries) in expense_seed.items():
         parent = ExpenseCategory(
             family_budget_id=family_budget_id,
             name=parent_name,

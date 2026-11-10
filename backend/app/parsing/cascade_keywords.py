@@ -210,3 +210,49 @@ CASCADE_KEYWORDS: dict[str, list[str]] = {
         "қариндошдан", "ота-онамдан",
     ],
 }
+
+
+# ---------------------------------------------------------------------------------------
+# Categories of the set seeded into NEW budgets (PRD-ux U7). Merged categories take the terms of
+# everything they absorbed, so «стоматолог» -> Врачи, «доставка» -> Кафе и доставка,
+# «такси/автобус/метро» -> Такси и проезд, «бензин/техосмотр» -> Автомобиль. The legacy keys above
+# stay untouched: budgets created before U7 keep their categories and this mapping.
+# ---------------------------------------------------------------------------------------
+def _merge(*keys: str, extra: list[str] | None = None) -> list[str]:
+    merged: list[str] = []
+    for term in [t for k in keys for t in CASCADE_KEYWORDS[k]] + (extra or []):
+        if term not in merged:
+            merged.append(term)
+    return merged
+
+
+CASCADE_KEYWORDS.update(
+    {
+        "cafes_delivery": _merge("cafes_restaurants", "delivery"),
+        "taxi_transit": _merge("taxi", "public_transport"),
+        "car": _merge(
+            "fuel", "car_maintenance",
+            extra=["техосмотр", "техобслуживание", "texosmotr", "texnik ko'rik", "техосмотрга"],
+        ),
+        "utilities_telecom": _merge("utilities", "telecom_internet"),
+        "home_repairs": _merge("repairs_furnishing"),
+        "kids_learning": _merge("kindergarten_school", "clubs_tutoring"),
+        "drugstore": _merge("pharmacy"),
+        "doctors": _merge("doctors_clinics", "dentistry"),
+        "toi_gifts": _merge("events_celebrations"),
+        "family_help": [
+            "родителям", "маме", "папе", "родным", "помощь родным", "помощь маме", "помощь папе",
+            "помощь родителям", "бабушке", "дедушке", "брату", "сестре", "yaqinlarga yordam",
+            "yaqinlarga", "qarindoshlarga", "ota-onamga", "ota onamga", "onamga", "dadamga",
+            "otamga", "akamga", "opamga", "ukamga", "singlimga", "buvimga", "bobomga",
+            "онамга", "дадамга", "отамга", "ота-онамга", "қариндошларга",
+        ],
+        "personal_leisure": _merge("shopping_leisure"),
+        "fun_subscriptions": _merge("entertainment", "subscriptions"),
+        "business_side_job": _merge(
+            "side_job",
+            extra=["бизнес", "выручка", "прибыль", "biznes", "tushum", "foyda", "бизнес даромад"],
+        ),
+        "transfers_gifts": _merge("gifts", "family_transfers"),
+    }
+)

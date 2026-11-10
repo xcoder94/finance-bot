@@ -144,8 +144,12 @@ def _value_text(field: str, value: Any, lang: str) -> str:
     if field == "date":
         return date.fromisoformat(value).strftime("%d.%m.%Y")
     if field in ENTITY_FIELDS:
-        if lang == "uz" and value.get("tk") in DEFAULT_ENTITY_UZ:
-            return DEFAULT_ENTITY_UZ[value["tk"]]
+        if lang == "uz":
+            from app.services.display_name import SEED_NAMES_UZ
+
+            uz_name = DEFAULT_ENTITY_UZ.get(value.get("tk")) or SEED_NAMES_UZ.get(value.get("tk"))
+            if uz_name:
+                return uz_name
         return value["name"]
     return str(value)
 

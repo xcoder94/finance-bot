@@ -18,6 +18,8 @@ from app.services.transactions import (
 )
 
 EVENTS_PARENT_NAME = "События и тои"
+TOI_GIFTS_PARENT_NAME = "Тои и подарки"  # parent of new budgets (PRD-ux U7)
+INCOME_TRANSFERS_GIFTS_NAME = "Переводы и подарки"
 PODARKI_NAME = "Подарки"
 
 
@@ -177,13 +179,18 @@ async def resolve_category_id(
 
     if name == PODARKI_NAME and button_choice is not None:
         if button_choice == "income":
-            return await _find_income_by_name(session, family_budget_id, PODARKI_NAME)
-        return await _find_expense_sub_under_parent(
-            session,
-            family_budget_id,
-            PODARKI_NAME,
-            EVENTS_PARENT_NAME,
-        )
+            return await _find_income_by_name(
+                session, family_budget_id, PODARKI_NAME
+            ) or await _find_income_by_name(
+                session, family_budget_id, INCOME_TRANSFERS_GIFTS_NAME
+            )
+        for parent_name in (EVENTS_PARENT_NAME, TOI_GIFTS_PARENT_NAME):
+            found = await _find_expense_sub_under_parent(
+                session, family_budget_id, PODARKI_NAME, parent_name
+            )
+            if found is not None:
+                return found
+        return None
 
     # Search only the list of the operation's own type: an id from the other
     # list would fail validation (404) or leak across types.

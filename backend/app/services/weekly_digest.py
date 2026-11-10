@@ -165,7 +165,7 @@ async def _leader_for_currency(
     leader_amount = top.amount
     if (
         top.category_name == SHOPPING_LEISURE_NAME
-        or top.category_translation_key == "shopping_leisure"
+        or top.category_translation_key in ("shopping_leisure", "personal_leisure")
     ):
         subs = await get_expenses_by_subcategory(
             session,

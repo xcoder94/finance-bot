@@ -206,7 +206,7 @@ async def test_delete_subcategory_under_protected_parent_succeeds(
         select(ExpenseCategory).where(
             ExpenseCategory.family_budget_id == budget.id,
             ExpenseCategory.parent_id == food.id,
-            ExpenseCategory.translation_key == "delivery",
+            ExpenseCategory.translation_key == "cafes_delivery",
         )
     )
     assert sub is not None
