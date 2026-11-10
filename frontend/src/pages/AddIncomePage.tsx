@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -14,6 +14,7 @@ import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContex
 import { CategoryPickerSheet } from '../components/forms/CategoryPickerSheet'
 import { FormSheet } from '../components/forms/FormSheet'
 import { FormSheetField } from '../components/forms/FormSheetField'
+import { RecentCategoryChips } from '../components/forms/RecentCategoryChips'
 import {
   FormSheetAmountField,
   FormSheetCommentField,
@@ -30,11 +31,16 @@ import {
   peekIncomeCategories,
   peekWallets,
 } from '../store/dataCacheStore'
+import { evaluateAddSubmit } from '../utils/addFormGate'
 import { getDisplayName } from '../utils/getDisplayName'
+import {
+  readRecentCategories,
+  recordRecentCategory,
+  resolveRecentChips,
+} from '../utils/recentCategories'
 import { parsePositiveInt } from '../utils/transactionForm'
 import { todayTashkent, dateToTransactionIso } from '../utils/dateChips'
 import {
-  filterUncategorizedCategories,
   resolveDefaultWalletId,
   walletCurrencySuffix,
 } from '../utils/transactionFormFields'
@@ -68,6 +74,7 @@ export function AddIncomePage() {
   const [walletId, setWalletId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [categoryLabel, setCategoryLabel] = useState('')
+  const [categoryError, setCategoryError] = useState(false)
   const [comment, setComment] = useState('')
 
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
@@ -110,16 +117,17 @@ export function AddIncomePage() {
     if (!walletId && referenceState.wallets.length > 0) {
       setWalletId(resolveDefaultWalletId(referenceState.wallets, defaultWalletId))
     }
+  }, [referenceState, walletId, defaultWalletId])
 
-    if (!categoryId && referenceState.categories.length > 0) {
-      const visibleCategories = filterUncategorizedCategories(referenceState.categories)
-      if (visibleCategories.length > 0) {
-        const firstCategory = visibleCategories[0]
-        setCategoryId(firstCategory.id)
-        setCategoryLabel(getDisplayName(firstCategory, t))
-      }
-    }
-  }, [referenceState, walletId, categoryId, defaultWalletId, t])
+  const recentChips = useMemo(
+    () =>
+      resolveRecentChips(
+        readRecentCategories(familyId, 'income'),
+        referenceState.status === 'success' ? referenceState.categories : [],
+        (category) => getDisplayName(category, t),
+      ),
+    [familyId, referenceState, t],
+  )
 
   const selectedWallet =
     referenceState.status === 'success'
@@ -138,7 +146,12 @@ export function AddIncomePage() {
     }
 
     const parsedAmount = parsePositiveInt(amount)
-    if (!parsedAmount || !walletId || !categoryId || amountOverLimit) {
+    const verdict = evaluateAddSubmit({ parsedAmount, walletId, categoryId, amountOverLimit })
+    if (verdict === 'category') {
+      setCategoryError(true)
+      return
+    }
+    if (verdict !== 'ok' || !parsedAmount) {
       return
     }
 
@@ -159,6 +172,7 @@ export function AddIncomePage() {
         income_category_id: categoryId,
         comment: comment.trim() || null,
       })
+      recordRecentCategory(familyId, 'income', categoryId)
       invalidateHomeData(familyId)
       celebrateSave()
       closeSheet()
@@ -176,7 +190,6 @@ export function AddIncomePage() {
     referenceState.categories.length > 0 &&
     parsePositiveInt(amount) !== null &&
     Boolean(walletId) &&
-    Boolean(categoryId) &&
     !amountOverLimit &&
     isFormSheetDateValid(transactionDate) &&
     comment.length <= 200
@@ -218,6 +231,7 @@ export function AddIncomePage() {
         primaryLoading={submitting}
       >
         <FormSheetAmountField
+          autoFocus
           value={amount}
           currencySuffix={walletCurrencySuffix(selectedWallet?.currency ?? 'UZS')}
           overLimit={amountOverLimit}
@@ -225,13 +239,25 @@ export function AddIncomePage() {
           onOverLimitChange={setAmountOverLimit}
         />
 
+        <RecentCategoryChips
+          chips={recentChips}
+          selectedId={categoryId}
+          onSelect={(chip) => {
+            setCategoryId(chip.id)
+            setCategoryLabel(chip.label)
+            setCategoryError(false)
+          }}
+        />
+
         <FormSheetField
           label={t('addTransaction.category')}
           right="›"
-          hint={t('formSheet.incomeCategoryHint')}
+          muted={!categoryLabel}
+          hint={categoryError ? t('addTransaction.chooseCategory') : t('formSheet.incomeCategoryHint')}
+          hintError={categoryError}
           onClick={() => setCategoryPickerOpen(true)}
         >
-          <span>{categoryLabel || '—'}</span>
+          <span>{categoryLabel || t('addTransaction.chooseCategory')}</span>
         </FormSheetField>
 
         <FormSheetField
@@ -264,6 +290,7 @@ export function AddIncomePage() {
         onClose={() => setCategoryPickerOpen(false)}
         onSelect={(selection) => {
           setCategoryId(selection.categoryId)
+          setCategoryError(false)
           setCategoryLabel(selection.label)
         }}
       />

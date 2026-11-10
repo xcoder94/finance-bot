@@ -2359,9 +2359,14 @@ button.home-ops-row:focus-visible {
 }
 
 .form-sheet-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   gap: 8px;
-  margin-top: 2px;
+  margin: 2px -16px -24px;
+  padding: 8px 16px 24px;
+  background: var(--bg);
 }
 
 .form-sheet-cancel {
@@ -2378,6 +2383,10 @@ button.home-ops-row:focus-visible {
 }
 
 .form-sheet-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   flex: 1;
   border: none;
   padding: 14px;
@@ -4351,4 +4360,8 @@ a.tabbar-link:active {
   font: inherit;
   font-size: 14px;
   cursor: pointer;
+}
+
+.recent-category-chips {
+  margin-top: -4px;
 }

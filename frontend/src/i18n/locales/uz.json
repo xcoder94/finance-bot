@@ -274,7 +274,8 @@
     "addAnother": "Yana qo'shish",
     "invalidDateTime": "To'g'ri sana va vaqtni kiriting",
     "invalidDate": "To'g'ri sanani kiriting",
-    "amountTooLong": "Summa 10 ta raqamdan oshmasligi kerak"
+    "amountTooLong": "Summa 10 ta raqamdan oshmasligi kerak",
+    "chooseCategory": "Toifani tanlang"
   },
   "history": {
     "title": "Operatsiyalar tarixi",

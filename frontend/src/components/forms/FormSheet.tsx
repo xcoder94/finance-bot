@@ -1,7 +1,10 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Spinner } from '@telegram-apps/telegram-ui'
+
 import { useExitTransition } from '../../hooks/useExitTransition'
+import { useVisualViewport } from '../../hooks/useVisualViewport'
 
 type FormSheetProps = {
   open: boolean
@@ -36,6 +39,7 @@ export function FormSheet({
 }: FormSheetProps) {
   const { t } = useTranslation()
   const [mounted, closing] = useExitTransition(open)
+  const viewport = useVisualViewport(mounted)
   if (!mounted) {
     return null
   }
@@ -43,6 +47,11 @@ export function FormSheet({
   return (
     <div
       className={`form-sheet-backdrop${closing ? ' form-sheet-backdrop--closing' : ''}`}
+      style={
+        viewport
+          ? { top: viewport.offsetTop, bottom: 'auto', height: viewport.height }
+          : undefined
+      }
       onClick={closing ? undefined : onClose}
     >
       <div
@@ -83,7 +92,14 @@ export function FormSheet({
               onClick={onPrimary}
               disabled={primaryDisabled || primaryLoading}
             >
-              {primaryLoading ? '…' : primaryLabel ?? t('formSheet.save')}
+              {primaryLoading ? (
+                <>
+                  <Spinner size="s" aria-hidden="true" />
+                  <span className="visually-hidden">{t('home.loading')}</span>
+                </>
+              ) : (
+                primaryLabel ?? t('formSheet.save')
+              )}
             </button>
           </div>
         ) : null}

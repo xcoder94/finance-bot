@@ -13,6 +13,7 @@ import {
 import { CategoryPickerSheet } from '../components/forms/CategoryPickerSheet'
 import { FormSheet } from '../components/forms/FormSheet'
 import { FormSheetField } from '../components/forms/FormSheetField'
+import { RecentCategoryChips } from '../components/forms/RecentCategoryChips'
 import {
   FormSheetAmountField,
   FormSheetCommentField,
@@ -30,10 +31,17 @@ import {
   peekExpenseCategories,
   peekWallets,
 } from '../store/dataCacheStore'
+import { evaluateAddSubmit } from '../utils/addFormGate'
 import { getDisplayName } from '../utils/getDisplayName'
+import {
+  readRecentCategories,
+  recordRecentCategory,
+  resolveRecentChips,
+} from '../utils/recentCategories'
 import { parsePositiveInt } from '../utils/transactionForm'
 import { todayTashkent, dateToTransactionIso } from '../utils/dateChips'
 import {
+  buildExpenseCategoryDisplayLabel,
   filterUncategorizedCategories,
   resolveDefaultWalletId,
   walletCurrencySuffix,
@@ -72,6 +80,7 @@ export function AddExpensePage() {
   const [walletId, setWalletId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [categoryLabel, setCategoryLabel] = useState('')
+  const [categoryError, setCategoryError] = useState(false)
   const [comment, setComment] = useState('')
 
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
@@ -121,13 +130,20 @@ export function AddExpensePage() {
     if (!walletId && referenceState.wallets.length > 0) {
       setWalletId(resolveDefaultWalletId(referenceState.wallets, defaultWalletId))
     }
+  }, [referenceState, walletId, defaultWalletId])
 
-    if (!categoryId && topLevelCategories.length > 0) {
-      const firstParent = topLevelCategories[0]
-      setCategoryId(firstParent.id)
-      setCategoryLabel(getDisplayName(firstParent, t))
-    }
-  }, [referenceState, walletId, categoryId, topLevelCategories, defaultWalletId, t])
+  const recentChips = useMemo(
+    () =>
+      resolveRecentChips(
+        readRecentCategories(familyId, 'expense'),
+        referenceState.status === 'success' ? referenceState.categories : [],
+        (category, parent) =>
+          parent
+            ? buildExpenseCategoryDisplayLabel(getDisplayName(parent, t), getDisplayName(category, t))
+            : getDisplayName(category, t),
+      ),
+    [familyId, referenceState, t],
+  )
 
   const selectedWallet =
     referenceState.status === 'success'
@@ -151,7 +167,12 @@ export function AddExpensePage() {
     }
 
     const parsedAmount = parsePositiveInt(amount)
-    if (!parsedAmount || !walletId || !categoryId || amountOverLimit) {
+    const verdict = evaluateAddSubmit({ parsedAmount, walletId, categoryId, amountOverLimit })
+    if (verdict === 'category') {
+      setCategoryError(true)
+      return
+    }
+    if (verdict !== 'ok' || !parsedAmount) {
       return
     }
 
@@ -172,6 +193,7 @@ export function AddExpensePage() {
         expense_category_id: categoryId,
         comment: comment.trim() || null,
       })
+      recordRecentCategory(familyId, 'expense', categoryId)
       invalidateHomeData(familyId)
       celebrateSave()
       closeSheet()
@@ -189,7 +211,6 @@ export function AddExpensePage() {
     topLevelCategories.length > 0 &&
     parsePositiveInt(amount) !== null &&
     Boolean(walletId) &&
-    Boolean(categoryId) &&
     !amountOverLimit &&
     isFormSheetDateValid(transactionDate) &&
     comment.length <= 200
@@ -231,6 +252,7 @@ export function AddExpensePage() {
         primaryLoading={submitting}
       >
         <FormSheetAmountField
+          autoFocus
           value={amount}
           currencySuffix={walletCurrencySuffix(selectedWallet?.currency ?? 'UZS')}
           overLimit={amountOverLimit}
@@ -239,12 +261,25 @@ export function AddExpensePage() {
           onOverLimitChange={setAmountOverLimit}
         />
 
+        <RecentCategoryChips
+          chips={recentChips}
+          selectedId={categoryId}
+          onSelect={(chip) => {
+            setCategoryId(chip.id)
+            setCategoryLabel(chip.label)
+            setCategoryError(false)
+          }}
+        />
+
         <FormSheetField
           label={t('addTransaction.category')}
           right="›"
+          muted={!categoryLabel}
+          hint={categoryError ? t('addTransaction.chooseCategory') : undefined}
+          hintError={categoryError}
           onClick={() => setCategoryPickerOpen(true)}
         >
-          <span>{categoryLabel || '—'}</span>
+          <span>{categoryLabel || t('addTransaction.chooseCategory')}</span>
         </FormSheetField>
 
         <FormSheetField
@@ -278,6 +313,7 @@ export function AddExpensePage() {
         onClose={() => setCategoryPickerOpen(false)}
         onSelect={(selection) => {
           setCategoryId(selection.categoryId)
+          setCategoryError(false)
           setCategoryLabel(selection.label)
         }}
       />

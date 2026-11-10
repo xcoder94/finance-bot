@@ -1,6 +1,7 @@
 import {
   type ClipboardEvent,
   type KeyboardEvent,
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -38,6 +39,7 @@ type FormSheetAmountFieldProps = {
   overLimit: boolean
   hint?: string
   label?: string
+  autoFocus?: boolean
   onChange: (value: string) => void
   onOverLimitChange: (overLimit: boolean) => void
 }
@@ -48,6 +50,7 @@ export function FormSheetAmountField({
   overLimit,
   hint,
   label,
+  autoFocus = false,
   onChange,
   onOverLimitChange,
 }: FormSheetAmountFieldProps) {
@@ -56,6 +59,12 @@ export function FormSheetAmountField({
   const pendingCursor = useRef<number | null>(null)
   const errorId = useId()
   const displayValue = formatThousandsDigits(value)
+
+  useEffect(() => {
+    if (autoFocus) {
+      inputRef.current?.focus()
+    }
+  }, [autoFocus])
 
   useLayoutEffect(() => {
     if (pendingCursor.current === null || !inputRef.current) {
@@ -171,7 +180,7 @@ export function FormSheetAmountField({
         ref={inputRef}
         className="form-sheet-field__input form-sheet-field__input--mono"
         type="text"
-        inputMode="numeric"
+        inputMode="decimal"
         autoComplete="off"
         placeholder="0"
         value={displayValue}

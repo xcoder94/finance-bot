@@ -1,0 +1,82 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
+
+;(globalThis as unknown as { document: { documentElement: { lang: string } } }).document ??= {
+  documentElement: { lang: '' },
+}
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}))
+vi.mock('@telegram-apps/telegram-ui', () => ({
+  Spinner: () => <i {...{ 'data-spinner': 'true' }} />,
+}))
+vi.mock('../../i18n/t', () => ({ t: (key: string) => key }))
+vi.mock('../../i18n', () => ({ default: { language: 'ru' } }))
+vi.mock('../../utils/periodFilter', () => ({ getLocale: () => 'ru-RU' }))
+
+const { RecentCategoryChips } = await import('./RecentCategoryChips')
+const { FormSheet } = await import('./FormSheet')
+const { FormSheetAmountField } = await import('./transactionAddFields')
+
+describe('RecentCategoryChips', () => {
+  const chips = [
+    { id: 'a', label: 'Еда · Кафе' },
+    { id: 'b', label: 'Дом' },
+  ]
+
+  it('renders nothing for a new person with no history', () => {
+    expect(renderToStaticMarkup(<RecentCategoryChips chips={[]} selectedId="" onSelect={() => undefined} />)).toBe('')
+  })
+
+  it('renders chips in the given (newest first) order and marks the selected one', () => {
+    const html = renderToStaticMarkup(<RecentCategoryChips chips={chips} selectedId="b" onSelect={() => undefined} />)
+    expect(html.indexOf('Еда · Кафе')).toBeLessThan(html.indexOf('Дом'))
+    expect([...html.matchAll(/aria-pressed="true"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual(['Дом'])
+  })
+})
+
+describe('amount field', () => {
+  it('uses the decimal keyboard', () => {
+    const html = renderToStaticMarkup(
+      <FormSheetAmountField
+        value=""
+        currencySuffix="so'm"
+        overLimit={false}
+        autoFocus
+        onChange={() => undefined}
+        onOverLimitChange={() => undefined}
+      />,
+    )
+    expect(html).toContain('inputMode="decimal"')
+  })
+})
+
+describe('FormSheet primary button', () => {
+  const render = (loading: boolean) =>
+    renderToStaticMarkup(
+      <FormSheet open title="T" onClose={() => undefined} onPrimary={() => undefined} primaryLoading={loading}>
+        <div />
+      </FormSheet>,
+    )
+
+  it('shows a spinner, not an ellipsis, while sending', () => {
+    const html = render(true)
+    expect(html).not.toContain('…')
+    expect(html).toContain('data-spinner')
+    expect(html).toMatch(/form-sheet-primary[^>]*disabled/)
+  })
+
+  it('shows the label when idle', () => {
+    expect(render(false)).toContain('formSheet.save')
+  })
+
+  it('keeps the action row sticky so Save stays above the keyboard', () => {
+    const css = readFileSync(join(__dirname, '../../index.css'), 'utf8')
+    const rule = /\.form-sheet-actions\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+    expect(rule).toContain('position: sticky')
+    expect(rule).toContain('bottom: 0')
+  })
+})
