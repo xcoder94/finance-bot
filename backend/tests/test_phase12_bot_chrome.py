@@ -181,7 +181,7 @@ def test_owner_language_callback_sends_18_1_with_markdown_and_keyboard() -> None
         ):
             await language_callback(callback, state, bot)
 
-        assert message.answer.await_count == 2  # 18.1 text, then the phone request
+        assert message.answer.await_count == 1  # welcome only; the phone request comes after the 3rd operation
         args, kwargs = message.answer.await_args_list[0]
         assert args[0] == START_SOLO_TEXT
         assert kwargs.get("parse_mode") == "Markdown"

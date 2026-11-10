@@ -8,6 +8,7 @@ from aiogram.types import ErrorEvent, Update
 from app.config import BOT_TOKEN, receipt_photo_enabled, SUPPORT_CHAT_ID
 from app.logging_setup import setup_logging
 from app.services.invite import cache_bot_username
+from app.services import deferred_phone_prompt  # noqa: F401  (registers the session listeners)
 from app.services.notification_scheduler import notification_loop
 from bot.activity_middleware import register_activity_middleware
 from bot.keyboard_hygiene import ClearStaleReplyKeyboardMiddleware

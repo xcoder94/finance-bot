@@ -189,7 +189,7 @@ class TestLanguageCallbackSessionOrdering:
                 await language_callback(callback, state, bot)
 
             bot.get_me.assert_not_awaited()
-            assert message.answer.await_count == 2  # welcome, then the phone request
+            assert message.answer.await_count == 1  # welcome only; the phone request comes after the 3rd operation
             answer_args, answer_kwargs = message.answer.await_args_list[0]
             assert answer_args[0] == welcome_solo()
             assert answer_kwargs.get("parse_mode") == "Markdown"
@@ -459,7 +459,7 @@ class TestDefaultWalletAssignment:
             ):
                 await language_callback(callback, state, bot)
 
-            assert message.answer.await_count == 2  # welcome, then the phone request
+            assert message.answer.await_count == 1  # welcome only; the phone request comes after the 3rd operation
             assert message.answer.await_args_list[0].args[0] == welcome_invited(
                 "Семья Юсуповых"
             )

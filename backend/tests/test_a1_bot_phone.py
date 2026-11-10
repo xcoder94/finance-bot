@@ -125,39 +125,27 @@ class _Tx:
 
 
 class TestNewUserPrompt:
+    """PRD-ux U7: no phone request right after the welcome (it comes after the 3rd operation,
+    see tests/test_ux_p6_phone.py). The prompt itself is unchanged."""
+
     @pytest.mark.parametrize("language,text,share,skip", [
         ("ru", RU_PROMPT, "Поделиться номером", "Пропустить"),
         ("uz", UZ_PROMPT, "Raqamni yuborish", "O'tkazib yuborish"),
     ])
-    async def test_owner_gets_welcome_then_prompt_with_two_buttons(
-        self, monkeypatch, language, text, share, skip
-    ) -> None:
+    async def test_prompt_text_and_two_buttons(self, language, text, share, skip) -> None:
+        assert phone_prompt.prompt_text(language) == text
+        markup = phone_prompt.prompt_keyboard(language)
+        assert isinstance(markup, ReplyKeyboardMarkup)
+        assert _buttons(markup) == [(share, True), (skip, False)]
+
+    async def test_owner_welcome_has_no_prompt(self, monkeypatch) -> None:
         from app.services.member_texts import welcome_solo
 
         async with rollback_session() as session:
             monkeypatch.setattr("bot.onboarding.assign_default_card_uzs", AsyncMock())
-            user, message = await _new_user_callback(session, monkeypatch, language=language)
-            calls = message.answer.await_args_list
-            assert [c.args[0] for c in calls] == [welcome_solo(language), text]
-            markup = calls[1].kwargs["reply_markup"]
-            assert isinstance(markup, ReplyKeyboardMarkup)
-            assert _buttons(markup) == [(share, True), (skip, False)]
-            assert user.phone_prompted_at is not None
-            assert user.phone_prompt_closed_at is None and user.phone is None
-
-    async def test_invited_member_gets_welcome_then_prompt(self, monkeypatch) -> None:
-        from app.services.member_texts import welcome_invited
-
-        async with rollback_session() as session:
-            _owner, budget = await create_user(session, telegram_id=9_510_050)
-            monkeypatch.setattr("bot.onboarding.assign_default_card_uzs", AsyncMock())
-            user, message = await _new_user_callback(
-                session, monkeypatch, language="ru", flow="member", budget_id=budget.id
-            )
-            calls = message.answer.await_args_list
-            assert user.role == "member" and user.phone_prompted_at is not None
-            assert calls[0].args[0] == welcome_invited(budget.name)
-            assert calls[1].args[0] == RU_PROMPT
+            user, message = await _new_user_callback(session, monkeypatch, language="ru")
+            assert [c.args[0] for c in message.answer.await_args_list] == [welcome_solo("ru")]
+            assert user.phone_prompted_at is None and user.phone is None
 
     async def test_existing_user_start_gets_no_prompt(self, monkeypatch) -> None:
         async with rollback_session() as session:

@@ -46,5 +46,9 @@ class User(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):
     phone_prompt_closed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # New user registered under the deferred-request rules (PRD-ux U7); NULL = already handled.
+    phone_prompt_eligible_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Not indexed on purpose (HOT updates); precision 10 minutes, see work/db/admin-schema.md.
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

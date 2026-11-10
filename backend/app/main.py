@@ -26,6 +26,7 @@ from app.api.v1.wallets import router as wallets_router
 from app.auth.pass_tokens import AppPassError, decode_app_pass
 from app.config import APP_PASS_SECRET, CORS_ALLOWED_ORIGINS, RATE_LIMIT_DEFAULT, asyncpg_dsn, redact_dsn
 from app.db import dispose_engine
+from app.services import deferred_phone_prompt  # noqa: F401  (registers the session listeners)
 from app.logging_setup import setup_logging
 
 setup_logging()

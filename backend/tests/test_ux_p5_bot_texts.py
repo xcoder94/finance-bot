@@ -167,8 +167,7 @@ async def test_acceptance_1_fresh_uz_account_start_is_uzbek(monkeypatch) -> None
         calls = message.answer.await_args_list
         assert calls[0].args[0] == member_texts.welcome_solo("uz")
         assert calls[0].kwargs["reply_markup"].inline_keyboard[0][0].text == "Ilovani ochish"
-        assert calls[1].args[0] == CATALOGUE["phone.prompt"]["uz"]
-        assert isinstance(calls[1].kwargs["reply_markup"], ReplyKeyboardMarkup)
+        assert len(calls) == 1  # the phone request now comes after the 3rd operation (U7)
 
 
 async def test_invited_uz_member_welcome_is_uzbek(monkeypatch) -> None:
