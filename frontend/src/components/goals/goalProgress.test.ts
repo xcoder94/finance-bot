@@ -4,6 +4,8 @@ import {
   formatGoalMoney,
   goalDueLabel,
   goalLeftLine,
+  goalPercent,
+  goalProgressBarWidth,
   goalShowCloseButton,
   goalShowOwnerNote,
 } from './goalProgress'
@@ -167,5 +169,19 @@ describe('goalShowOwnerNote', () => {
         status: 'active',
       }),
     ).toBe(false)
+  })
+})
+
+describe('goal progress is clamped to 0..100 (B10)', () => {
+  it('negative wallet balance: 0 and an empty bar', () => {
+    expect(goalPercent(-39837, -1_000_000, 2_500)).toBe(0)
+    expect(goalProgressBarWidth(-39837, -1_000_000, 2_500)).toBe('0%')
+    expect(goalProgressBarWidth(null, -5, 100)).toBe('0%')
+  })
+  it('over target stays at 100, normal values pass through', () => {
+    expect(goalPercent(250, 0, 0)).toBe(100)
+    expect(goalPercent(42, 0, 0)).toBe(42)
+    expect(goalPercent(null, 50, 200)).toBe(25)
+    expect(goalPercent(null, 5, 0)).toBe(0)
   })
 })

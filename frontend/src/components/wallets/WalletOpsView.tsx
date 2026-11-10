@@ -1,4 +1,4 @@
-import { Text, Title } from '@telegram-apps/telegram-ui'
+import { Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
 import type { HistoryItem } from '../../api/history'
@@ -10,6 +10,7 @@ import { walletOpAmount, type WalletOpsState } from '../../utils/walletOps'
 import type { WalletsOverviewItem } from '../../utils/walletsOverview'
 import { balanceSizeClass } from '../home/homeBlocks'
 import { HistoryTransactionList } from '../history/HistoryTransactionList'
+import { ScreenTitle } from '../ScreenTitle'
 
 export type WalletOpsViewProps = {
   wallet: WalletsOverviewItem
@@ -37,9 +38,7 @@ export function WalletOpsView({
 
   return (
     <div className="page-content home-page wallets-page">
-      <Title level="1" weight="2" className="home-page__title">
-        {getDisplayName(wallet, t)}
-      </Title>
+      <ScreenTitle>{getDisplayName(wallet, t)}</ScreenTitle>
 
       <div className="home-figures-card wallets-total">
         <div className="home-figures-card__label">{t('wallets.balanceNow')}</div>

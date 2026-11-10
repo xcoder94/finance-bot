@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
-import { Button, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
@@ -78,6 +77,8 @@ import {
   shiftHomeMonth,
   type HomeMonth,
 } from '../utils/homeMonth'
+import { EmptyStateIcon } from '../components/EmptyStateIcon'
+import { BlockError } from '../components/BlockError'
 
 const PRIMARY_CURRENCY: Currency = 'UZS'
 
@@ -168,19 +169,6 @@ function useFetchBlock<T>(
 
   const state: FetchState<T> = resolveFetchState(stored, dataKey, initialData)
   return { state, retry }
-}
-
-function BlockError({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="home-block-error" role="alert">
-      <Text>{t('home.loadError')}</Text>
-      <Button mode="plain" size="s" onClick={onRetry}>
-        {t('auth.retry')}
-      </Button>
-    </div>
-  )
 }
 
 function HomeSkeleton() {
@@ -624,7 +612,7 @@ export function HomePage() {
 
           {historySuccess && totalCount === 0 ? (
             <div className="home-empty-card">
-              <div className="home-empty-card__icon" aria-hidden="true" />
+              <EmptyStateIcon className="home-empty-card__icon" />
               <div className="home-empty-card__title">{emptyMonthTitle(month)}</div>
               <div className="home-empty-card__hint">{t('home.emptyMonthHint')}</div>
             </div>

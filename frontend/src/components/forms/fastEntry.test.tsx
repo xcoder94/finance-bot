@@ -80,3 +80,21 @@ describe('FormSheet primary button', () => {
     expect(rule).toContain('bottom: 0')
   })
 })
+
+describe('FormSheet delete button (B22)', () => {
+  it('renders the visible Удалить block above the sticky save bar', () => {
+    const html = renderToStaticMarkup(
+      <FormSheet
+        open
+        title="T"
+        onClose={() => undefined}
+        onPrimary={() => undefined}
+        danger={<button className="form-sheet-danger-button">Удалить</button>}
+      >
+        <div />
+      </FormSheet>,
+    )
+    expect(html).toContain('form-sheet-danger-button')
+    expect(html.indexOf('form-sheet-danger')).toBeLessThan(html.indexOf('form-sheet-actions'))
+  })
+})

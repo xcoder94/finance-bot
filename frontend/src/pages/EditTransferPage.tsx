@@ -288,9 +288,7 @@ export function EditTransferPage() {
       ? buildEditSheetTitle(resolveEditSheetLabel(comment, transferSubtitle))
       : t('editTransfer.title')
 
-  const sheetIntro = isCrossCurrency
-    ? t('formSheet.transferDiffIntro')
-    : t('formSheet.transferSameIntro')
+  const sheetIntro = isCrossCurrency ? t('formSheet.transferDiffIntro') : undefined
 
   const parsedAmount = parsePositiveInt(amount)
   const parsedRate = parsePositiveInt(rate)

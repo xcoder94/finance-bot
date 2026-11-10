@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 
 import type { WalletResponse } from '../../api/wallets'
 import { ENTITY_NAME_MAX } from '../../constants/entityLimits'
+import { clampEntityName } from './entityNameValidation'
+import { useNameOverflow } from './useNameOverflow'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
 import { FormSheetField } from '../forms/FormSheetField'
@@ -69,6 +71,7 @@ export function WalletFormSheet({
   const [name, setName] = useState('')
   const [walletType, setWalletType] = useState<WalletFormType>('shared')
   const [nameTouched, setNameTouched] = useState(false)
+  const nameOverflow = useNameOverflow()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
 
@@ -92,6 +95,7 @@ export function WalletFormSheet({
     setName(wallet?.name ?? '')
     setWalletType(wallet?.is_personal ? 'personal' : 'shared')
     setNameTouched(false)
+    nameOverflow.reset()
     setSaving(false)
     setSaveError(false)
   }, [open, wallet])
@@ -112,8 +116,13 @@ export function WalletFormSheet({
   const trimmedLength = name.trim().length
   const fieldHint =
     limitHint ??
-    (nameTouched && nameErrorKey ? t(nameErrorKey) : undefined)
-  const fieldHintError = atLimit || (nameTouched && nameErrorKey !== null)
+    (nameOverflow.overflow
+      ? t('settings.nameTooLong30')
+      : nameTouched && nameErrorKey
+        ? t(nameErrorKey)
+        : undefined)
+  const fieldHintError =
+    atLimit || nameOverflow.overflow || (nameTouched && nameErrorKey !== null)
 
   const canSave =
     editable &&
@@ -238,11 +247,14 @@ export function WalletFormSheet({
         <input
           className="form-sheet-field__input"
           value={name}
-          maxLength={ENTITY_NAME_MAX + 10}
+          maxLength={ENTITY_NAME_MAX}
           readOnly={!editable}
           onBlur={() => setNameTouched(true)}
+          onPaste={nameOverflow.onPaste}
           onChange={(event) => {
-            setName(event.target.value)
+            const next = clampEntityName(event.target.value)
+            nameOverflow.onValueChange(next)
+            setName(next)
             setSaveError(false)
           }}
         />

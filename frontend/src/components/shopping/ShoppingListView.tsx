@@ -6,6 +6,8 @@ import type { AddResult, ShoppingStatus } from '../../store/shoppingStore'
 import { useLeavingItems } from '../../hooks/useLeavingItems'
 import { ShoppingAddRow } from './ShoppingAddRow'
 import { ShoppingSwipeRow } from './ShoppingSwipeRow'
+import { FailBox } from '../FailBox'
+import { EmptyStateIcon } from '../EmptyStateIcon'
 
 type ShoppingListViewProps = {
   status: ShoppingStatus
@@ -60,13 +62,7 @@ export function ShoppingListView({
       </div>
 
       {showError ? (
-        <div className="shopping-page__fail" role="alert">
-          <div className="shopping-page__fail-title">{t('home.loadError')}</div>
-          <div className="shopping-page__fail-hint">{t('home.failHint')}</div>
-          <button type="button" className="shopping-page__retry" onClick={onRetry}>
-            {t('home.retry')}
-          </button>
-        </div>
+        <FailBox onRetry={onRetry} />
       ) : (
         <ShoppingAddRow onAdd={onAdd} />
       )}
@@ -75,7 +71,7 @@ export function ShoppingListView({
 
       {showEmpty ? (
         <div className="goals-page__empty">
-          <div className="goals-page__empty-icon" aria-hidden="true" />
+          <EmptyStateIcon className="goals-page__empty-icon" />
           <div className="goals-page__empty-title">{t('shopping.emptyTitle')}</div>
           <div className="goals-page__empty-subtitle">{t('shopping.emptyHint')}</div>
         </div>

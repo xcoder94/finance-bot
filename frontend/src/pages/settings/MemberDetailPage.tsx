@@ -159,7 +159,9 @@ export function MemberDetailPage() {
           </>
         ) : null}
         {loadState.status === 'success' && !member ? (
-          <SettingsSectionLoadError onRetry={() => setReloadCount((count) => count + 1)} />
+          <p className="settings-sub-page__not-found" role="alert">
+            {t('settings.membersScreen.notFound')}
+          </p>
         ) : null}
       </SettingsSubPageShell>
 

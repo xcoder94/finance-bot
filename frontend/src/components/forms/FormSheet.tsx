@@ -81,6 +81,8 @@ export function FormSheet({
 
         {changes}
 
+        {danger ? <div className="form-sheet-danger">{danger}</div> : null}
+
         {showPrimary ? (
           <div className="form-sheet-actions">
             <button type="button" className="form-sheet-cancel" onClick={onClose}>
@@ -103,8 +105,6 @@ export function FormSheet({
             </button>
           </div>
         ) : null}
-
-        {danger ? <div className="form-sheet-danger">{danger}</div> : null}
       </div>
     </div>
   )

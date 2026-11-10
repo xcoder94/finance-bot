@@ -2,7 +2,9 @@ import { type ReactNode, useState } from 'react'
 import { Button, Cell, Input, Modal, Select, Spinner, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
-import { ENTITY_NAME_MAX_LENGTH, validateEntityName } from './entityNameValidation'
+import { ENTITY_NAME_MAX_LENGTH, clampEntityName, validateEntityName } from './entityNameValidation'
+import { BlockError } from '../BlockError'
+import { useNameOverflow } from './useNameOverflow'
 
 export type EditableEntity = {
   id: string
@@ -69,6 +71,7 @@ export function EditableEntityList<T extends EditableEntity>({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
 
+  const nameOverflow = useNameOverflow()
   const nameValidationError = validateEntityName(addForm.name)
   const nameErrorKey =
     nameValidationError === 'required'
@@ -174,17 +177,20 @@ export function EditableEntityList<T extends EditableEntity>({
             <Input
               header={t('settings.nameLabel')}
               value={addForm.name}
-              maxLength={ENTITY_NAME_MAX_LENGTH + 10}
+              maxLength={ENTITY_NAME_MAX_LENGTH}
+              onPaste={nameOverflow.onPaste}
               status={nameTouched && nameErrorKey ? 'error' : 'default'}
               onBlur={() => setNameTouched(true)}
               onChange={(event) => {
-                setAddForm((current) => ({ ...current, name: event.target.value }))
+                const next = clampEntityName(event.target.value)
+                nameOverflow.onValueChange(next)
+                setAddForm((current) => ({ ...current, name: next }))
                 setAddError(false)
               }}
             />
-            {nameTouched && nameErrorKey ? (
+            {nameOverflow.overflow || (nameTouched && nameErrorKey) ? (
               <Text className="settings-entity-list__field-error" role="alert">
-                {t(nameErrorKey)}
+                {nameOverflow.overflow ? t('settings.nameTooLong30') : t(nameErrorKey!)}
               </Text>
             ) : null}
 
@@ -312,16 +318,9 @@ export function SettingsSectionLoading() {
 }
 
 export function SettingsSectionLoadError({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation()
-
   return (
     <Cell>
-      <div className="home-block-error" role="alert">
-        <Text>{t('settings.loadError')}</Text>
-        <Button mode="plain" size="s" onClick={onRetry}>
-          {t('auth.retry')}
-        </Button>
-      </div>
+      <BlockError onRetry={onRetry} />
     </Cell>
   )
 }

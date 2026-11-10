@@ -58,7 +58,7 @@ describe('Settings: Admin row', () => {
     // after the main list (Theme row is its last) and after the language row
     expect(html.indexOf('Админка')).toBeGreaterThan(html.indexOf('Тема'))
     expect(html.match(/class="settings-toc-list/g)).toHaveLength(2)
-    // the footer hint stays the very last element
-    expect(html.indexOf('settings-page__footer-hint')).toBeGreaterThan(html.indexOf('Админка'))
+    // developer footer hint is gone (B19)
+    expect(html).not.toContain('settings-page__footer-hint')
   })
 })

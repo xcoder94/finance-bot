@@ -142,6 +142,7 @@ export function HomeOnboardingCard({
     { done: steps.defaultWalletChecked, label: t('home.onboarding.step2') },
     { done: steps.familyInvited, label: t('home.onboarding.step3') },
   ]
+  const currentIndex = items.findIndex((item) => !item.done)
   return (
     <div className="home-onboarding">
       <button
@@ -154,33 +155,46 @@ export function HomeOnboardingCard({
       </button>
       <div className="home-onboarding__title">{t('home.onboarding.title')}</div>
       <ol className="home-onboarding__steps">
-        {items.map((item, index) => (
-          <li
-            key={index}
-            className={`home-onboarding__step${item.done ? ' home-onboarding__step--done' : ''}`}
-          >
-            <span className="home-onboarding__num">{index + 1}</span>
-            <span className="home-onboarding__label">{item.label}</span>
-          </li>
-        ))}
+        {items.map((item, index) => {
+          const state = item.done ? 'done' : index === currentIndex ? 'current' : 'next'
+          return (
+            <li
+              key={index}
+              className={`home-onboarding__step home-onboarding__step--${state}`}
+              aria-current={state === 'current' ? 'step' : undefined}
+            >
+              <span className="home-onboarding__num">
+                {item.done ? (
+                  <svg
+                    className="home-onboarding__check"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 8.5l3.2 3.2L13 4.8" />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <span className="home-onboarding__label">{item.label}</span>
+            </li>
+          )
+        })}
       </ol>
-      <button type="button" className="home-onboarding__cta" onClick={onStart}>
-        {t('home.onboarding.cta')}
-      </button>
+      {!steps.firstOperation ? (
+        <button type="button" className="home-onboarding__cta" onClick={onStart}>
+          {t('home.onboarding.cta')}
+        </button>
+      ) : null}
     </div>
   )
 }
 
-export function HomeFailBox({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation()
-  return (
-    <div className="home-fail" role="alert">
-      <div className="home-fail__icon" aria-hidden="true">!</div>
-      <div className="home-fail__title">{t('home.loadError')}</div>
-      <div className="home-fail__hint">{t('home.failHint')}</div>
-      <button type="button" className="home-fail__btn" onClick={onRetry}>
-        {t('home.retry')}
-      </button>
-    </div>
-  )
-}
+export { FailBox as HomeFailBox } from '../FailBox'

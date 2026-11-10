@@ -1,4 +1,4 @@
-import { Button, Text, Title } from '@telegram-apps/telegram-ui'
+import { Text } from '@telegram-apps/telegram-ui'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
@@ -10,6 +10,8 @@ import {
   totalsByCurrency,
   type WalletsOverviewItem,
 } from '../../utils/walletsOverview'
+import { BlockError } from '../BlockError'
+import { ScreenTitle } from '../ScreenTitle'
 
 export type WalletsViewProps = {
   status: 'loading' | 'error' | 'success'
@@ -60,9 +62,7 @@ export function WalletsView({ status, wallets, onRetry, onOpenWallet }: WalletsV
 
   return (
     <div className="page-content home-page wallets-page">
-      <Title level="1" weight="2" className="home-page__title">
-        {t('wallets.title')}
-      </Title>
+      <ScreenTitle>{t('wallets.title')}</ScreenTitle>
 
       {status === 'loading' ? (
         <div className="home-block-loading" role="status" aria-live="polite">
@@ -70,12 +70,7 @@ export function WalletsView({ status, wallets, onRetry, onOpenWallet }: WalletsV
           <span className="visually-hidden">{t('home.loading')}</span>
         </div>
       ) : status === 'error' ? (
-        <div className="home-block-error" role="alert">
-          <Text>{t('home.loadError')}</Text>
-          <Button mode="plain" size="s" onClick={onRetry}>
-            {t('auth.retry')}
-          </Button>
-        </div>
+        <BlockError onRetry={onRetry} />
       ) : wallets.length === 0 ? (
         <Text className="wallets-page__empty">{t('wallets.empty')}</Text>
       ) : (

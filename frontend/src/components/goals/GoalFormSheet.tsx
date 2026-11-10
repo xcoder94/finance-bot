@@ -26,6 +26,9 @@ import {
 import {
   walletCurrencySuffix,
 } from '../../utils/transactionFormFields'
+import { ENTITY_NAME_MAX } from '../../constants/entityLimits'
+import { clampEntityName } from '../settings/entityNameValidation'
+import { useNameOverflow } from '../settings/useNameOverflow'
 import { goalDeadlineValidation } from './goalFormDeadline'
 import { formatChipDate, todayTashkent } from '../../utils/dateChips'
 import { getLocale } from '../../utils/periodFilter'
@@ -207,6 +210,7 @@ export function GoalFormSheet({
   const [targetAmountDigits, setTargetAmountDigits] = useState('')
   const [amountOverLimit, setAmountOverLimit] = useState(false)
   const [name, setName] = useState('')
+  const nameOverflow = useNameOverflow()
   const [deadline, setDeadline] = useState('')
   const [deadlineTouched, setDeadlineTouched] = useState(false)
   const [walletPickerOpen, setWalletPickerOpen] = useState(false)
@@ -239,6 +243,7 @@ export function GoalFormSheet({
       setWalletId(goal.wallet_id)
       setTargetAmountDigits(String(goal.target_amount))
       setName(goal.name)
+      nameOverflow.reset()
       setDeadline(goal.deadline ?? '')
       setDeadlineTouched(false)
     } else {
@@ -363,14 +368,19 @@ export function GoalFormSheet({
 
       <FormSheetField
         label={t('goals.form.nameLabel')}
-        hint={t('goals.form.nameHint')}
+        hint={nameOverflow.overflow ? t('settings.nameTooLong30') : t('goals.form.nameHint')}
+        hintError={nameOverflow.overflow}
         muted={name.trim().length === 0}
       >
         <input
           className="form-sheet-field__input"
           value={name}
+          maxLength={ENTITY_NAME_MAX}
+          onPaste={nameOverflow.onPaste}
           onChange={(event) => {
-            setName(event.target.value)
+            const next = clampEntityName(event.target.value)
+            nameOverflow.onValueChange(next)
+            setName(next)
             setSaveError(false)
           }}
         />

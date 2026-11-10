@@ -89,14 +89,20 @@ export function goalShowOwnerNote(opts: {
   return !opts.isOwner && opts.status === 'active' && opts.excessAmount != null
 }
 
+/** Percent for the label and the bar: always 0..100 (a negative wallet balance shows 0). */
+export function goalPercent(progressPct: number | null, balance: number, target: number): number {
+  const raw =
+    progressPct != null
+      ? progressPct
+      : target > 0
+        ? Math.round((balance / target) * 100)
+        : 0
+  if (!Number.isFinite(raw)) {
+    return 0
+  }
+  return Math.min(100, Math.max(0, raw))
+}
+
 export function goalProgressBarWidth(progressPct: number | null, balance: number, target: number): string {
-  if (progressPct != null) {
-    return `${Math.min(100, progressPct)}%`
-  }
-
-  if (target <= 0) {
-    return '0%'
-  }
-
-  return `${Math.min(100, Math.round((balance / target) * 100))}%`
+  return `${goalPercent(progressPct, balance, target)}%`
 }

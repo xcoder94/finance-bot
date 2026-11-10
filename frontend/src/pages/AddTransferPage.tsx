@@ -233,9 +233,7 @@ export function AddTransferPage() {
   }
 
   const sheetTitle = isCrossCurrency ? t('addTransfer.titleExchange') : t('addTransfer.titleSame')
-  const sheetIntro = isCrossCurrency
-    ? t('formSheet.transferDiffIntro')
-    : t('formSheet.transferSameIntro')
+  const sheetIntro = isCrossCurrency ? t('formSheet.transferDiffIntro') : undefined
 
   const parsedAmount = parsePositiveInt(amount)
   const parsedRate = parsePositiveInt(rate)

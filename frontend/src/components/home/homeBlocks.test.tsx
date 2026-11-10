@@ -89,3 +89,27 @@ describe('balanceSizeClass (owner decision: shrink from 15 characters)', () => {
     expect(balanceSizeClass('x'.repeat(17))).toBe(' home-figures-card__balance--xlong')
   })
 })
+
+describe('HomeOnboardingCard step states (B12)', () => {
+  const render = (s: typeof steps) =>
+    renderToStaticMarkup(
+      <I18nextProvider i18n={make('ru')}>
+        <HomeOnboardingCard steps={s} onStart={vi.fn()} onClose={vi.fn()} />
+      </I18nextProvider>,
+    )
+  it('first step done: check icon, muted, step 2 is current, no CTA', () => {
+    const html = render({ ...steps, firstOperation: true })
+    expect(html).toContain('home-onboarding__step--done')
+    expect(html).toContain('home-onboarding__check')
+    expect(html.match(/home-onboarding__step--current/g)).toHaveLength(1)
+    expect(html.indexOf('step--done')).toBeLessThan(html.indexOf('step--current'))
+    expect(html).not.toContain('home-onboarding__cta')
+    expect(html).not.toContain('Записать расход')
+  })
+  it('nothing done: first step is current, CTA shown, no check', () => {
+    const html = render(steps)
+    expect(html).toContain('home-onboarding__cta')
+    expect(html).not.toContain('home-onboarding__check')
+    expect(html.indexOf('step--current')).toBeLessThan(html.indexOf('step--next'))
+  })
+})

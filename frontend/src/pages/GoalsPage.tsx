@@ -13,6 +13,7 @@ import { BlockError } from '../components/BlockError'
 import { GoalCard } from '../components/goals/GoalCard'
 import { GoalFormSheet, type GoalFormMode } from '../components/goals/GoalFormSheet'
 import { useAuthStore } from '../store/authStore'
+import { EmptyStateIcon } from '../components/EmptyStateIcon'
 
 type GoalTab = 'active' | 'closed'
 
@@ -178,7 +179,7 @@ export function GoalsPage() {
 
         {showEmpty ? (
           <div className="goals-page__empty">
-            <div className="goals-page__empty-icon" aria-hidden="true" />
+            <EmptyStateIcon className="goals-page__empty-icon" />
             <div className="goals-page__empty-title">{t('goals.emptyTitle')}</div>
             <div className="goals-page__empty-subtitle">{t('goals.emptySubtitle')}</div>
             {isOwner ? (

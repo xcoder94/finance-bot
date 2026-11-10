@@ -188,3 +188,9 @@ describe('CategoryFormSheet edit delete — expense-parent', () => {
     expect(html).not.toContain('form-sheet-danger-button')
   })
 })
+
+describe('CategoryFormSheet name limit (B11)', () => {
+  it('input stops at 30 chars', () => {
+    expect(renderCategoryForm()).toContain('maxLength="30"')
+  })
+})

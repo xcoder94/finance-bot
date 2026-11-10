@@ -92,7 +92,7 @@ describe('ShoppingListView', () => {
   it('fail: load error with retry, no list', () => {
     const html = render({ status: 'error', items: [] })
     expect(html).toContain('Не удалось загрузить данные')
-    expect(html).toContain('Повторить')
+    expect(html).toContain('Попробовать снова')
     expect(html).not.toContain('Начать закупку')
   })
 

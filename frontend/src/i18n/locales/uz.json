@@ -103,8 +103,7 @@
     "currencyLabel": "Valyuta",
     "nameRequired": "Nomni kiriting",
     "nameTooLong": "Nom 50 ta belgidan oshmasligi kerak",
-    "nameTooLong30": "Nom 30 ta belgidan oshmasligi kerak",
-    "loadError": "Sozlamalarni yuklab bo'lmadi",
+    "nameTooLong30": "30 tadan ortiq belgi mumkin emas",
     "submitError": "O'zgarishlarni saqlab bo'lmadi",
     "members": "Oila a'zolari",
     "backHome": "‹ Bosh sahifa",
@@ -114,7 +113,6 @@
       "notifications": "Bildirishnomalar",
       "back": "‹ Sozlamalar",
       "backExpenseCategories": "‹ Xarajat toifalari",
-      "footerHint": "Har bir bo'lim o'z ekranida sozlanadi. O'chirish ham o'sha yerda — ro'yxat qatorida emas.",
       "profileOwner": "«{{name}}» byudjeti egasi",
       "profileMember": "«{{name}}» byudjeti a'zosi"
     },
@@ -132,7 +130,7 @@
       "sharedOwner": "Umumiy · siz o'zgartirasiz",
       "sharedMember": "Umumiy · faqat egasi o'zgartiradi",
       "personal": "Shaxsiy · faqat sizga ko'rinadi",
-      "personalNote": "Chapga suring — «O'chirish» va tasdiqlash ochiladi. Limit: 10 ta umumiy va 5 ta shaxsiy hamyon."
+      "personalNote": "Limit: 10 ta umumiy va 5 ta shaxsiy hamyon."
     },
     "walletType": {
       "shared": "Umumiy",
@@ -153,6 +151,7 @@
       "subcategoriesNote": "Pastki kategoriyani o'chirish — surish orqali; operatsiyalar ota kategoriyada qoladi."
     },
     "membersScreen": {
+      "notFound": "A'zo topilmadi",
       "noteOwner": "Egalik huquqini topshirish va a'zoni o'chirish — a'zo kartochkasida. Egasi chiqa olmaydi: avval huquqni topshiring.",
       "noteMember": "Yangilarni faqat egasi taklif qila oladi.",
       "leaveBudget": "Byudjetdan chiqish",
@@ -231,7 +230,6 @@
     "trendTitle": "So'nggi 3 oy xarajati",
     "trendUnit": "mln so'm",
     "failHint": "Aloqani tekshirib, qayta urinib ko'ring.",
-    "retry": "Qayta urinish",
     "onboarding": {
       "title": "Birinchi byudjetgacha 3 qadam",
       "step1": "Birinchi xarajatni yozing",
@@ -325,7 +323,6 @@
     "amountCurrencyHint": "Valyuta hamyondan olinadi va alohida tanlanmaydi.",
     "defaultWalletHint": "Standart hamyon tanlangan",
     "incomeCategoryHint": "Daromadlarda pastki kategoriya yo'q",
-    "transferSameIntro": "Valyutalar bir xil — kurs maydoni yo'q.",
     "transferDiffIntro": "Valyutalar boshqacha — kurs va natija qatori paydo bo'ladi.",
     "deleteRecord": "Yozuvni o'chirish",
     "changes": "O'zgarishlar",

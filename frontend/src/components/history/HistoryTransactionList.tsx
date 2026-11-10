@@ -13,6 +13,7 @@ import {
   getHistoryItemMeta,
   getHistoryItemTitle,
 } from '../../utils/getDisplayName'
+import { EmptyStateIcon } from '../EmptyStateIcon'
 
 type HistoryTransactionListProps = {
   status: 'idle' | 'loading' | 'error' | 'success'
@@ -56,7 +57,7 @@ export function HistoryTransactionList({
 
       {status === 'success' && items.length === 0 ? (
         <div className="home-empty-card">
-          <div className="home-empty-card__icon" aria-hidden="true" />
+          <EmptyStateIcon className="home-empty-card__icon" />
           <div className="home-empty-card__title">{t('history.emptyTitle')}</div>
           <div className="home-empty-card__hint">{emptyHint ?? t('history.emptyHint')}</div>
         </div>

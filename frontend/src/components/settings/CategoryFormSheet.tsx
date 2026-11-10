@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 
 import { t as translate } from '../../i18n/t'
 import { ENTITY_NAME_MAX } from '../../constants/entityLimits'
+import { clampEntityName } from './entityNameValidation'
+import { useNameOverflow } from './useNameOverflow'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
 import { FormSheetField } from '../forms/FormSheetField'
@@ -67,6 +69,7 @@ export function CategoryFormSheet({
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [nameTouched, setNameTouched] = useState(false)
+  const nameOverflow = useNameOverflow()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
 
@@ -75,6 +78,7 @@ export function CategoryFormSheet({
       return
     }
     setName(category?.name ?? '')
+    nameOverflow.reset()
     setNameTouched(false)
     setSaving(false)
     setSaveError(false)
@@ -94,10 +98,15 @@ export function CategoryFormSheet({
   const fieldHint =
     atLimit && limitMessage
       ? limitMessage
-      : nameTouched && nameErrorKey
-        ? t(nameErrorKey)
-        : undefined
-  const fieldHintError = (atLimit && Boolean(limitMessage)) || (nameTouched && nameErrorKey !== null)
+      : nameOverflow.overflow
+        ? t('settings.nameTooLong30')
+        : nameTouched && nameErrorKey
+          ? t(nameErrorKey)
+          : undefined
+  const fieldHintError =
+    (atLimit && Boolean(limitMessage)) ||
+    nameOverflow.overflow ||
+    (nameTouched && nameErrorKey !== null)
 
   const canSave =
     editable &&
@@ -168,11 +177,14 @@ export function CategoryFormSheet({
         <input
           className="form-sheet-field__input"
           value={name}
-          maxLength={ENTITY_NAME_MAX + 10}
+          maxLength={ENTITY_NAME_MAX}
           readOnly={!editable}
           onBlur={() => setNameTouched(true)}
+          onPaste={nameOverflow.onPaste}
           onChange={(event) => {
-            setName(event.target.value)
+            const next = clampEntityName(event.target.value)
+            nameOverflow.onValueChange(next)
+            setName(next)
             setSaveError(false)
           }}
         />

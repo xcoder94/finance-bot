@@ -2665,6 +2665,7 @@ button.home-ops-row:focus-visible {
 .form-sheet-danger {
   display: flex;
   flex-direction: column;
+  margin-top: 14px;
 }
 
 .form-sheet-danger-button {
@@ -3273,11 +3274,25 @@ button.home-ops-row:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  opacity: 0.55;
 }
 
-.home-onboarding__step--done {
-  opacity: 1;
+/* done: check mark + muted text; current: first not-done, emphasised; next: neutral */
+.home-onboarding__step--done .home-onboarding__label {
+  color: var(--hint);
+}
+
+.home-onboarding__step--next {
+  opacity: 0.7;
+}
+
+.home-onboarding__step--current .home-onboarding__num {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: var(--acct);
+}
+
+.home-onboarding__step--current .home-onboarding__label {
+  font-weight: 600;
 }
 
 .home-onboarding__num {
@@ -3298,6 +3313,7 @@ button.home-ops-row:focus-visible {
 .home-onboarding__step--done .home-onboarding__num {
   border-color: var(--acc);
   color: var(--acc);
+  opacity: 0.8;
 }
 
 .home-onboarding__label {
@@ -4381,4 +4397,28 @@ a.tabbar-link:active {
 
 .recent-category-chips {
   margin-top: -4px;
+}
+
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hint);
+}
+
+.screen-title {
+  margin: 0;
+  padding: 12px 16px 16px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  color: var(--tx);
+}
+
+.settings-sub-page__not-found {
+  margin: 16px 0;
+  color: var(--hint);
+  font-size: 14px;
+  text-align: center;
 }

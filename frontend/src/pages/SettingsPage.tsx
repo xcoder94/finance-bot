@@ -255,7 +255,6 @@ export function SettingsPage() {
         </div>
       ) : null}
 
-      <p className="settings-page__footer-hint">{t('settings.toc.footerHint')}</p>
     </div>
   )
 }

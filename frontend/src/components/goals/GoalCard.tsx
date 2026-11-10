@@ -6,6 +6,7 @@ import {
   formatGoalMoney,
   goalDueLabel,
   goalLeftLine,
+  goalPercent,
   goalProgressBarWidth,
   goalShowCloseButton,
   goalShowOwnerNote,
@@ -24,7 +25,7 @@ export function GoalCard({ goal, isOwner, onClose, onEdit, closing = false }: Go
   const done = goal.status === 'closed'
   const currency = goal.currency as GoalCurrency
   const hasBar = !done
-  const pctLabel = done ? t('goals.closedBadge') : `${goal.progress_pct ?? 0}%`
+  const pctLabel = done ? t('goals.closedBadge') : `${goalPercent(goal.progress_pct, goal.balance, goal.target_amount)}%`
   const left = goalLeftLine({
     done,
     balance: goal.balance,

@@ -168,3 +168,14 @@ describe('WalletFormSheet currency', () => {
     expect(html).toContain('USD')
   })
 })
+
+describe('WalletFormSheet name limit (B11)', () => {
+  it('input stops at 30 chars and the counter cannot exceed 30 / 30', () => {
+    const html = renderWalletForm({
+      mode: 'edit',
+      wallet: { ...editWallet, name: 'x'.repeat(40) },
+    })
+    expect(html).toContain('maxLength="30"')
+    expect(html).not.toContain('40 / 30')
+  })
+})

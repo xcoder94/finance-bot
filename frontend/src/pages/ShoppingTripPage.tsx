@@ -52,6 +52,7 @@ import {
 } from '../utils/shoppingPending'
 import { parsePositiveInt } from '../utils/transactionForm'
 import { walletCurrencySuffix } from '../utils/transactionFormFields'
+import { FailBox } from '../components/FailBox'
 
 type Stage = 'launch' | 'trip' | 'amount' | 'manual' | 'result'
 
@@ -332,17 +333,7 @@ export function ShoppingTripPage() {
           <h1 className="shopping-page__title">{t('shopping.tripTitle')}</h1>
         </div>
         {launchFailed ? (
-          <div className="shopping-page__fail" role="alert">
-            <div className="shopping-page__fail-title">{t('home.loadError')}</div>
-            <div className="shopping-page__fail-hint">{t('home.failHint')}</div>
-            <button
-              type="button"
-              className="shopping-page__retry"
-              onClick={() => setLaunchTry((n) => n + 1)}
-            >
-              {t('home.retry')}
-            </button>
-          </div>
+          <FailBox onRetry={() => setLaunchTry((n) => n + 1)} />
         ) : null}
       </div>
     )

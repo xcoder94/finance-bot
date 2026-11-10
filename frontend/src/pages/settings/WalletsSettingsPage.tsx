@@ -171,8 +171,8 @@ export function WalletsSettingsPage() {
         title={t('settings.wallets')}
         backLabel={t('settings.toc.back')}
         backTo="/settings"
-        actionLabel={t('settings.addWallet')}
-        onAction={openCreateForm}
+        actionLabel={loadState.status === 'success' ? t('settings.addWallet') : undefined}
+        onAction={loadState.status === 'success' ? openCreateForm : undefined}
       >
         {loadState.status === 'loading' ? (
           <div className="settings-entity-page__loading">
