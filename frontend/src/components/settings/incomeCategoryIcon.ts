@@ -16,6 +16,8 @@ const KEYWORD_ICONS: ReadonlyArray<[string, LucideIcon]> = [
   ['ish haqi', CircleDollarSign],
   ['freelance', BriefcaseBusiness],
   ['фриланс', BriefcaseBusiness],
+  ['бизнес', BriefcaseBusiness],
+  ['подработ', BriefcaseBusiness],
   ['gift', Gift],
   ['подар', Gift],
   ['sovg', Gift],

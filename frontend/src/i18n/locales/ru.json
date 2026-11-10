@@ -414,7 +414,21 @@
     "clothing": "Одежда",
     "entertainment": "Развлечения",
     "subscriptions": "Подписки",
-    "beauty_care": "Красота и уход"
+    "beauty_care": "Красота и уход",
+    "cafes_delivery": "Кафе и доставка",
+    "taxi_transit": "Такси и проезд",
+    "car": "Автомобиль",
+    "utilities_telecom": "Коммуналка и связь",
+    "home_repairs": "Ремонт и вещи для дома",
+    "kids_learning": "Учёба и кружки",
+    "drugstore": "Аптека",
+    "doctors": "Врачи",
+    "toi_gifts": "Тои и подарки",
+    "family_help": "Помощь родным",
+    "personal_leisure": "Личное и досуг",
+    "fun_subscriptions": "Развлечения и подписки",
+    "business_side_job": "Бизнес и подработка",
+    "transfers_gifts": "Переводы и подарки"
   },
   "goals": {
     "title": "Цели",
