@@ -11,10 +11,9 @@ import {
   HomeLeftSkeleton,
   balanceSizeClass,
   HomeOnboardingCard,
-  HomeTrendCard,
-  HomeTrendPlaceholder,
 } from '../components/home/homeBlocks'
-import { fetchTrend, type TrendEntry } from '../api/analytics'
+import { fetchWallets } from '../api/transactions'
+import { sharedUzsWalletsTotal } from '../utils/homeWallets'
 import { fetchOnboarding, type OnboardingState } from '../api/me'
 
 import {
@@ -28,20 +27,19 @@ import { useAuthStore } from '../store/authStore'
 import {
   getCachedHomeSummary,
   getCachedRecentHistory,
-  getCachedTrend,
+  getCachedWallets,
   useDataCacheStore,
   getCachedPersonalSummary,
   getCachedPersonalWalletBalances,
   invalidateHomeData,
   peekHomeSummary,
   peekRecentHistory,
-  peekTrend,
+  peekWallets,
   peekPersonalSummary,
   peekPersonalWalletBalances,
 } from '../store/dataCacheStore'
 import { resolveFetchState, type FetchState, type KeyedFetchState } from '../utils/homeFetchState'
 import { daysLeftInMonth, monthHasIncome, perDayAllowance, remainingFromSummary } from '../utils/homeLeft'
-import { buildTrend3, trendEndMonthParam } from '../utils/homeTrend'
 import {
   loadDismissedAt,
   readDismissedAtSync,
@@ -321,17 +319,15 @@ export function HomePage() {
     monthKey,
   )
 
-  const trendFetch = useFetchBlock(
+  // Forced on every trigger: balances change with each operation and the reference cache is long-lived.
+  const walletsFetch = useFetchBlock(
     useCallback(
-      () =>
-        getCachedTrend(familyId, trendEndMonthParam({ year, month }), () =>
-          fetchTrend(trendEndMonthParam({ year, month })),
-        ),
-      [familyId, year, month],
+      () => getCachedWallets(familyId, fetchWallets, true),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [familyId, homeEpoch, visibilityRefreshCount],
     ),
-    homeFetchTrigger,
-    peekTrend(familyId, trendEndMonthParam({ year, month })),
-    monthKey,
+    balancesFetchTrigger,
+    peekWallets(familyId),
   )
   useHomeScrollRestore()
   const [dismissedAt, setDismissedAt] = useState<number | null>(readDismissedAtSync)
@@ -364,10 +360,9 @@ export function HomePage() {
   const remaining = summaryData ? remainingFromSummary(summaryData) : 0
   const daysLeft = daysLeftInMonth(new Date(), selectedMonth)
   const perDay = perDayAllowance(remaining, daysLeft)
-  const trendBars =
-    trendFetch.state.status === 'success'
-      ? buildTrend3(trendFetch.state.data as TrendEntry[], selectedMonth)
-      : null
+  const walletsTotal =
+    walletsFetch.state.status === 'success' ? sharedUzsWalletsTotal(walletsFetch.state.data) : null
+  const showNoIncomeHint = !!summaryData && expense > 0 && income === 0
   const onboardingState =
     onboardingFetch.state.status === 'success' ? onboardingFetch.state.data : null
   const showOnboarding = shouldShowOnboardingCard(onboardingState, dismissedAt, Date.now())
@@ -495,30 +490,14 @@ export function HomePage() {
             <HomeOnboardingCard
               steps={onboardingState.steps}
               onStart={() => openForm('/add-expense')}
+              onStartIncome={() => openForm('/add-income')}
               onClose={closeOnboarding}
-            />
-          )}
-
-          {anyBlockFailed ? null : summaryLoading ? (
-            <HomeLeftSkeleton />
-          ) : (
-            <HomeLeftBlock
-              remaining={remaining}
-              perDay={perDay}
-              days={daysLeft}
-              noIncome={!!summaryData && !monthHasIncome(summaryData)}
             />
           )}
 
           {anyBlockFailed ? null : (
           <>
-          <button
-            type="button"
-            className="home-figures-card home-figures-card--link"
-            onClick={() => openWalletsFromHome(selectedMonth, (path) => navigate(path))}
-          >
-            <span className="visually-hidden">{t('wallets.title')}. </span>
-            <span className="home-figures-card__chevron" aria-hidden="true">›</span>
+          <div className="home-figures-card">
             <div className="home-figures-card__label">{balanceMonthLabel(month)}</div>
             <div className={`home-figures-card__balance${balanceSizeClass(balanceText)}`}>
               {summaryUnavailable || summaryLoading ? (
@@ -531,6 +510,9 @@ export function HomePage() {
                 />
               )}
             </div>
+            {showNoIncomeHint ? (
+              <div className="home-figures-card__hint">{t('home.noIncomeHint')}</div>
+            ) : null}
             <div className="home-figures-card__stats">
               <div className="home-figures-card__stat">
                 <div className="home-figures-card__stat-label">{t('home.income')}</div>
@@ -562,13 +544,27 @@ export function HomePage() {
                 </div>
               </div>
             </div>
-          </button>
+            {walletsTotal !== null ? (
+              <button
+                type="button"
+                className="home-figures-card__wallets"
+                onClick={() => openWalletsFromHome(selectedMonth, (path) => navigate(path))}
+              >
+                {t('home.walletsLine', { sum: formatCurrency(walletsTotal, primaryCurrency) })}
+                <span aria-hidden="true"> ›</span>
+              </button>
+            ) : null}
+          </div>
 
-          {!anyBlockFailed && trendBars ? (
-            <HomeTrendCard bars={trendBars} />
-          ) : !anyBlockFailed && trendFetch.state.status === 'loading' ? (
-            <HomeTrendPlaceholder />
-          ) : null}
+          {summaryLoading ? (
+            <HomeLeftSkeleton />
+          ) : (
+            <HomeLeftBlock
+              perDay={perDay}
+              days={daysLeft}
+              noIncome={!!summaryData && !monthHasIncome(summaryData)}
+            />
+          )}
 
           <div className="home-actions">
             {quickActions.map((action) => (
@@ -606,6 +602,13 @@ export function HomePage() {
               <EmptyStateIcon className="home-empty-card__icon" />
               <div className="home-empty-card__title">{emptyMonthTitle(month)}</div>
               <div className="home-empty-card__hint">{t('home.emptyMonthHint')}</div>
+              <button
+                type="button"
+                className="home-empty-card__cta"
+                onClick={() => openForm('/add-expense')}
+              >
+                {t('home.addExpense')}
+              </button>
             </div>
           ) : historySuccess && totalCount > 0 ? (
             <div className="home-ops-card">

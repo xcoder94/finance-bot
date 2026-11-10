@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
 import type { OnboardingState } from '../../api/me'
-import { formatMillions, trendMonthLabel, type TrendBar } from '../../utils/homeTrend'
 import { CountUp } from '../CountUp'
 import { groupThousands } from '../../utils/groupThousands'
 
@@ -37,12 +36,10 @@ function SumAmount({ id, value, negative }: { id: string; value: number; negativ
 }
 
 export function HomeLeftBlock({
-  remaining,
   perDay,
   days,
   noIncome = false,
 }: {
-  remaining: number
   perDay: number | null
   days: number | null
   noIncome?: boolean
@@ -65,11 +62,6 @@ export function HomeLeftBlock({
               : t('home.leftPerDayHint', { days })}
         </div>
       </div>
-      <div className="home-left__plate">
-        <div className="home-left__label">{t('home.leftTotal')}</div>
-        <SumAmount id="home-left-total" value={remaining} negative={remaining < 0} />
-        <div className="home-left__hint">{t('home.leftTotalHint')}</div>
-      </div>
     </div>
   )
 }
@@ -77,7 +69,7 @@ export function HomeLeftBlock({
 export function HomeLeftSkeleton() {
   return (
     <div className="home-left" aria-hidden="true">
-      {[0, 1].map((key) => (
+      {[0].map((key) => (
         <div key={key} className="home-left__plate home-left__plate--skeleton">
           <div className="home-skeleton__line home-skeleton__line--label" />
           <div className="home-skeleton__line home-left__skeleton-value" />
@@ -87,53 +79,15 @@ export function HomeLeftSkeleton() {
   )
 }
 
-export function HomeTrendCard({ bars }: { bars: TrendBar[] }) {
-  const { t } = useTranslation()
-  return (
-    <div className="home-trend">
-      <div className="home-trend__head">
-        <div className="home-trend__title">{t('home.trendTitle')}</div>
-        <div className="home-trend__unit">{t('home.trendUnit')}</div>
-      </div>
-      <div className="home-trend__cols">
-        {bars.map((bar) => {
-          return (
-            <div
-              key={`${bar.year}-${bar.month}`}
-              className={`home-trend__col${bar.current ? ' home-trend__col--current' : ''}`}
-            >
-              <div className="home-trend__value">{formatMillions(bar.expense)}</div>
-              <div className="home-trend__bar" style={{ height: `${bar.heightPx}px` }} />
-              <div className="home-trend__month">{trendMonthLabel(bar.month)}</div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-/** Same box as HomeTrendCard so the page below does not move when the trend arrives. */
-export function HomeTrendPlaceholder() {
-  const { t } = useTranslation()
-  return (
-    <div className="home-trend home-trend--ph" aria-hidden="true">
-      <div className="home-trend__head">
-        <div className="home-trend__title">{t('home.trendTitle')}</div>
-        <div className="home-trend__unit">{t('home.trendUnit')}</div>
-      </div>
-      <div className="home-trend__cols" />
-    </div>
-  )
-}
-
 export function HomeOnboardingCard({
   steps,
   onStart,
+  onStartIncome,
   onClose,
 }: {
   steps: OnboardingState['steps']
   onStart: () => void
+  onStartIncome: () => void
   onClose: () => void
 }) {
   const { t } = useTranslation()
@@ -188,9 +142,13 @@ export function HomeOnboardingCard({
           )
         })}
       </ol>
-      {!steps.firstOperation ? (
+      {currentIndex === 0 ? (
         <button type="button" className="home-onboarding__cta" onClick={onStart}>
           {t('home.onboarding.cta')}
+        </button>
+      ) : currentIndex === 1 ? (
+        <button type="button" className="home-onboarding__cta" onClick={onStartIncome}>
+          {t('home.onboarding.ctaIncome')}
         </button>
       ) : null}
     </div>

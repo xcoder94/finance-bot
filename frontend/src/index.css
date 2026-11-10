@@ -383,34 +383,6 @@ body {
   padding: 14px 16px 4px;
 }
 
-button.home-figures-card--link {
-  position: relative;
-  display: block;
-  width: 100%;
-  text-align: left;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-button.home-figures-card--link:active {
-  background: var(--chip);
-}
-
-button.home-figures-card--link:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 3px var(--acc);
-}
-
-.home-figures-card__chevron {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--hint);
-}
-
 .wallets-page__hint {
   display: block;
   margin: 12px 0 16px;
@@ -4469,4 +4441,45 @@ a.tabbar-link:active {
 
 .history-summary-line__expense {
   color: var(--exp);
+}
+
+.home-figures-card__hint {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--hint);
+}
+
+.home-figures-card__wallets {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 12px 0;
+  border: none;
+  border-top: 1px solid var(--sep);
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  color: var(--acc);
+  cursor: pointer;
+}
+
+.home-figures-card__wallets:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--acc);
+}
+
+.home-empty-card__cta {
+  margin-top: 14px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 12px;
+  background: var(--acc);
+  color: var(--acct);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }

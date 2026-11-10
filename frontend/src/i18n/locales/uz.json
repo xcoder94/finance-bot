@@ -226,21 +226,20 @@
     "leftPerDayHint": "qoldiq ÷ {{days}} kun",
     "leftPerDayDone": "oy yakunlangan",
     "leftPerDayNoIncome": "Hisoblash uchun daromad qo'shing",
-    "leftTotal": "Oy oxirigacha qoldiq",
-    "leftTotalHint": "daromad − xarajat",
-    "trendTitle": "So'nggi 3 oy xarajati",
-    "trendUnit": "mln so'm",
     "failHint": "Aloqani tekshirib, qayta urinib ko'ring.",
     "onboarding": {
       "title": "Birinchi byudjetgacha 3 qadam",
       "step1": "Birinchi xarajatni yozing",
-      "step2": "Asosiy hamyonni tekshiring",
+      "step2": "Oylik daromadni qo'shing",
       "step3": "Oilani taklif qiling",
       "cta": "Xarajat yozish",
+      "ctaIncome": "Daromad qo'shish",
       "close": "Yopish"
     },
     "emptyMonth": "{{month}} operatsiyalar yo'q",
-    "balanceMonth": "Qoldiq · {{month}}"
+    "balanceMonth": "Oy yakuni · {{month}}",
+    "noIncomeHint": "Daromadni yozing — masalan, «maosh 8 mln»",
+    "walletsLine": "Hamyonlardagi pul: {{sum}}"
   },
   "addIncome": {
     "title": "Daromad qo'shish"

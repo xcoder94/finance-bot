@@ -46,7 +46,7 @@ describe('month titles and empty-month phrase', () => {
     await i18n.changeLanguage('uz')
     expect(emptyMonthTitle(8)).toBe("Avgustda operatsiyalar yo'q")
     expect(formatMonthTitle(2026, 8)).toBe('2026-yil avgust')
-    expect(balanceMonthLabel(10)).toBe('Qoldiq · okt')
+    expect(balanceMonthLabel(10)).toBe('Oy yakuni · okt')
     expect(opsCountLabel(0, 8)).toBe("operatsiyalar yo'q")
   })
 })
@@ -75,7 +75,7 @@ describe('opsCountLabel', () => {
 
 describe('balanceMonthLabel', () => {
   it('formats balance label with short month', () => {
-    expect(balanceMonthLabel(8)).toBe('Остаток · август')
+    expect(balanceMonthLabel(8)).toBe('Итог месяца · август')
   })
 })
 

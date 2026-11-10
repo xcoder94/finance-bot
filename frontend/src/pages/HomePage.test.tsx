@@ -49,6 +49,11 @@ function seed(history: { total_count: number }) {
   set('home:fam:personal-summary:2026-10', { currencies_with_wallets: [], by_currency: [] })
   set('home:fam:personal-balances', { currencies_with_wallets: [], balances: [] })
   set('home:fam:recent:2026-10', { items: [], ...history })
+  const wallet = (currency: string, balance: number, is_personal = false) => ({
+    id: currency + balance, name: 'w', currency, translation_key: null, transaction_count: 0,
+    is_personal, has_active_goal: false, balance,
+  })
+  set('reference:fam:wallets', [wallet('UZS', 10_000_000), wallet('UZS', 2_400_000), wallet('USD', 999), wallet('UZS', 5, true)])
 }
 
 beforeEach(() => {
@@ -77,7 +82,7 @@ describe('HomePage', () => {
     seed({ total_count: 0 })
     const html = renderHome()
     expect(html).toContain('Октябрь 2026')
-    expect(html).toContain('Остаток · окт')
+    expect(html).toContain('Итог месяца · окт')
     expect(html).toContain('3 450 000 сум')
     expect(html).not.toContain('home-fail')
   })
@@ -91,16 +96,16 @@ describe('HomePage', () => {
     expect(html).not.toContain('UZS')
   })
 
-  it('balance card is a button that opens /wallets, with a screen-reader label', () => {
+  it('U5.2: wallets line shows the shared UZS wallets sum and is the only button to /wallets', () => {
     seed({ total_count: 0 })
-    const html = renderHome()
-    const m = html.match(/<button[^>]*home-figures-card[^>]*>/)
+    const html = renderHome().replace(/\u00a0/g, ' ')
+    expect(html).toContain('Деньги в кошельках: 12 400 000 сум')
+    const m = html.match(/<button[^>]*home-figures-card__wallets[^>]*>/)
     expect(m).not.toBeNull()
     expect(m![0]).toContain('type="button"')
-    const card = html.slice(html.indexOf('home-figures-card')).replace(/\u00a0/g, ' ')
-    expect(card).toContain('Кошельки')
-    expect(card).toContain('visually-hidden')
-    expect(card).toContain('Остаток · окт')
+    expect(html).not.toMatch(/<button[^>]*class="home-figures-card /)
+    const card = html.slice(html.indexOf('home-figures-card'))
+    expect(card).toContain('Итог месяца · окт')
     expect(card).toContain('3 450 000 сум')
     expect(card).toContain('Доход')
     expect(card).toContain('Расход')
@@ -115,5 +120,46 @@ describe('HomePage', () => {
       forgetHomeMonth()
     }
     expect(renderHome()).toContain('Октябрь 2026')
+  })
+
+  it('U5.1: the word Остаток is gone from Home, Итог месяца is there', () => {
+    seed({ total_count: 0 })
+    const html = renderHome()
+    expect(html).not.toContain('Остаток')
+    expect(html).not.toContain('Осталось до конца месяца')
+    expect(html).toContain('Итог месяца')
+  })
+
+  it('U5.3: expenses without income show the hint; with income it is hidden', () => {
+    seed({ total_count: 0 })
+    useDataCacheStore.getState().setEntry('home:fam:summary:2026-10', {
+      by_currency: [{ currency: 'UZS', income: 0, expense: 500_000, net_change: 0 }],
+    })
+    expect(renderHome()).toContain('Запишите доход — например, «зарплата 8 млн»')
+    useDataCacheStore.getState().setEntry('home:fam:summary:2026-10', {
+      by_currency: [{ currency: 'UZS', income: 8_000_000, expense: 500_000, net_change: 0 }],
+    })
+    expect(renderHome()).not.toContain('Запишите доход')
+  })
+
+  it('U5.3b: no hint for an empty month', () => {
+    seed({ total_count: 0 })
+    useDataCacheStore.getState().setEntry('home:fam:summary:2026-10', { by_currency: [] })
+    expect(renderHome()).not.toContain('Запишите доход')
+  })
+
+  it('U5: the 3-month trend block is removed', () => {
+    seed({ total_count: 0 })
+    const html = renderHome()
+    expect(html).not.toContain('home-trend')
+    expect(html).not.toContain('3 месяца')
+  })
+
+  it('U5.4: empty Home has the Добавить расход button', () => {
+    seed({ total_count: 0 })
+    const html = renderHome()
+    const empty = html.slice(html.indexOf('home-empty-card'))
+    expect(empty).toContain('home-empty-card__cta')
+    expect(empty).toContain('Добавить расход')
   })
 })
