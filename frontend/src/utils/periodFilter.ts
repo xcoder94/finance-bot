@@ -1,8 +1,8 @@
-import { t } from '../i18n/t'
 import { useMemo } from 'react'
 
 import { monthDateRange } from '../api/home'
 import i18n from '../i18n'
+import { formatMonthTitle, monthShortLabel } from './homeMonth'
 import { dayEndIso, dayStartIso, isValidIsoDate, tashkentDateOf, todayTashkent } from './dateChips'
 
 function clampToToday(iso: string): string {
@@ -36,27 +36,16 @@ export function getLocale(): string {
   return i18n.language.startsWith('uz') ? 'uz-UZ' : 'ru-RU'
 }
 
+/** The one month-label format for the whole app: «Ноябрь 2026» / «2026-yil noyabr». */
 export function formatMonthLabel(selected: SelectedMonth): string {
-  if (i18n.language.startsWith('uz')) {
-    return t('months.title', { month: t(`months.long.${selected.month}`), year: selected.year })
-  }
-  const text = new Intl.DateTimeFormat(getLocale(), {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(selected.year, selected.month - 1, 1))
-  // first letter only (CSS `capitalize` would also turn «г.» into «Г.»)
-  return text.charAt(0).toLocaleUpperCase(getLocale()) + text.slice(1)
+  return formatMonthTitle(selected.year, selected.month)
 }
 
+/** Short month name from the app's own strings (RU and UZ), never Intl: «Ноя» / «Noy». */
 export function formatShortMonthKey(monthKey: string): string {
-  const [yearText, monthText] = monthKey.split('-')
-  const year = Number(yearText)
-  const month = Number(monthText)
-  return new Intl.DateTimeFormat(getLocale(), {
-    month: 'short',
-  })
-    .format(new Date(year, month - 1, 1))
-    .replace('.', '')
+  const month = Number(monthKey.split('-')[1])
+  const label = monthShortLabel(month)
+  return label.charAt(0).toLocaleUpperCase() + label.slice(1)
 }
 
 export function resolveRange(

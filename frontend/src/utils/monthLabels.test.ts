@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import i18n from '../i18n'
 
 import { formatChartsEmptyMonth } from './analyticsChartsTab'
-import { formatMonthLabel } from './periodFilter'
+import { formatMonthTitle } from './homeMonth'
+import { formatMonthLabel, formatShortMonthKey } from './periodFilter'
 
 afterEach(async () => {
   await i18n.changeLanguage('ru')
@@ -16,9 +17,9 @@ describe('month labels case (P3-6)', () => {
     await i18n.changeLanguage('uz')
     expect(formatMonthLabel({ year: 2026, month: 11 })).toBe('2026-yil noyabr')
   })
-  it('RU: first letter only, «г.» stays lower-case', async () => {
+  it('RU: «Ноябрь 2026», no «г.» (B21)', async () => {
     await i18n.changeLanguage('ru')
-    expect(formatMonthLabel({ year: 2026, month: 11 })).toBe('Ноябрь 2026 г.')
+    expect(formatMonthLabel({ year: 2026, month: 11 })).toBe('Ноябрь 2026')
   })
   it('UZ empty-month sentence starts with a capital', async () => {
     await i18n.changeLanguage('uz')
@@ -31,5 +32,22 @@ describe('month labels case (P3-6)', () => {
   it('no CSS text-transform: capitalize on month labels', () => {
     const css = readFileSync(join(__dirname, '..', 'index.css'), 'utf8')
     expect(css).not.toMatch(/text-transform:\s*capitalize/)
+  })
+  it('one helper: Home title equals the shared label, RU and UZ (B21)', async () => {
+    for (const lng of ['ru', 'uz']) {
+      await i18n.changeLanguage(lng)
+      expect(formatMonthLabel({ year: 2026, month: 11 })).toBe(formatMonthTitle(2026, 11))
+      expect(formatMonthLabel({ year: 2026, month: 11 })).not.toMatch(/г\./)
+    }
+  })
+  it('UZ short month keys come from app strings: Noy / Dek, never M12 (B6)', async () => {
+    await i18n.changeLanguage('uz')
+    expect(formatShortMonthKey('2026-11')).toBe('Noy')
+    expect(formatShortMonthKey('2026-12')).toBe('Dek')
+    expect(formatShortMonthKey('2026-01')).not.toMatch(/^M\d+$/)
+  })
+  it('RU short month key', async () => {
+    await i18n.changeLanguage('ru')
+    expect(formatShortMonthKey('2026-11')).toBe('Ноя')
   })
 })

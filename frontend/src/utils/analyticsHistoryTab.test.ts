@@ -5,6 +5,7 @@ import { historyFilterAfterTabSwitch } from './analyticsTabState'
 import { CHART_CATEGORY_COLORS } from './chartColors'
 import {
   buildAnalyticsHistoryFetchKey,
+  filterHistoryByCurrency,
   getAnalyticsHistoryExpenseCategoryId,
   isAnalyticsHistoryUncategorized,
 } from './analyticsHistoryTab'
@@ -56,5 +57,13 @@ describe('uncategorized filter', () => {
   it('survives switching to history tab and is cleared on charts', () => {
     expect(historyFilterAfterTabSwitch(filter, 'history')).toBe(filter)
     expect(historyFilterAfterTabSwitch(filter, 'charts')).toBeNull()
+  })
+})
+
+describe('filterHistoryByCurrency (B17)', () => {
+  it('keeps only rows of the selected currency', () => {
+    const rows = [{ currency: 'UZS' }, { currency: 'USD' }, { currency: 'UZS' }]
+    expect(filterHistoryByCurrency(rows, 'UZS')).toHaveLength(2)
+    expect(filterHistoryByCurrency(rows, 'USD')).toHaveLength(1)
   })
 })

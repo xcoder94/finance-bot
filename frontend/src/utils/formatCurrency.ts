@@ -13,7 +13,8 @@ export function formatCurrency(amount: number, currency: Currency): string {
     return `${sign}$${formatted}`
   }
 
-  return `${sign}${formatted} ${sumUnit()}`
+  // NBSP before the unit: amount + currency is one unbreakable unit (B5)
+  return `${sign}${formatted}\u00a0${sumUnit()}`
 }
 
 export function formatUsdTrendAxisAmount(value: number): string {

@@ -110,4 +110,17 @@ describe('fetchHistoryPage uncategorized', () => {
   it('omits uncategorized by default', async () => {
     expect((await call()).get('uncategorized')).toBeNull()
   })
+
+  it('passes the selected currency when provided (B17)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total_count: 0 }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchHistoryPage('2026-08-01T00:00:00.000+05:00', '2026-08-31T23:59:59.999+05:00', 20, 0, 'c1', undefined, false, 'USD')
+
+    const [url] = fetchMock.mock.calls[0] as [string]
+    expect(new URL(url, 'http://localhost').searchParams.get('currency')).toBe('USD')
+  })
 })

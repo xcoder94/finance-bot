@@ -446,6 +446,9 @@ button.home-figures-card--link:focus-visible {
   font-variant-numeric: tabular-nums;
   color: var(--tx);
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-figures-card__balance--long {
@@ -464,6 +467,7 @@ button.home-figures-card--link:focus-visible {
 
 .home-figures-card__stat {
   flex: 1;
+  min-width: 0;
   padding: 11px 0 13px;
 }
 
@@ -490,6 +494,9 @@ button.home-figures-card--link:focus-visible {
   font-weight: 500;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-figures-card__stat-value--income {
@@ -695,7 +702,9 @@ button.home-figures-card--link:focus-visible {
 }
 
 .home-ops-row__aside {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
   text-align: right;
 }
 
@@ -706,6 +715,14 @@ button.home-figures-card--link:focus-visible {
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-ops-row > .home-ops-row__amount {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
 }
 
 .home-ops-row__amount--income {

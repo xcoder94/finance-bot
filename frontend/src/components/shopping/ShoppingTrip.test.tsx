@@ -92,8 +92,8 @@ describe('ShoppingResultView', () => {
   it('shows N from the API, amount, remaining, caption with K', () => {
     const html = wrap(<ShoppingResultView purchase={purchase} categoryLabel={null} walletLabel={null} onDone={noop} />)
     expect(html).toContain('Записано 6 товаров')
-    expect(html).toContain('−412 000 сум')
-    expect(html).toContain('3 038 000 сум')
+    expect(html).toContain('−412 000 сум')
+    expect(html).toContain('3 038 000 сум')
     expect(html).toContain('осталось')
     expect(html).toContain('Еда · Продукты · Карта Humo')
     expect(html).toContain('Купленные позиции ушли из списка, неотмеченные (3) остались.')

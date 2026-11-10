@@ -10,14 +10,13 @@ import {
 } from 'recharts'
 
 import type { TrendChartRow } from '../../utils/analyticsCharts'
-import { formatCompactAxisAmount } from '../../utils/formatCurrency'
 import { Text } from '@telegram-apps/telegram-ui'
 
 const INCOME_COLOR = 'var(--app-color-income)'
 const EXPENSE_COLOR = 'var(--app-color-expense)'
 const AXIS_COLOR = 'var(--app-chart-axis)'
 const GRID_COLOR = 'var(--app-chart-grid)'
-const Y_AXIS_WIDTH = 64
+const Y_AXIS_WIDTH = 48
 const CHART_MARGIN = { top: 20, right: 8, left: 8, bottom: 0 }
 const AXIS_TICK = { fill: AXIS_COLOR, fontSize: 12 }
 const TOOLTIP_STYLE = {
@@ -27,6 +26,8 @@ const TOOLTIP_STYLE = {
   color: 'var(--app-chart-tooltip-text)',
 }
 const TOOLTIP_TEXT_STYLE = { color: 'var(--app-chart-tooltip-text)' }
+// legend in the same text size as the axis labels
+const LEGEND_STYLE = { ...TOOLTIP_TEXT_STYLE, fontSize: 12 }
 
 type TrendChartProps = {
   rows: TrendChartRow[]
@@ -34,7 +35,7 @@ type TrendChartProps = {
   expenseLabel: string
   title: string
   unit: string
-  yAxisTickFormatter?: (value: number) => string
+  yAxisTickFormatter: (value: number) => string
 }
 
 export function TrendChart({
@@ -43,7 +44,7 @@ export function TrendChart({
   expenseLabel,
   title,
   unit,
-  yAxisTickFormatter = formatCompactAxisAmount,
+  yAxisTickFormatter,
 }: TrendChartProps) {
   return (
     <div className="analytics-trend-chart">
@@ -60,10 +61,9 @@ export function TrendChart({
               tick={AXIS_TICK}
               axisLine={{ stroke: AXIS_COLOR }}
               tickLine={{ stroke: AXIS_COLOR }}
-              interval={0}
-              angle={-45}
-              textAnchor="end"
-              height={56}
+              interval="preserveStartEnd"
+              minTickGap={6}
+              height={28}
             />
             <YAxis
               tick={AXIS_TICK}
@@ -71,6 +71,7 @@ export function TrendChart({
               tickLine={{ stroke: AXIS_COLOR }}
               width={Y_AXIS_WIDTH}
               tickFormatter={yAxisTickFormatter}
+              tickMargin={2}
             />
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
@@ -78,7 +79,7 @@ export function TrendChart({
               itemStyle={TOOLTIP_TEXT_STYLE}
               cursor={{ fill: 'var(--app-chart-cursor)' }}
             />
-            <Legend wrapperStyle={TOOLTIP_TEXT_STYLE} />
+            <Legend wrapperStyle={LEGEND_STYLE} />
             <Bar dataKey="income" name={incomeLabel} fill={INCOME_COLOR} radius={[4, 4, 0, 0]} />
             <Bar dataKey="expense" name={expenseLabel} fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
           </BarChart>

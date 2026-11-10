@@ -6,15 +6,19 @@ import { formatCurrency } from './formatCurrency'
 import { groupThousands } from './groupThousands'
 
 describe('formatCurrency wrapping', () => {
-  it('keeps the digits of one number together (NBSP) and breaks only before the unit', async () => {
+  it('amount and unit are one unbreakable unit (no plain space)', async () => {
     await i18n.changeLanguage('uz')
     const text = formatCurrency(12_400_000, 'UZS')
-    expect(text).toBe("12 400 000 so'm")
-    expect(text.split(' ')).toEqual(["12 400 000", "so'm"])
+    expect(text).toBe("12\u00a0400\u00a0000\u00a0so'm")
+    expect(text).not.toContain(' ')
+    await i18n.changeLanguage('ru')
+    const big = formatCurrency(2_002_658_999, 'UZS')
+    expect(big).toBe('2\u00a0002\u00a0658\u00a0999\u00a0сум')
+    expect(big).not.toContain(' ')
   })
   it('RU and negative numbers behave the same', async () => {
     await i18n.changeLanguage('ru')
-    expect(formatCurrency(-3_450_000, 'UZS')).toBe('-3 450 000 сум')
+    expect(formatCurrency(-3_450_000, 'UZS')).toBe('-3 450 000 сум')
     expect(formatCurrency(1_500, 'USD')).toBe('$1 500')
   })
   it('groupThousands leaves short numbers alone', () => {

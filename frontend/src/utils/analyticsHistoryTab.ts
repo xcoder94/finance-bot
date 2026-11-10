@@ -24,3 +24,11 @@ export function isAnalyticsHistoryUncategorized(
 ): boolean {
   return historyCategoryFilter?.uncategorized === true
 }
+
+/** Display-side guard: a page may still carry other-currency rows if the server ignores `currency`. */
+export function filterHistoryByCurrency<T extends { currency: string }>(
+  items: T[],
+  currency: string,
+): T[] {
+  return items.filter((item) => item.currency === currency)
+}

@@ -41,9 +41,14 @@ import {
   isChartsTabEmpty,
   mergeCategoryIds,
 } from '../../utils/analyticsChartsTab'
-import { OTHER_CATEGORY_COLOR_INDEX, mergeStoredCategoryColorIndices } from '../../utils/chartColors'
+import { OTHER_CATEGORY_COLOR_INDEX, resolveEffectiveColorIndices } from '../../utils/chartColors'
 import { dayWordRu } from '../../utils/dayCountLabel'
 import { buildDisplayNameById } from '../../utils/getDisplayName'
+import {
+  chooseTrendAxisScale,
+  formatTrendAxisTick,
+  trendAxisCaption,
+} from '../../utils/trendAxis'
 import { formatMonthLabel, formatShortMonthKey } from '../../utils/periodFilter'
 
 function getSummaryEntry(
@@ -198,15 +203,11 @@ export function AnalyticsChartsTab() {
       .filter((entry) => entry.amount > 0)
       .flatMap((entry) => (entry.category_id === null ? [] : [entry.category_id]))
     const orderedParentIds = mergeCategoryIds(categoryMaps.expenseParentIds, apiCategoryIds)
-    const storedColorIndices = mergeStoredCategoryColorIndices(
-      categoryMaps.expenseCategories.filter((category) => category.parent_id === null),
-      expensesFetch.state.data,
-      'category_id',
-    )
+    const effectiveIndices = resolveEffectiveColorIndices(categoryMaps.expenseCategories)
     return prepareDonutSlices(
       expensesFetch.state.data,
       orderedParentIds,
-      extendCategoryColorMap(categoryMaps.expenseParentIds, apiCategoryIds, storedColorIndices),
+      effectiveIndices,
       t('analytics.other'),
       t,
       categoryMaps.expenseDisplayNameById,
@@ -237,14 +238,8 @@ export function AnalyticsChartsTab() {
       categoryMaps.expenseCategories,
     )
     const apiIds = subcategoryEntries.map((entry) => entry.subcategory_id)
-    const storedColorIndices = mergeStoredCategoryColorIndices(
-      categoryMaps.expenseCategories.filter(
-        (category) => category.parent_id === drillParent.id,
-      ),
-      subcategoriesFetch.state.status === 'success' ? subcategoriesFetch.state.data : [],
-      'subcategory_id',
-    )
-    return extendCategoryColorMap(orderedIds, apiIds, storedColorIndices)
+    const effectiveIndices = resolveEffectiveColorIndices(categoryMaps.expenseCategories)
+    return extendCategoryColorMap(orderedIds, apiIds, effectiveIndices)
   }, [drillParent, categoryMaps, subcategoryEntries, subcategoriesFetch.state])
 
   const drillSlices = useMemo(() => {
@@ -275,6 +270,12 @@ export function AnalyticsChartsTab() {
       formatShortMonthKey,
     )
   }, [trendFetch.state, currency, selectedMonth])
+
+  const trendScale = useMemo(
+    () =>
+      chooseTrendAxisScale(Math.max(0, ...trendRows.flatMap((row) => [row.income, row.expense]))),
+    [trendRows],
+  )
 
   const weekdayLabels = [
     t('analytics.weekdayMon'),
@@ -479,7 +480,8 @@ export function AnalyticsChartsTab() {
             incomeLabel={t('home.income')}
             expenseLabel={t('home.expense')}
             title={t('analytics.trendTitle')}
-            unit={t('analytics.trendUnitUzs')}
+            unit={trendAxisCaption(trendScale, currency)}
+            yAxisTickFormatter={(value) => formatTrendAxisTick(value, trendScale)}
           />
         )}
       </section>

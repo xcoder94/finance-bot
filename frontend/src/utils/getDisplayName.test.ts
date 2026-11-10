@@ -7,7 +7,10 @@ import {
   resolveCategoryAmountDisplayName,
   resolveStoredEntityDisplayName,
   resolveSubcategoryAmountDisplayName,
+  getHistoryItemMeta,
+  getHistoryItemTitle,
 } from './getDisplayName'
+import type { HistoryItem } from '../api/home'
 
 // dev-fix9: backend keeps translation_key after a rename, so a renamed default wallet or category
 // must still show the user's own name (not the localized default).
@@ -77,4 +80,32 @@ describe('xls_* import entities', () => {
       expect(getDisplayName({ name: 'Моё имя', translation_key: c.key }, i18next.t)).toBe('Моё имя')
     })
   }
+})
+
+describe('record without category (B4)', () => {
+  afterEach(async () => {
+    await i18next.changeLanguage('ru')
+  })
+  const base = {
+    id: 'x', type: 'expense', amount: 1, currency: 'UZS', created_by: null,
+    wallet_name: 'Карта', wallet_translation_key: null,
+    expense_category_name: null, expense_category_translation_key: null,
+    expense_subcategory_name: null, expense_subcategory_translation_key: null,
+    income_category_name: null, income_category_translation_key: null,
+  } as unknown as HistoryItem
+  const labels = { transfer: 'T', exchange: 'E' }
+
+  it('RU: never a dash', async () => {
+    await i18next.changeLanguage('ru')
+    expect(getHistoryItemTitle(base, labels, i18next.t)).toBe('Без категории')
+    expect(getHistoryItemMeta(base, i18next.t)).toBe('Без категории · Карта')
+    const income = { ...base, type: 'income' } as HistoryItem
+    expect(getHistoryItemTitle(income, labels, i18next.t)).toBe('Без категории')
+    expect(getHistoryItemMeta(income, i18next.t)).not.toContain('—')
+  })
+  it('UZ', async () => {
+    await i18next.changeLanguage('uz')
+    expect(getHistoryItemTitle(base, labels, i18next.t)).toBe('Kategoriyasiz')
+    expect(getHistoryItemMeta(base, i18next.t)).toBe('Kategoriyasiz · Карта')
+  })
 })

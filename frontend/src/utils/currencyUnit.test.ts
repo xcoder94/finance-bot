@@ -11,8 +11,8 @@ describe('owner decision 12: сум / so\'m instead of UZS', () => {
   it('RU uses сум everywhere', async () => {
     await i18n.changeLanguage('ru')
     expect(sumUnit()).toBe('сум')
-    expect(formatCurrency(3_450_000, 'UZS')).toBe('3 450 000 сум')
-    expect(formatCurrency(-5, 'UZS')).toBe('-5 сум')
+    expect(formatCurrency(3_450_000, 'UZS')).toBe('3 450 000 сум')
+    expect(formatCurrency(-5, 'UZS')).toBe('-5 сум')
     expect(walletCurrencySuffix('UZS')).toBe('сум')
     expect(formatGoalMoney(200_000, 'UZS')).toBe('200 000 сум')
   })
@@ -20,7 +20,7 @@ describe('owner decision 12: сум / so\'m instead of UZS', () => {
   it('UZ uses so\'m everywhere', async () => {
     await i18n.changeLanguage('uz')
     expect(sumUnit()).toBe("so'm")
-    expect(formatCurrency(3_450_000, 'UZS')).toBe("3 450 000 so'm")
+    expect(formatCurrency(3_450_000, 'UZS')).toBe("3 450 000 so'm")
     expect(walletCurrencySuffix('UZS')).toBe("so'm")
     expect(formatGoalMoney(200_000, 'UZS')).toBe("200 000 so'm")
     expect(formatTransferResultLine(100, 'USD', 1_280_000, 'UZS')).toBe("100 $ → 1 280 000 so'm")

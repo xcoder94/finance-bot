@@ -58,7 +58,7 @@ export function getHistoryItemTitle(
         item.income_category_name,
         item.income_category_translation_key,
         t,
-      ) ?? '—'
+      ) ?? t('analytics.uncategorized')
     )
   }
   if (item.type === 'expense') {
@@ -67,7 +67,13 @@ export function getHistoryItemTitle(
         item.expense_subcategory_name,
         item.expense_subcategory_translation_key,
         t,
-      ) ?? '—'
+      ) ??
+      resolveStoredEntityDisplayName(
+        item.expense_category_name,
+        item.expense_category_translation_key,
+        t,
+      ) ??
+      t('analytics.uncategorized')
     )
   }
   if (item.type === 'transfer' && item.currency !== item.to_currency) {
@@ -90,7 +96,7 @@ export function getHistoryItemSubtitle(
         item.expense_category_name,
         item.expense_category_translation_key,
         t,
-      ) ?? '—'
+      ) ?? t('analytics.uncategorized')
     )
   }
 
@@ -121,7 +127,7 @@ export function getHistoryItemMeta(item: HistoryItem, t: TFunction): string {
         item.income_category_name,
         item.income_category_translation_key,
         t,
-      ) ?? '—'
+      ) ?? t('analytics.uncategorized')
     return [category, wallet, author].filter(Boolean).join(' · ')
   }
 
@@ -131,14 +137,15 @@ export function getHistoryItemMeta(item: HistoryItem, t: TFunction): string {
         item.expense_category_name,
         item.expense_category_translation_key,
         t,
-      ) ?? '—'
-    const subcategory =
-      resolveStoredEntityDisplayName(
-        item.expense_subcategory_name,
-        item.expense_subcategory_translation_key,
-        t,
-      ) ?? '—'
-    return [category, subcategory, wallet, author].filter(Boolean).join(' · ')
+      ) ?? null
+    const subcategory = resolveStoredEntityDisplayName(
+      item.expense_subcategory_name,
+      item.expense_subcategory_translation_key,
+      t,
+    )
+    const categoryPart =
+      category === null && subcategory === null ? t('analytics.uncategorized') : category
+    return [categoryPart, subcategory, wallet, author].filter(Boolean).join(' · ')
   }
 
   const wallets = getHistoryItemSubtitle(item, t('home.income'), t)

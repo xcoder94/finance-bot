@@ -78,7 +78,7 @@ describe('HomePage', () => {
     const html = renderHome()
     expect(html).toContain('Октябрь 2026')
     expect(html).toContain('Остаток · окт')
-    expect(html).toContain('3 450 000 сум')
+    expect(html).toContain('3 450 000 сум')
     expect(html).not.toContain('home-fail')
   })
 
@@ -86,7 +86,7 @@ describe('HomePage', () => {
     seed({ total_count: 0 })
     const html = renderHome()
     const card = html.slice(html.indexOf('home-figures-card__balance'))
-    expect(card.slice(0, 120)).toContain('3 450 000 сум')
+    expect(card.slice(0, 120)).toContain('3 450 000 сум')
     expect(html).not.toContain('13 550 000')
     expect(html).not.toContain('UZS')
   })

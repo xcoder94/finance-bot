@@ -47,6 +47,7 @@ export async function fetchHistoryPage(
   expenseCategoryId?: string,
   walletId?: string,
   uncategorized?: boolean,
+  currency?: string,
 ): Promise<HistoryResponse> {
   const params = new URLSearchParams({
     date_from: dateFrom,
@@ -62,6 +63,9 @@ export async function fetchHistoryPage(
   }
   if (uncategorized && !expenseCategoryId) {
     params.set('uncategorized', 'true')
+  }
+  if (currency) {
+    params.set('currency', currency)
   }
   return apiGet<HistoryResponse>(`/api/v1/transactions/history?${params}`)
 }

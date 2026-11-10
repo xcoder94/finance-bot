@@ -8,6 +8,7 @@ import { useAnalyticsContext } from '../../contexts/AnalyticsContext'
 import {
   buildAnalyticsHistoryFetchKey,
   getAnalyticsHistoryExpenseCategoryId,
+  filterHistoryByCurrency,
   isAnalyticsHistoryUncategorized,
 } from '../../utils/analyticsHistoryTab'
 import { applyClearHistoryFilter } from '../../utils/analyticsTabState'
@@ -79,6 +80,7 @@ export function AnalyticsHistoryTab() {
       expenseCategoryId,
       undefined,
       uncategorized,
+      currency,
     )
       .then((data) => {
         if (!cancelled) {
@@ -96,7 +98,12 @@ export function AnalyticsHistoryTab() {
     return () => {
       cancelled = true
     }
-  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, historyRetryCount])
+  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, currency, historyRetryCount])
+
+  const shownItems = useMemo(
+    () => filterHistoryByCurrency(historyItems, currency),
+    [historyItems, currency],
+  )
 
   const handleLoadMore = async () => {
     if (!range || loadingMore || historyItems.length >= historyTotal) {
@@ -114,6 +121,7 @@ export function AnalyticsHistoryTab() {
         expenseCategoryId,
         undefined,
         uncategorized,
+        currency,
       )
       setHistoryItems((current) => [...current, ...data.items])
       setHistoryTotal(data.total_count)
@@ -182,8 +190,8 @@ export function AnalyticsHistoryTab() {
 
       <HistoryTransactionList
         status={historyStatus}
-        items={historyItems}
-        totalCount={historyTotal}
+        items={shownItems}
+        totalCount={shownItems.length + Math.max(0, historyTotal - historyItems.length)}
         onItemClick={handleItemClick}
         onRetry={() => setHistoryRetryCount((count) => count + 1)}
         loadingMore={loadingMore}
