@@ -4,7 +4,6 @@
     "shopping": "Покупки",
     "analytics": "Аналитика",
     "goals": "Цели",
-    "history": "История",
     "settings": "Настройки"
   },
   "auth": {
@@ -92,7 +91,6 @@
       "owner": "Владелец",
       "member": "Участник"
     },
-    "firstName": "Имя",
     "language": "Язык",
     "wallets": "Кошельки",
     "categoriesIncome": "Категории доходов",
@@ -102,7 +100,6 @@
     "addSubcategory": "Добавить подкатегорию",
     "delete": "Удалить",
     "confirmDelete": "Удалить этот элемент?",
-    "confirmDeleteParentWithSubcategories": "Категория и {{count}} вложенных подкатегорий будут удалены",
     "nameLabel": "Название",
     "currencyLabel": "Валюта",
     "nameRequired": "Введите название",
@@ -122,7 +119,6 @@
     },
     "inviteLink": "Ссылка-приглашение",
     "copyLink": "Скопировать",
-    "linkCopied": "Скопировано",
     "walletForm": {
       "newTitle": "Новый кошелёк",
       "createIntroOwner": "Общий кошелёк создаёт только владелец. Личный — каждый себе.",
@@ -203,18 +199,12 @@
     }
   },
   "home": {
-    "summary": "Сводка",
     "income": "Доход",
     "expense": "Расход",
     "balance": "Остаток",
-    "quickActions": "Быстрые действия",
-    "addIncome": "Добавить доход",
     "addExpense": "Добавить расход",
-    "addTransfer": "Добавить перевод",
-    "comingSoon": "Скоро",
     "recentTransactions": "Последние операции",
     "seeAll": "Все",
-    "noTransactions": "Пока нет операций",
     "transfer": "Перевод",
     "loadError": "Не удалось загрузить данные",
     "previousMonth": "Предыдущий месяц",
@@ -261,17 +251,12 @@
     "titleExchange": "Обмен"
   },
   "addTransaction": {
-    "dateTime": "Дата и время",
     "amount": "Сумма",
-    "amountWithCurrency": "Сумма ({{currency}})",
     "wallet": "Кошелёк",
     "category": "Категория",
-    "subcategory": "Подкатегория",
-    "commentOptional": "Комментарий (необязательно)",
     "sourceWallet": "Откуда",
     "destinationWallet": "Куда",
     "rateLabel": "Курс",
-    "walletWillReceive": "Получит кошелёк",
     "cancel": "Отменить",
     "add": "Добавить",
     "loadError": "Не удалось загрузить данные",
@@ -279,13 +264,11 @@
     "successTitle": "Операция добавлена",
     "goHome": "На главную",
     "addAnother": "Добавить ещё",
-    "invalidDateTime": "Введите корректную дату и время",
     "invalidDate": "Введите корректную дату",
     "amountTooLong": "Сумма не должна превышать 10 цифр",
     "chooseCategory": "Выберите категорию"
   },
   "history": {
-    "title": "История операций",
     "tabMonth": "Месяц",
     "tabRange": "Диапазон",
     "dateFrom": "С",
@@ -295,15 +278,9 @@
     "emptyTitle": "Операций за период нет",
     "emptyHint": "Смените месяц или сбросьте фильтр по категории.",
     "loadMore": "Показать ещё",
-    "invalidDate": "Введите корректную дату",
     "invalidRange": "Дата «С» не может быть позже даты «По»",
-    "detailTitle": "Детали операции",
-    "edit": "Редактировать",
     "delete": "Удалить",
-    "close": "Закрыть",
-    "confirmDelete": "Удалить запись?",
-    "deleteError": "Не удалось удалить операцию",
-    "destinationAmount": "Получено: {{amount}}"
+    "deleteError": "Не удалось удалить операцию"
   },
   "editIncome": {
     "title": "Запись"
@@ -313,9 +290,6 @@
   },
   "editTransfer": {
     "title": "Запись"
-  },
-  "editTransaction": {
-    "save": "Сохранить"
   },
   "categoryPicker": {
     "expenseTitle": "Категория расхода",
@@ -348,12 +322,7 @@
     "expensesByCategory": "Расходы по категориям",
     "uncategorized": "Без категории",
     "incomeByCategory": "Доходы по категориям",
-    "monthlyTrend": "Доход и расход по месяцам",
     "trendTitle": "Доход и расход, 12 месяцев",
-    "summaryTitle": "Сводка за месяц",
-    "transferNet": "Переводы (нетто)",
-    "netChange": "Итоговое изменение",
-    "averageDailyExpense": "Средний расход в день",
     "avgDaily": "Средний расход в день",
     "weekdayExpenses": "Расход по дням недели",
     "avgDailyCaption": "сум · {{count}} {{dayWord}}",
@@ -377,7 +346,6 @@
     "hintOther": "Мелкие категории собраны в «Другое»",
     "personalOnly": "Здесь только общие кошельки. Личные траты в аналитику не входят.",
     "resetFilter": "Сбросить",
-    "noData": "Нет данных за выбранный период",
     "other": "Другое",
     "weekdayMon": "Пн",
     "weekdayTue": "Вт",
@@ -386,9 +354,6 @@
     "weekdayFri": "Пт",
     "weekdaySat": "Сб",
     "weekdaySun": "Вс",
-    "categoriesTitle": "Расходы по категориям",
-    "backToAnalytics": "← Аналитика",
-    "backToCategories": "← Категории",
     "compactUnits": {
       "thousand": "тыс",
       "million": "млн",
@@ -605,7 +570,7 @@
     "total": "Всего на кошельках",
     "shared": "Общие",
     "personal": "Личные",
-    "hint": "Это деньги на кошельках сейчас. На главной «Остаток» показывает доход минус расход за месяц.",
+    "hint": "Это деньги на кошельках сейчас. На главной «Итог месяца» показывает доход минус расход за месяц.",
     "empty": "Кошельков пока нет",
     "balanceNow": "Сейчас на кошельке",
     "opsEmptyHint": "Выберите другой месяц."

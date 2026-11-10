@@ -105,7 +105,7 @@ describe('record without category (B4)', () => {
   })
   it('UZ', async () => {
     await i18next.changeLanguage('uz')
-    expect(getHistoryItemTitle(base, labels, i18next.t)).toBe('Kategoriyasiz')
-    expect(getHistoryItemMeta(base, i18next.t)).toBe('Kategoriyasiz · Карта')
+    expect(getHistoryItemTitle(base, labels, i18next.t)).toBe('Toifasiz')
+    expect(getHistoryItemMeta(base, i18next.t)).toBe('Toifasiz · Карта')
   })
 })
