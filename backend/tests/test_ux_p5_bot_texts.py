@@ -194,7 +194,7 @@ async def test_existing_uz_user_start_reply_is_uzbek(monkeypatch) -> None:
             _update(user.telegram_id, text="/start",
                     entities=[{"type": "bot_command", "offset": 0, "length": 6}]),
         )
-        assert [m.text for m in bot.sent] == ["Siz allaqachon Chontak a'zosisiz."]
+        assert [m.text for m in bot.sent] == ["Siz allaqachon «Семейный бюджет» oilaviy byudjetidasiz."]
 
 
 async def test_existing_ru_user_start_reply_is_ru_with_chontak(monkeypatch) -> None:
@@ -207,4 +207,4 @@ async def test_existing_ru_user_start_reply_is_ru_with_chontak(monkeypatch) -> N
             _update(user.telegram_id, text="/start",
                     entities=[{"type": "bot_command", "offset": 0, "length": 6}]),
         )
-        assert [m.text for m in bot.sent] == ["Вы уже состоите в Chontak."]
+        assert [m.text for m in bot.sent] == ["Вы уже в семейном бюджете «Семейный бюджет»."]

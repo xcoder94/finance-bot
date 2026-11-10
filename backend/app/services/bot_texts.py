@@ -47,6 +47,24 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "ru": "Сначала пройдите регистрацию через /start.",
         "uz": "Avval /start orqali ro'yxatdan o'ting.",
     },
+    # --- /start of a registered user, help, command menu (ux-fix B16, B20) ---
+    "start.already_registered": {
+        "ru": "Вы уже в семейном бюджете «{budget_name}».",
+        "uz": "Siz allaqachon «{budget_name}» oilaviy byudjetidasiz.",
+    },
+    "help.hint": {
+        "ru": "Напишите трату или доход обычным текстом, например: такси 25 тысяч. "
+        "Или откройте приложение.",
+        "uz": "Xarajat yoki daromadni oddiy matn bilan yozing, masalan: taksi 25 ming. "
+        "Yoki ilovani oching.",
+    },
+    "command.start": {"ru": "Начать", "uz": "Boshlash"},
+    "command.help": {"ru": "Подсказка", "uz": "Yordam"},
+    # --- quick entry ---
+    "quick.amount_too_large": {
+        "ru": "Слишком большая сумма — больше {max} сум записать нельзя. Проверьте число.",
+        "uz": "Summa juda katta — {max} so'mdan ko'p yozib bo'lmaydi. Raqamni tekshiring.",
+    },
     # --- buttons ---
     "button.open_app": {"ru": "Открыть приложение", "uz": "Ilovani ochish"},
     "button.join": {"ru": "Присоединиться", "uz": "Qo'shilish"},

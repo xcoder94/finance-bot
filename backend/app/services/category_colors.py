@@ -1,8 +1,7 @@
 import uuid
-from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.expense_category import ExpenseCategory
@@ -10,8 +9,8 @@ from app.models.income_category import IncomeCategory
 
 CategoryKind = Literal["expense", "income"]
 
-ALL_COLOR_INDICES = frozenset(range(1, 9))
-RECENTLY_DELETED_WINDOW = timedelta(days=365)
+PALETTE_SIZE = 8
+ALL_COLOR_INDICES = frozenset(range(1, PALETTE_SIZE + 1))
 
 
 async def assign_category_color(
@@ -19,49 +18,32 @@ async def assign_category_color(
     family_budget_id: uuid.UUID,
     *,
     kind: CategoryKind,
+    parent_id: uuid.UUID | None = None,
 ) -> int:
+    """Colour index unique among live siblings of the new category.
+
+    Siblings: expense parents (parent_id is None) among the budget's parents;
+    subcategories among the subcategories of one parent; income among income.
+    First unused palette index; when all are taken, cycle by sibling count.
+    """
     if kind == "income":
         model = IncomeCategory
+        scope = [model.family_budget_id == family_budget_id]
     else:
         model = ExpenseCategory
+        scope = [
+            model.family_budget_id == family_budget_id,
+            model.parent_id.is_(None)
+            if parent_id is None
+            else model.parent_id == parent_id,
+        ]
 
-    cutoff = datetime.now(UTC) - RECENTLY_DELETED_WINDOW
-
-    active_colors = set(
+    used = list(
         await session.scalars(
-            select(model.color_index).where(
-                model.family_budget_id == family_budget_id,
-                model.is_deleted.is_(False),
-            )
+            select(model.color_index).where(model.is_deleted.is_(False), *scope)
         )
     )
-
-    recent_deleted_colors = set(
-        await session.scalars(
-            select(model.color_index).where(
-                model.family_budget_id == family_budget_id,
-                model.is_deleted.is_(True),
-                model.deleted_at.is_not(None),
-                model.deleted_at >= cutoff,
-            )
-        )
-    )
-
-    free = ALL_COLOR_INDICES - active_colors - recent_deleted_colors
+    free = ALL_COLOR_INDICES - set(used)
     if free:
         return min(free)
-
-    oldest_color = await session.scalar(
-        select(model.color_index)
-        .where(
-            model.family_budget_id == family_budget_id,
-            model.is_deleted.is_(True),
-            model.deleted_at.is_not(None),
-        )
-        .order_by(model.deleted_at.asc())
-        .limit(1)
-    )
-    if oldest_color is not None:
-        return oldest_color
-
-    return min(ALL_COLOR_INDICES - active_colors) if ALL_COLOR_INDICES - active_colors else 1
+    return len(used) % PALETTE_SIZE + 1

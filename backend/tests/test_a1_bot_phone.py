@@ -166,7 +166,7 @@ class TestNewUserPrompt:
             bot = FakeBot()
             await _feed(bot, _update(user.telegram_id, text="/start",
                                      entities=[{"type": "bot_command", "offset": 0, "length": 6}]))
-            assert [m.text for m in bot.sent] == ["Вы уже состоите в Chontak."]
+            assert [m.text for m in bot.sent] == ["Вы уже в семейном бюджете «Семейный бюджет»."]
             assert (await _fresh(session, user)).phone_prompted_at is None
 
 
@@ -326,7 +326,7 @@ class TestSkipAndOtherMessage:
             bot = FakeBot()
             await _feed(bot, _update(user.telegram_id, text="/start",
                                      entities=[{"type": "bot_command", "offset": 0, "length": 6}]))
-            assert [m.text for m in bot.sent] == ["Вы уже состоите в Chontak."]
+            assert [m.text for m in bot.sent] == ["Вы уже в семейном бюджете «Семейный бюджет»."]
             assert phone_prompt.pending_keyboard_restore == {}
 
 

@@ -80,6 +80,7 @@ from app.services.quick_entry_wallets import (
     list_wallets_for_parse,
     resolve_wallet,
 )
+from app.services.bot_texts import t as catalogue_t
 from app.services.shopping import add_shopping_items, cancel_purchase, find_open_purchase
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id, greeting_inline_keyboard
 from bot.quick_entry.cards import (
@@ -88,6 +89,7 @@ from bot.quick_entry.cards import (
     format_amount,
     format_card,
     format_exchange_card,
+    format_number,
     format_transfer_card,
     transfer_card_keyboard,
     type_question_keyboard,
@@ -429,6 +431,16 @@ async def _process_parsed_response(
         return
 
     if not clear_ops and not ambiguous_ops and not transfer_ops:
+        if any(
+            op.amount is not None and op.amount > MAX_AMOUNT
+            for op in response.operations
+        ):
+            await message.answer(
+                catalogue_t(
+                    user, "quick.amount_too_large", max=format_number(MAX_AMOUNT)
+                )
+            )
+            return
         if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
             await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
             return

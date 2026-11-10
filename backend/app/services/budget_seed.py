@@ -135,7 +135,10 @@ async def copy_seed_categories_only(
                     parent_id=parent.id,
                     translation_key=sub_key,
                     color_index=await assign_category_color(
-                        session, family_budget_id, kind="expense"
+                        session,
+                        family_budget_id,
+                        kind="expense",
+                        parent_id=parent.id,
                     ),
                 )
             )

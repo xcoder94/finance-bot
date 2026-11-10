@@ -310,7 +310,10 @@ async def create_expense_category(
         name=body.name,
         parent_id=body.parent_id,
         color_index=await assign_category_color(
-            session, user.family_budget_id, kind="expense"
+            session,
+            user.family_budget_id,
+            kind="expense",
+            parent_id=body.parent_id,
         ),
     )
     session.add(category)

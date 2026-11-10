@@ -14,6 +14,7 @@ from bot.keyboard_hygiene import ClearStaleReplyKeyboardMiddleware
 from bot.onboarding import router as onboarding_router
 from bot.phone_prompt import router as phone_prompt_router
 from bot.membership import router as membership_router
+from bot.help import register_bot_commands, router as help_router
 from bot.goals import router as goals_router
 from bot.support import router as support_router
 from bot.quick_entry.handlers import router as quick_entry_router
@@ -64,6 +65,8 @@ def register_bot_routers(dp: Dispatcher) -> None:
         from bot.quick_entry.receipt_photo import disabled_router
 
         dp.include_router(disabled_router)
+    # last: catches /help, /menu and unknown commands after the real handlers
+    dp.include_router(help_router)
 
 
 async def _run_notification_loop(bot: Bot) -> None:
@@ -78,6 +81,10 @@ async def main() -> None:
     register_activity_middleware(dp)
     dp.startup.register(cache_bot_username)
     register_bot_routers(dp)
+    try:
+        await register_bot_commands(bot)
+    except Exception:
+        logger.exception("Failed to register bot command menu")
     loop_task = asyncio.create_task(_run_notification_loop(bot))
     try:
         await dp.start_polling(bot)

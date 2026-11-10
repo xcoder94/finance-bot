@@ -220,7 +220,19 @@ async def start_handler(
                 )
                 return
 
-            await message.answer(t("already_member", existing_user.language))
+            budget_name = await session.scalar(
+                select(FamilyBudget.name).where(
+                    FamilyBudget.id == existing_user.family_budget_id
+                )
+            )
+            await message.answer(
+                catalogue_t(
+                    existing_user.language,
+                    "start.already_registered",
+                    budget_name=budget_name or "Chontak",
+                ),
+                reply_markup=greeting_inline_keyboard(existing_user.language),
+            )
             return
 
         target_budget_id: uuid.UUID | None = None
