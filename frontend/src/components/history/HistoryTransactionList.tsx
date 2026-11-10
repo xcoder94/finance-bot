@@ -14,6 +14,10 @@ import {
   getHistoryItemTitle,
 } from '../../utils/getDisplayName'
 import { EmptyStateIcon } from '../EmptyStateIcon'
+import { formatChipDate, todayTashkent } from '../../utils/dateChips'
+import { formatCurrency, type Currency } from '../../utils/formatCurrency'
+import { dayHeaderKind, groupHistoryByDay } from '../../utils/groupHistoryByDay'
+import { getLocale } from '../../utils/periodFilter'
 
 type HistoryTransactionListProps = {
   status: 'idle' | 'loading' | 'error' | 'success'
@@ -28,6 +32,8 @@ type HistoryTransactionListProps = {
   formatAmount?: (item: HistoryItem) => string
   /** Replaces the default empty-list hint. */
   emptyHint?: string
+  /** Day headers («Сегодня», «Вчера», «8 ноября») with the day's expense total. */
+  groupByDay?: boolean
 }
 
 export function HistoryTransactionList({
@@ -41,6 +47,7 @@ export function HistoryTransactionList({
   onLoadMore,
   formatAmount = formatHistoryTransactionAmount,
   emptyHint,
+  groupByDay = false,
 }: HistoryTransactionListProps) {
   const { t } = useTranslation()
 
@@ -48,6 +55,32 @@ export function HistoryTransactionList({
     transfer: t('history.transfer'),
     exchange: t('history.exchange'),
   }
+
+  const today = todayTashkent()
+
+  const renderRow = (item: HistoryItem) => (
+    <button
+      key={item.id}
+      type="button"
+      className="home-ops-row home-ops-row--clickable"
+      onClick={() => onItemClick(item)}
+    >
+      <div className="home-ops-row__main">
+        <div className="home-ops-row__title">
+          {getHistoryItemTitle(item, transferLabels, t)}
+        </div>
+        <div className="home-ops-row__meta">{getHistoryItemMeta(item, t)}</div>
+      </div>
+      <div className="home-ops-row__aside">
+        <div className={historyAmountClass(item)}>
+          {formatAmount(item)}
+        </div>
+        <div className="home-ops-row__date">
+          {formatTransactionDateShort(item.transaction_date)}
+        </div>
+      </div>
+    </button>
+  )
 
   return (
     <>
@@ -66,29 +99,27 @@ export function HistoryTransactionList({
       {status === 'success' && items.length > 0 ? (
         <>
           <div className="home-ops-card">
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="home-ops-row home-ops-row--clickable"
-                onClick={() => onItemClick(item)}
-              >
-                <div className="home-ops-row__main">
-                  <div className="home-ops-row__title">
-                    {getHistoryItemTitle(item, transferLabels, t)}
-                  </div>
-                  <div className="home-ops-row__meta">{getHistoryItemMeta(item, t)}</div>
-                </div>
-                <div className="home-ops-row__aside">
-                  <div className={historyAmountClass(item)}>
-                    {formatAmount(item)}
-                  </div>
-                  <div className="home-ops-row__date">
-                    {formatTransactionDateShort(item.transaction_date)}
-                  </div>
-                </div>
-              </button>
-            ))}
+            {groupByDay
+              ? groupHistoryByDay(items).map((group) => {
+                  const kind = dayHeaderKind(group.day, today)
+                  const title =
+                    kind === 'other'
+                      ? formatChipDate(group.day, today, getLocale())
+                      : t(kind === 'today' ? 'dateChips.today' : 'dateChips.yesterday')
+                  const total = group.expenseTotals
+                    .map((row) => `−${formatCurrency(row.amount, row.currency as Currency)}`)
+                    .join(' · ')
+                  return (
+                    <div key={group.day} className="history-day-group" data-day={group.day}>
+                      <div className="history-day">
+                        <span className="history-day__title">{title}</span>
+                        {total ? <span className="history-day__total">{total}</span> : null}
+                      </div>
+                      {group.items.map(renderRow)}
+                    </div>
+                  )
+                })
+              : items.map(renderRow)}
           </div>
 
           {onLoadMore && items.length < totalCount ? (

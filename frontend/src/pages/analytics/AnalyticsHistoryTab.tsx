@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
-import { fetchHistoryPage, type HistoryItem } from '../../api/history'
+import { fetchHistoryPage, fetchSummaryForRange, type HistoryItem, type SummaryResponse } from '../../api/history'
 import { HistoryTransactionList } from '../../components/history/HistoryTransactionList'
 import { useAnalyticsContext } from '../../contexts/AnalyticsContext'
 import {
@@ -12,6 +12,7 @@ import {
   isAnalyticsHistoryUncategorized,
 } from '../../utils/analyticsHistoryTab'
 import { applyClearHistoryFilter } from '../../utils/analyticsTabState'
+import { HistorySummaryLine } from './HistorySummaryLine'
 import { editRouteForItem } from '../../utils/editRouteForItem'
 
 const HISTORY_PAGE_SIZE = 50
@@ -45,6 +46,30 @@ export function AnalyticsHistoryTab() {
   const [historyRetryCount, setHistoryRetryCount] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState(false)
+
+  const [summary, setSummary] = useState<SummaryResponse | null>(null)
+
+  useEffect(() => {
+    if (!range || !rangeFetchEnabled) {
+      setSummary(null)
+      return
+    }
+    let cancelled = false
+    void fetchSummaryForRange(range.dateFrom, range.dateTo)
+      .then((data) => {
+        if (!cancelled) {
+          setSummary(data)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummary(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [range, rangeFetchEnabled])
 
   const historyFetchKey = useMemo(
     () => buildAnalyticsHistoryFetchKey(rangeKey, historyCategoryFilter),
@@ -174,6 +199,8 @@ export function AnalyticsHistoryTab() {
 
   return (
     <div className="analytics-history-tab">
+      {historyCategoryFilter ? null : <HistorySummaryLine summary={summary} />}
+
       {historyCategoryFilter ? (
         <div className="analytics-history-filter">
           <span
@@ -191,6 +218,7 @@ export function AnalyticsHistoryTab() {
       <HistoryTransactionList
         status={historyStatus}
         items={shownItems}
+        groupByDay
         totalCount={shownItems.length + Math.max(0, historyTotal - historyItems.length)}
         onItemClick={handleItemClick}
         onRetry={() => setHistoryRetryCount((count) => count + 1)}

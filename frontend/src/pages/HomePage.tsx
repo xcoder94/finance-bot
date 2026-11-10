@@ -1,3 +1,5 @@
+import { MonthArrow } from '../components/MonthArrow'
+import { openHistoryFromHome } from '../utils/historyEntry'
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -472,23 +474,9 @@ export function HomePage() {
       </div>
 
       <div className="home-month-bar">
-        <button
-          type="button"
-          className="home-month-bar__nav"
-          aria-label={t('home.previousMonth')}
-          onClick={() => setSelectedMonth((current) => shiftHomeMonth(current, -1))}
-        >
-          ‹
-        </button>
+        <MonthArrow direction="prev" label={t('home.previousMonth')} onClick={() => setSelectedMonth((current) => shiftHomeMonth(current, -1))} />
         <div className="home-month-bar__label">{formatMonthTitle(year, month)}</div>
-        <button
-          type="button"
-          className="home-month-bar__nav"
-          aria-label={t('home.nextMonth')}
-          onClick={() => setSelectedMonth((current) => shiftHomeMonth(current, 1))}
-        >
-          ›
-        </button>
+        <MonthArrow direction="next" label={t('home.nextMonth')} onClick={() => setSelectedMonth((current) => shiftHomeMonth(current, 1))} />
       </div>
 
       {showSkeleton ? <HomeSkeleton /> : null}
@@ -597,17 +585,20 @@ export function HomePage() {
           </div>
 
           <div className="home-recent-header">
+            <div className="home-recent-header__main">
+              <div className="home-recent-header__title">{t('home.recentTransactions')}</div>
+              {opsCountLabel ? (
+                <div className="home-recent-header__count">{opsCountLabel}</div>
+              ) : null}
+            </div>
             <button
               type="button"
               className="home-recent-header__link"
-              onClick={() => navigate('/history', { state: { from: 'home' } })}
+              onClick={() => openHistoryFromHome({ year, month }, navigate)}
             >
-              {t('home.recentTransactions')}
+              {t('home.seeAll')}
               <span className="home-recent-header__chevron"> ›</span>
             </button>
-            {opsCountLabel ? (
-              <div className="home-recent-header__count">{opsCountLabel}</div>
-            ) : null}
           </div>
 
           {historySuccess && totalCount === 0 ? (

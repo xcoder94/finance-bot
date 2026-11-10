@@ -28,7 +28,7 @@ describe('developer texts are gone (B19)', () => {
     'toc.footerHint',
   ]) {
     it(`no «${text}» in src or locales`, () => {
-      expect(grep(text).replace(/devTextsRemoved\.test\.ts.*\n?/g, '')).toBe('')
+      expect(grep(text).replace(/^.*devTextsRemoved\.test\.ts.*\n?/gm, '')).toBe('')
     })
   }
   it('uz locale has no swipe hint either', () => {

@@ -16,3 +16,13 @@ export function historyBackTarget(state: unknown): '/' | '/analytics' | null {
   }
   return null
 }
+
+const ROOT_PATHS = new Set(['/', '/shopping', '/analytics', '/goals'])
+
+/** Bottom-tab screens have no Back button; Analytics opened from Home does (it returns Home). */
+export function isRootPath(pathname: string, state: unknown): boolean {
+  if (pathname === '/analytics' && historyBackTarget(state) === '/') {
+    return false
+  }
+  return ROOT_PATHS.has(pathname)
+}

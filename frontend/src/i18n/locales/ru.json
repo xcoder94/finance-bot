@@ -213,6 +213,7 @@
     "addTransfer": "Добавить перевод",
     "comingSoon": "Скоро",
     "recentTransactions": "Последние операции",
+    "seeAll": "Все",
     "noTransactions": "Пока нет операций",
     "transfer": "Перевод",
     "loadError": "Не удалось загрузить данные",

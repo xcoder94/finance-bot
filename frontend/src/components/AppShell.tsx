@@ -29,7 +29,7 @@ import { EditExpensePage } from '../pages/EditExpensePage'
 import { EditIncomePage } from '../pages/EditIncomePage'
 import { EditTransferPage } from '../pages/EditTransferPage'
 import { GoalsPage } from '../pages/GoalsPage'
-import { HistoryPage } from '../pages/HistoryPage'
+import { HistoryRedirect } from './HistoryRedirect'
 import { WalletDetailPage } from '../pages/WalletDetailPage'
 import { WalletsPage } from '../pages/WalletsPage'
 import { HomePage } from '../pages/HomePage'
@@ -264,7 +264,7 @@ export function AppShell() {
           <Route path="shopping/trip" element={<ShoppingTripPage />} />
           <Route path="analytics/*" element={<AnalyticsRoute />} />
           <Route path="goals" element={<GoalsPage />} />
-          <Route path="history" element={<HistoryPage />} />
+          <Route path="history" element={<HistoryRedirect />} />
           <Route path="wallets" element={<WalletsPage />} />
           <Route path="wallets/:id" element={<WalletDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />

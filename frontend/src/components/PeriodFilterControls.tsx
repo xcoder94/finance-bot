@@ -9,6 +9,7 @@ import {
   type PeriodTab,
   type SelectedMonth,
 } from '../utils/periodFilter'
+import { MonthArrow } from './MonthArrow'
 import { DateRangeFields } from './DateRangeFields'
 
 type PeriodFilterControlsProps = {
@@ -70,28 +71,14 @@ export function PeriodFilterControls({
 
       {periodTab === 'month' ? (
         <div className="home-month-bar analytics-page__month-bar">
-          <button
-            type="button"
-            className="home-month-bar__nav"
-            aria-label={t('home.previousMonth')}
-            onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, -1))}
-          >
-            ‹
-          </button>
+          <MonthArrow direction="prev" label={t('home.previousMonth')} onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, -1))} />
           <div className="analytics-page__month-label-wrap">
             <div className="home-month-bar__label">{formatMonthLabel(selectedMonth)}</div>
             {periodHint ? (
               <Text className="analytics-page__period-hint">{periodHint}</Text>
             ) : null}
           </div>
-          <button
-            type="button"
-            className="home-month-bar__nav"
-            aria-label={t('home.nextMonth')}
-            onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, 1))}
-          >
-            ›
-          </button>
+          <MonthArrow direction="next" label={t('home.nextMonth')} onClick={() => onSelectedMonthChange(shiftMonth(selectedMonth, 1))} />
         </div>
       ) : (
         <DateRangeFields

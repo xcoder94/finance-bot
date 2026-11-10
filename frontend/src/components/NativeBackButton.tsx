@@ -10,13 +10,11 @@ import { backButton } from '@tma.js/sdk-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { backFallbackPath } from '../utils/backFallback'
-import { historyBackTarget } from '../utils/historyBackTarget'
+import { historyBackTarget, isRootPath } from '../utils/historyBackTarget'
 import {
   type BackHandler,
   NativeBackButtonContext,
 } from './nativeBackButtonContext'
-
-const ROOT_PATHS = new Set(['/', '/shopping', '/analytics', '/goals'])
 
 function normalizePathname(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
@@ -30,6 +28,7 @@ function NativeBackButtonController({
   const location = useLocation()
   const navigate = useNavigate()
   const pathname = normalizePathname(location.pathname)
+  const locationState = location.state
   const pathnameRef = useRef(pathname)
   const locationStateRef = useRef(location.state)
   const overlayHandlerRef = useRef(overlayHandler)
@@ -52,11 +51,11 @@ function NativeBackButtonController({
       }
 
       const activePathname = pathnameRef.current
-      if (ROOT_PATHS.has(activePathname)) {
+      if (isRootPath(activePathname, locationStateRef.current)) {
         return
       }
 
-      if (activePathname === '/history') {
+      if (activePathname === '/history' || activePathname === '/analytics') {
         const backTarget = historyBackTarget(locationStateRef.current)
         if (backTarget) {
           navigate(backTarget, { replace: true })
@@ -85,12 +84,12 @@ function NativeBackButtonController({
       return
     }
 
-    if (overlayHandler || !ROOT_PATHS.has(pathname)) {
+    if (overlayHandler || !isRootPath(pathname, locationState)) {
       backButton.show()
     } else {
       backButton.hide()
     }
-  }, [overlayHandler, pathname])
+  }, [overlayHandler, pathname, locationState])
 
   return null
 }

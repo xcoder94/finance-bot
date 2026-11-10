@@ -1,3 +1,4 @@
+import { MonthArrow } from '../MonthArrow'
 import { Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
@@ -48,25 +49,11 @@ export function WalletOpsView({
       </div>
 
       <div className="home-page__month-selector">
-        <button
-          type="button"
-          className="home-month-nav__button"
-          aria-label={t('home.previousMonth')}
-          onClick={onPrevMonth}
-        >
-          ‹
-        </button>
+        <MonthArrow direction="prev" label={t('home.previousMonth')} onClick={onPrevMonth} />
         <Text weight="2" className="home-page__month-label">
           {formatMonthLabel(month)}
         </Text>
-        <button
-          type="button"
-          className="home-month-nav__button"
-          aria-label={t('home.nextMonth')}
-          onClick={onNextMonth}
-        >
-          ›
-        </button>
+        <MonthArrow direction="next" label={t('home.nextMonth')} onClick={onNextMonth} />
       </div>
 
       <div className="history-page__list">
