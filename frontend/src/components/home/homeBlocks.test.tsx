@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import ru from '../../i18n/locales/ru.json'
 import uz from '../../i18n/locales/uz.json'
-import { balanceSizeClass, HomeLeftBlock, HomeOnboardingCard } from './homeBlocks'
+import { balanceSizeClass, statSizeClass, HomeLeftBlock, HomeOnboardingCard } from './homeBlocks'
 
 function make(lng: 'ru' | 'uz') {
   const inst = i18n.createInstance()
@@ -130,5 +130,16 @@ describe('HomeOnboardingCard U5 step 2', () => {
     expect(html).not.toContain('Проверьте кошелёк по умолчанию')
     expect(html).toContain('home-onboarding__cta')
     expect(html).toContain('Добавить доход')
+  })
+})
+
+describe('statSizeClass (B5: digits are never cut, the font steps down instead)', () => {
+  it('keeps 16px for short amounts', () => {
+    expect(statSizeClass('100 000 сум')).toBe('')
+  })
+  it('steps down for long amounts', () => {
+    expect(statSizeClass('15 500 000 сум')).toBe(' home-figures-card__stat-value--long')
+    expect(statSizeClass('2 005 970 900 сум')).toBe(' home-figures-card__stat-value--xlong')
+    expect(statSizeClass('x'.repeat(20))).toBe(' home-figures-card__stat-value--xxlong')
   })
 })

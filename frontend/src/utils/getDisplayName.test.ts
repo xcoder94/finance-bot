@@ -98,14 +98,15 @@ describe('record without category (B4)', () => {
   it('RU: never a dash', async () => {
     await i18next.changeLanguage('ru')
     expect(getHistoryItemTitle(base, labels, i18next.t)).toBe('Без категории')
-    expect(getHistoryItemMeta(base, i18next.t)).toBe('Без категории · Карта')
+    expect(getHistoryItemMeta(base, i18next.t)).toBe('Карта')
     const income = { ...base, type: 'income' } as HistoryItem
     expect(getHistoryItemTitle(income, labels, i18next.t)).toBe('Без категории')
     expect(getHistoryItemMeta(income, i18next.t)).not.toContain('—')
+    expect(getHistoryItemMeta(income, i18next.t)).not.toContain('Без категории')
   })
   it('UZ', async () => {
     await i18next.changeLanguage('uz')
     expect(getHistoryItemTitle(base, labels, i18next.t)).toBe('Toifasiz')
-    expect(getHistoryItemMeta(base, i18next.t)).toBe('Toifasiz · Карта')
+    expect(getHistoryItemMeta(base, i18next.t)).toBe('Карта')
   })
 })

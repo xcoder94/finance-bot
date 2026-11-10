@@ -7,6 +7,7 @@ import {
   formatChartsEmptyMonth,
   isChartsTabEmpty,
   mergeCategoryIds,
+  uniqueColorIndices,
 } from './analyticsChartsTab'
 import { assertNoFxConversionUsed } from './noCurrencyConversion'
 import { twelveMonthKeysEndingAt } from './analyticsPeriod'
@@ -107,5 +108,25 @@ describe('charts tab module', () => {
       '2026-02',
       '2026-03',
     ])
+  })
+})
+
+describe('uniqueColorIndices (B3 drill-down)', () => {
+  it('moves the parent own-spend slice off a colour a child already uses', () => {
+    const map = uniqueColorIndices(
+      new Map([
+        ['child-a', 1],
+        ['child-b', 2],
+        ['parent', 2],
+      ]),
+    )
+    expect(map.get('child-a')).toBe(1)
+    expect(map.get('child-b')).toBe(2)
+    expect(map.get('parent')).toBe(3)
+    expect(new Set(map.values()).size).toBe(3)
+  })
+  it('leaves an already distinct map untouched', () => {
+    const input = new Map([['a', 4], ['b', 5]])
+    expect(uniqueColorIndices(input)).toEqual(input)
   })
 })

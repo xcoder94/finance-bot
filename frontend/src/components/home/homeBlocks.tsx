@@ -18,8 +18,17 @@ export function sumSizeClass(text: string): string {
 
 /** Balance card (30px mono): shrink from 15 characters of text (owner decision) so the unit stays visible at 360px; the digit count differs by language («so'm» vs «сум»). */
 export function balanceSizeClass(text: string): string {
+  if (text.length >= 20) return ' home-figures-card__balance--xxlong'
   if (text.length >= 17) return ' home-figures-card__balance--xlong'
   if (text.length >= 15) return ' home-figures-card__balance--long'
+  return ''
+}
+
+/** Income/expense figures sit in half-width cells: step the font down so no digit is ever cut (B5, 320px). */
+export function statSizeClass(text: string): string {
+  if (text.length >= 20) return ' home-figures-card__stat-value--xxlong'
+  if (text.length >= 16) return ' home-figures-card__stat-value--xlong'
+  if (text.length >= 12) return ' home-figures-card__stat-value--long'
   return ''
 }
 

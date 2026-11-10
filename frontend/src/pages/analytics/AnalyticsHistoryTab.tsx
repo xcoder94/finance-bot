@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { fetchHistoryPage, fetchSummaryForRange, type HistoryItem, type SummaryResponse } from '../../api/history'
+import { fetchWallets } from '../../api/transactions'
 import { HistoryTransactionList } from '../../components/history/HistoryTransactionList'
 import { useAnalyticsContext } from '../../contexts/AnalyticsContext'
 import {
   buildAnalyticsHistoryFetchKey,
   getAnalyticsHistoryExpenseCategoryId,
-  filterHistoryByCurrency,
+  excludePersonalWalletRows,
+  historyCurrencyParam,
   isAnalyticsHistoryUncategorized,
 } from '../../utils/analyticsHistoryTab'
 import { applyClearHistoryFilter } from '../../utils/analyticsTabState'
@@ -82,6 +84,26 @@ export function AnalyticsHistoryTab() {
   )
 
   const uncategorized = isAnalyticsHistoryUncategorized(historyCategoryFilter)
+  const currencyParam = historyCurrencyParam(historyCategoryFilter, currency)
+
+  const [personalWalletIds, setPersonalWalletIds] = useState<ReadonlySet<string>>(new Set())
+  const filterActive = historyCategoryFilter !== null
+  useEffect(() => {
+    if (!filterActive) {
+      return
+    }
+    let cancelled = false
+    void fetchWallets()
+      .then((wallets) => {
+        if (!cancelled) {
+          setPersonalWalletIds(new Set(wallets.filter((w) => w.is_personal).map((w) => w.id)))
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [filterActive])
 
   useEffect(() => {
     if (!range || !rangeFetchEnabled) {
@@ -105,7 +127,7 @@ export function AnalyticsHistoryTab() {
       expenseCategoryId,
       undefined,
       uncategorized,
-      currency,
+      currencyParam,
     )
       .then((data) => {
         if (!cancelled) {
@@ -123,11 +145,11 @@ export function AnalyticsHistoryTab() {
     return () => {
       cancelled = true
     }
-  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, currency, historyRetryCount])
+  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, currencyParam, historyRetryCount])
 
   const shownItems = useMemo(
-    () => filterHistoryByCurrency(historyItems, currency),
-    [historyItems, currency],
+    () => (filterActive ? excludePersonalWalletRows(historyItems, personalWalletIds) : historyItems),
+    [historyItems, personalWalletIds, filterActive],
   )
 
   const handleLoadMore = async () => {
@@ -146,7 +168,7 @@ export function AnalyticsHistoryTab() {
         expenseCategoryId,
         undefined,
         uncategorized,
-        currency,
+        currencyParam,
       )
       setHistoryItems((current) => [...current, ...data.items])
       setHistoryTotal(data.total_count)

@@ -90,3 +90,31 @@ export function extendCategoryColorMap(
     storedColorIndexById,
   )
 }
+
+/**
+ * B3: in a drill-down the parent's own spend is a slice next to its children; its stored colour can equal a
+ * child's. Keep the first holder of each colour (children come first) and move later duplicates to a free
+ * colour among 1..7 (8 is reserved for «Другое»).
+ */
+export function uniqueColorIndices(colorMap: Map<string, number>): Map<string, number> {
+  const used = new Set<number>()
+  const result = new Map<string, number>()
+  for (const [id, index] of colorMap) {
+    if (!used.has(index)) {
+      used.add(index)
+      result.set(id, index)
+      continue
+    }
+    let free: number | undefined
+    for (let candidate = 1; candidate <= 7; candidate += 1) {
+      if (!used.has(candidate)) {
+        free = candidate
+        break
+      }
+    }
+    const next = free ?? index
+    used.add(next)
+    result.set(id, next)
+  }
+  return result
+}

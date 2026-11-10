@@ -25,10 +25,24 @@ export function isAnalyticsHistoryUncategorized(
   return historyCategoryFilter?.uncategorized === true
 }
 
-/** Display-side guard: a page may still carry other-currency rows if the server ignores `currency`. */
-export function filterHistoryByCurrency<T extends { currency: string }>(
-  items: T[],
-  currency: string,
-): T[] {
-  return items.filter((item) => item.currency === currency)
+/** PRD 17 #8: the plain History tab lists all currencies; the currency is sent only for a drill from a chart. */
+export function historyCurrencyParam(
+  historyCategoryFilter: HistoryCategoryFilter | null,
+  chartCurrency: string,
+): string | undefined {
+  return historyCategoryFilter ? chartCurrency : undefined
+}
+
+/** Charts count shared wallets only; a category-filtered list must match them. */
+export function excludePersonalWalletRows<
+  T extends { wallet_id: string; to_wallet_id: string | null },
+>(items: T[], personalWalletIds: ReadonlySet<string>): T[] {
+  if (personalWalletIds.size === 0) {
+    return items
+  }
+  return items.filter(
+    (item) =>
+      !personalWalletIds.has(item.wallet_id) &&
+      !(item.to_wallet_id !== null && personalWalletIds.has(item.to_wallet_id)),
+  )
 }

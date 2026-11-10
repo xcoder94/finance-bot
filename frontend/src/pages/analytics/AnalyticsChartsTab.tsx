@@ -43,6 +43,7 @@ import {
   formatChartsEmptyMonth,
   isChartsTabEmpty,
   mergeCategoryIds,
+  uniqueColorIndices,
 } from '../../utils/analyticsChartsTab'
 import {
   getColorByIndex,
@@ -305,7 +306,7 @@ export function AnalyticsChartsTab() {
     )
     const apiIds = subcategoryEntries.map((entry) => entry.subcategory_id)
     const effectiveIndices = resolveEffectiveColorIndices(categoryMaps.expenseCategories)
-    return extendCategoryColorMap(orderedIds, apiIds, effectiveIndices)
+    return uniqueColorIndices(extendCategoryColorMap(orderedIds, apiIds, effectiveIndices))
   }, [drillParent, categoryMaps, subcategoryEntries, subcategoriesFetch.state])
 
   const drillSlices = useMemo(() => {

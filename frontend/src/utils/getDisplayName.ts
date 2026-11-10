@@ -127,7 +127,8 @@ export function getHistoryItemMeta(item: HistoryItem, t: TFunction): string {
         item.income_category_name,
         item.income_category_translation_key,
         t,
-      ) ?? t('analytics.uncategorized')
+      ) ?? null
+    // P4: the title already says «Без категории»; do not repeat it
     return [category, wallet, author].filter(Boolean).join(' · ')
   }
 
@@ -143,9 +144,8 @@ export function getHistoryItemMeta(item: HistoryItem, t: TFunction): string {
       item.expense_subcategory_translation_key,
       t,
     )
-    const categoryPart =
-      category === null && subcategory === null ? t('analytics.uncategorized') : category
-    return [categoryPart, subcategory, wallet, author].filter(Boolean).join(' · ')
+    // P4: when there is no category the title already says «Без категории»
+    return [category, subcategory, wallet, author].filter(Boolean).join(' · ')
   }
 
   const wallets = getHistoryItemSubtitle(item, t('home.income'), t)

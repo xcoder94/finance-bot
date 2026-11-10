@@ -423,12 +423,14 @@ body {
   color: var(--tx);
   white-space: nowrap;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .home-figures-card__balance--long {
   font-size: 26px;
+}
+
+.home-figures-card__balance--xxlong {
+  font-size: 18px;
 }
 
 .home-figures-card__balance--xlong {
@@ -471,8 +473,18 @@ body {
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.home-figures-card__stat-value--long {
+  font-size: 13.5px;
+}
+
+.home-figures-card__stat-value--xlong {
+  font-size: 11.5px;
+}
+
+.home-figures-card__stat-value--xxlong {
+  font-size: 10px;
 }
 
 .home-figures-card__stat-value--income {
@@ -693,9 +705,7 @@ body {
 }
 
 .home-ops-row__aside {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 55%;
+  flex: none;
   text-align: right;
 }
 
@@ -706,14 +716,11 @@ body {
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
+/* B5: the amount is never cut; the title next to it shrinks instead */
 .home-ops-row > .home-ops-row__amount {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 55%;
+  flex: none;
 }
 
 .home-ops-row__amount--income {
@@ -4500,6 +4507,12 @@ a.tabbar-link:active {
   line-height: 1.2;
   text-align: left;
   color: var(--tx);
+}
+
+/* B14: .home-page already pads 14px sideways; the title must start at the same x as other screens */
+.wallets-page > .screen-title {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .settings-sub-page__not-found {

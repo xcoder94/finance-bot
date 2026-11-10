@@ -103,3 +103,12 @@ describe('settingsSubtitles', () => {
     expect(countNonProtectedExpenseParents(categories)).toBe(2)
   })
 })
+
+import { settingsSubtitleFallback } from './settingsSubtitles'
+
+describe('settingsSubtitleFallback (B18)', () => {
+  it('dash while loading, nothing after a failed load', () => {
+    expect(settingsSubtitleFallback('loading')).toBe('—')
+    expect(settingsSubtitleFallback('error')).toBe('')
+  })
+})

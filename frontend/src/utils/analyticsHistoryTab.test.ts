@@ -5,7 +5,8 @@ import { historyFilterAfterTabSwitch } from './analyticsTabState'
 import { CHART_CATEGORY_COLORS } from './chartColors'
 import {
   buildAnalyticsHistoryFetchKey,
-  filterHistoryByCurrency,
+  excludePersonalWalletRows,
+  historyCurrencyParam,
   getAnalyticsHistoryExpenseCategoryId,
   isAnalyticsHistoryUncategorized,
 } from './analyticsHistoryTab'
@@ -60,10 +61,26 @@ describe('uncategorized filter', () => {
   })
 })
 
-describe('filterHistoryByCurrency (B17)', () => {
-  it('keeps only rows of the selected currency', () => {
-    const rows = [{ currency: 'UZS' }, { currency: 'USD' }, { currency: 'UZS' }]
-    expect(filterHistoryByCurrency(rows, 'UZS')).toHaveLength(2)
-    expect(filterHistoryByCurrency(rows, 'USD')).toHaveLength(1)
+describe('historyCurrencyParam (PRD 17 #8)', () => {
+  const filter = { id: 'c', name: 'Такси', color: CHART_CATEGORY_COLORS[0] }
+  it('plain History tab lists every currency: no currency param', () => {
+    expect(historyCurrencyParam(null, 'UZS')).toBeUndefined()
+  })
+  it('drill from a currency chart passes the chart currency to the server', () => {
+    expect(historyCurrencyParam(filter, 'UZS')).toBe('UZS')
+  })
+})
+
+describe('excludePersonalWalletRows (B17 remainder)', () => {
+  const rows = [
+    { wallet_id: 'shared', to_wallet_id: null },
+    { wallet_id: 'mine', to_wallet_id: null },
+    { wallet_id: 'shared', to_wallet_id: 'mine' },
+  ]
+  it('drops rows touching a personal wallet, like the chart does', () => {
+    expect(excludePersonalWalletRows(rows, new Set(['mine']))).toEqual([rows[0]])
+  })
+  it('keeps everything when no personal wallets', () => {
+    expect(excludePersonalWalletRows(rows, new Set())).toHaveLength(3)
   })
 })

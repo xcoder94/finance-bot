@@ -10,6 +10,7 @@ import {
 } from '../api/categories'
 import { getWallets, type WalletResponse } from '../api/wallets'
 import { UserAvatar } from '../components/UserAvatar'
+import { BlockError } from '../components/BlockError'
 import { ThemeSwitch } from '../components/settings/ThemeSwitch'
 import { SETTINGS_TOC_ICONS } from '../components/settings/settingsTocIcons'
 import i18n from '../i18n'
@@ -36,6 +37,7 @@ import {
   membersSubtitle,
   notificationsSubtitle,
   walletsSubtitle,
+  settingsSubtitleFallback,
 } from '../utils/settingsSubtitles'
 
 type TocLoadState =
@@ -161,47 +163,50 @@ export function SettingsPage() {
       ? 'settings-profile-card__badge settings-profile-card__badge--owner'
       : 'settings-profile-card__badge settings-profile-card__badge--member'
 
+  const loadFailed = loadState.status === 'error'
+  const subtitleFallback = settingsSubtitleFallback(loadState.status)
+
   const rows = [
     {
       path: '/settings/wallets',
       title: t('settings.wallets'),
-      subtitle: subtitles?.wallets ?? '—',
+      subtitle: subtitles?.wallets ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.wallets,
     },
     {
       path: '/settings/default-wallet',
       title: t('settings.toc.defaultWallet'),
-      subtitle: subtitles?.defaultWallet ?? '—',
+      subtitle: subtitles?.defaultWallet ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.defaultWallet,
     },
     {
       path: '/settings/income-categories',
       title: t('settings.categoriesIncome'),
-      subtitle: subtitles?.income ?? '—',
+      subtitle: subtitles?.income ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.income,
     },
     {
       path: '/settings/expense-categories',
       title: t('settings.categoriesExpense'),
-      subtitle: subtitles?.expense ?? '—',
+      subtitle: subtitles?.expense ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.expense,
     },
     {
       path: '/settings/members',
       title: t('settings.toc.members'),
-      subtitle: subtitles?.members ?? '—',
+      subtitle: subtitles?.members ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.members,
     },
     {
       path: '/settings/notifications',
       title: t('settings.toc.notifications'),
-      subtitle: subtitles?.notifications ?? '—',
+      subtitle: subtitles?.notifications ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.notifications,
     },
     {
       path: '/settings/language',
       title: t('settings.language'),
-      subtitle: subtitles?.language ?? '—',
+      subtitle: subtitles?.language ?? subtitleFallback,
       icon: SETTINGS_TOC_ICONS.language,
     },
   ]
@@ -221,6 +226,8 @@ export function SettingsPage() {
         </div>
         <div className={badgeClass}>{badgeText}</div>
       </div>
+
+      {loadFailed ? <BlockError onRetry={() => void loadTocData()} /> : null}
 
       <div className="settings-toc-list">
         {rows.map((row) => (

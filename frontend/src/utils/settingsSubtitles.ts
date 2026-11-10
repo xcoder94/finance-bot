@@ -109,3 +109,8 @@ export function countNonProtectedExpenseParents(
 export function countExpenseSubcategories(categories: ExpenseCategorySubtitleInput[]): number {
   return categories.filter((category) => category.parent_id !== null).length
 }
+
+/** B18: a failed load shows the error block, not a column of dashes; dashes stay only while loading. */
+export function settingsSubtitleFallback(status: 'loading' | 'success' | 'error'): string {
+  return status === 'error' ? '' : '—'
+}

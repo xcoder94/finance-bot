@@ -10,6 +10,7 @@ import {
   HomeLeftBlock,
   HomeLeftSkeleton,
   balanceSizeClass,
+  statSizeClass,
   HomeOnboardingCard,
 } from '../components/home/homeBlocks'
 import { fetchWallets } from '../api/transactions'
@@ -516,7 +517,9 @@ export function HomePage() {
             <div className="home-figures-card__stats">
               <div className="home-figures-card__stat">
                 <div className="home-figures-card__stat-label">{t('home.income')}</div>
-                <div className="home-figures-card__stat-value home-figures-card__stat-value--income">
+                <div
+                  className={`home-figures-card__stat-value home-figures-card__stat-value--income${statSizeClass(formatCurrency(income, primaryCurrency))}`}
+                >
                   {summaryUnavailable || summaryLoading ? (
                     '—'
                   ) : (
@@ -531,7 +534,9 @@ export function HomePage() {
               <div className="home-figures-card__stat-divider" aria-hidden="true" />
               <div className="home-figures-card__stat">
                 <div className="home-figures-card__stat-label">{t('home.expense')}</div>
-                <div className="home-figures-card__stat-value home-figures-card__stat-value--expense">
+                <div
+                  className={`home-figures-card__stat-value home-figures-card__stat-value--expense${statSizeClass(formatCurrency(expense, primaryCurrency))}`}
+                >
                   {summaryUnavailable || summaryLoading ? (
                     '—'
                   ) : (
