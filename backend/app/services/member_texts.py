@@ -1,108 +1,80 @@
-def invite_link_invalid() -> str:
-    return (
-        "Эта ссылка-приглашение больше не действует. Попросите новую у того, кто вас "
-        "пригласил."
+"""Membership / welcome texts. Thin wrappers over the bot catalogue (app/services/bot_texts.py);
+`language` is a code or a User, default RU."""
+
+from typing import Any
+
+from app.services.bot_texts import t
+
+
+def invite_link_invalid(language: Any = "ru") -> str:
+    return t(language, "member.invite_link_invalid")
+
+
+def invite_family_full_chat(language: Any = "ru") -> str:
+    return t(language, "member.family_full")
+
+
+def invite_family_full(language: Any = "ru") -> str:
+    return invite_family_full_chat(language)
+
+
+def invite_already_member(budget_name: str, language: Any = "ru") -> str:
+    return t(language, "member.already_member", budget_name=budget_name)
+
+
+def join_has_other_members(language: Any = "ru") -> str:
+    return t(language, "member.join_has_other_members")
+
+
+def join_personal_wallet_cap(count: int, language: Any = "ru") -> str:
+    return t(language, "member.join_personal_wallet_cap", count=count)
+
+
+def join_confirm_prompt(budget_name: str, language: Any = "ru") -> str:
+    return t(language, "member.join_confirm", budget_name=budget_name)
+
+
+def welcome_solo(language: Any = "ru") -> str:
+    return t(language, "welcome.solo")
+
+
+def welcome_invited(budget_name: str, language: Any = "ru") -> str:
+    return t(language, "welcome.invited", budget_name=budget_name)
+
+
+def removed_notice(budget_name: str, language: Any = "ru") -> str:
+    return t(language, "member.removed_notice", budget_name=budget_name)
+
+
+def left_notice(budget_name: str, language: Any = "ru") -> str:
+    return t(language, "member.left_notice", budget_name=budget_name)
+
+
+def transfer_offer(budget_name: str, language: Any = "ru") -> str:
+    return t(language, "member.transfer_offer", budget_name=budget_name)
+
+
+def transfer_accepted_to_former(
+    new_owner_name: str, budget_name: str, language: Any = "ru"
+) -> str:
+    return t(
+        language, "member.transfer_accepted_to_former",
+        name=new_owner_name, budget_name=budget_name,
     )
 
 
-def invite_family_full_chat() -> str:
-    return "В этом семейном бюджете уже 4 участника — это предел."
+def transfer_refused_to_former(name: str, language: Any = "ru") -> str:
+    return t(language, "member.transfer_refused_to_former", name=name)
 
 
-def invite_family_full() -> str:
-    return invite_family_full_chat()
-
-
-def invite_already_member(budget_name: str) -> str:
-    return f"Вы уже участник бюджета «{budget_name}»."
-
-
-def join_has_other_members() -> str:
-    return (
-        "Нельзя присоединиться к другой семье, пока в вашем бюджете есть участники.\n"
-        "Передайте права владения одному из них или удалите участников, затем "
-        "попробуйте снова."
+def transfer_accepted_to_others(
+    new_owner_name: str, budget_name: str, language: Any = "ru"
+) -> str:
+    return t(
+        language, "member.transfer_accepted_to_others",
+        name=new_owner_name, budget_name=budget_name,
     )
 
 
-def join_personal_wallet_cap(count: int) -> str:
-    return (
-        "В новой семье ваши кошельки станут личными, а личных можно иметь не больше 5.\n"
-        f"Сейчас у вас {count} — удалите лишние и попробуйте снова."
-    )
-
-
-def join_confirm_prompt(budget_name: str) -> str:
-    return (
-        f"Вы присоединяетесь к бюджету «{budget_name}». Ваши кошельки и операции по "
-        "ним станут вашими личными в этой семье, ваш бюджет закроется."
-    )
-
-
-def welcome_solo() -> str:
-    return (
-        "Chontak — семейный бюджет.\n"
-        "\n"
-        "Записывайте траты прямо здесь, сообщением:\n"
-        "`такси 25 тысяч`\n"
-        "\n"
-        "Кошельки, категории и аналитика — в приложении."
-    )
-
-
-def welcome_invited(budget_name: str) -> str:
-    return (
-        f"Вы присоединились к бюджету «{budget_name}».\n"
-        "Всё, что вы запишете, увидят остальные участники.\n"
-        "\n"
-        "Записывайте траты прямо здесь, сообщением:\n"
-        "`такси 25 тысяч`\n"
-        "\n"
-        "Кошельки, цели и аналитика — в приложении."
-    )
-
-
-def removed_notice(budget_name: str) -> str:
-    return (
-        f"Вы больше не участник семейного бюджета «{budget_name}».\n"
-        "\n"
-        "Ваши личные кошельки и операции по ним перешли в ваш собственный бюджет — "
-        "вы теперь его владелец."
-    )
-
-
-def left_notice(budget_name: str) -> str:
-    return (
-        f"Вы вышли из бюджета «{budget_name}».\n"
-        "\n"
-        "Ваши личные кошельки и операции по ним перешли в ваш собственный бюджет — "
-        "вы теперь его владелец."
-    )
-
-
-def transfer_offer(budget_name: str) -> str:
-    return (
-        f"Вас предлагают сделать владельцем бюджета «{budget_name}».\n"
-        "\n"
-        "Владелец распоряжается общими кошельками, категориями и участниками.\n"
-        "Прежний владелец останется обычным участником."
-    )
-
-
-def transfer_accepted_to_former(new_owner_name: str, budget_name: str) -> str:
-    return (
-        f"{new_owner_name} теперь владелец бюджета «{budget_name}». "
-        "Вы остались участником."
-    )
-
-
-def transfer_refused_to_former(name: str) -> str:
-    return f"{name} отказался стать владельцем."
-
-
-def transfer_accepted_to_others(new_owner_name: str, budget_name: str) -> str:
-    return f"{new_owner_name} теперь владелец бюджета «{budget_name}»."
-
-
-def departed_label(name: str) -> str:
-    return f"{name} (бывший участник)"
+def departed_label(name: str, language: Any = "ru") -> str:
+    return t(language, "member.departed_label", name=name)

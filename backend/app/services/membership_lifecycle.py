@@ -234,9 +234,9 @@ async def detach_member_to_own_budget(
     resolved_bot, owned = await resolve_bot(bot)
     try:
         if reason == "removed":
-            text = removed_notice(old_budget_name)
+            text = removed_notice(old_budget_name, departing_user)
         else:
-            text = left_notice(old_budget_name)
+            text = left_notice(old_budget_name, departing_user)
         await resolved_bot.send_message(departing_user.telegram_id, text)
     finally:
         if owned:

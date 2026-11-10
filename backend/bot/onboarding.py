@@ -36,6 +36,7 @@ from app.services.invite import (
     cache_bot_username,
     get_cached_bot_username,
 )
+from app.services.bot_texts import CATALOGUE, t as catalogue_t
 from app.services.member_texts import (
     invite_already_member,
     invite_family_full_chat,
@@ -62,31 +63,19 @@ router = Router()
 FlowType = Literal["owner", "member"]
 
 MESSAGES: dict[str, dict[str, str]] = {
-    "already_member": {
-        "ru": "Вы уже состоите в Family Budget.",
-        "uz": "Siz allaqachon Family Budget a'zosiz.",
-    },
-    "invalid_invite": {
-        "ru": "Ссылка-приглашение недействительна или просрочена.",
-        "uz": "Taklif havolasi yaroqsiz yoki muddati tugagan.",
-    },
-    "choose_language": {
-        "ru": "Выберите язык:",
-        "uz": "Tilni tanlang:",
-    },
-    "invite_only_owner": {
-        "ru": "Только Owner может приглашать участников.",
-        "uz": "Faqat Owner a'zolarni taklif qila oladi.",
-    },
-    "not_registered": {
-        "ru": "Сначала пройдите регистрацию через /start.",
-        "uz": "Avval /start orqali ro'yxatdan o'ting.",
-    },
+    key: CATALOGUE[f"onboarding.{key}"]
+    for key in (
+        "already_member",
+        "invalid_invite",
+        "choose_language",
+        "invite_only_owner",
+        "not_registered",
+    )
 }
 
 SUPPORTED_LANGUAGES = frozenset({"ru", "uz"})
 
-OPEN_APP_BUTTON_LABEL = "Открыть приложение"
+OPEN_APP_BUTTON_LABEL = CATALOGUE["button.open_app"]["ru"]
 
 
 class OnboardingStates(StatesGroup):
@@ -94,9 +83,7 @@ class OnboardingStates(StatesGroup):
 
 
 def t(key: str, language: str, **kwargs: str) -> str:
-    lang = language if language in SUPPORTED_LANGUAGES else "ru"
-    template = MESSAGES[key][lang]
-    return template.format(**kwargs) if kwargs else template
+    return catalogue_t(language, f"onboarding.{key}", **kwargs)
 
 
 def parse_start_payload(payload: str | None) -> tuple[FlowType, str | None]:
@@ -126,14 +113,14 @@ def open_app_keyboard(
     return build_main_reply_keyboard(language)
 
 
-def greeting_inline_keyboard() -> InlineKeyboardMarkup | None:
+def greeting_inline_keyboard(language: str = "ru") -> InlineKeyboardMarkup | None:
     if not MINI_APP_URL:
         return None
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=OPEN_APP_BUTTON_LABEL,
+                    text=catalogue_t(language, "button.open_app"),
                     web_app=WebAppInfo(url=MINI_APP_URL),
                 )
             ]
@@ -141,16 +128,18 @@ def greeting_inline_keyboard() -> InlineKeyboardMarkup | None:
     )
 
 
-def join_confirm_keyboard(token: str) -> InlineKeyboardMarkup:
+def join_confirm_keyboard(token: str, language: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Присоединиться",
+                    text=catalogue_t(language, "button.join"),
                     callback_data=f"join_accept:{token}",
                 )
             ],
-            [InlineKeyboardButton(text="Отмена", callback_data="join_cancel")],
+            [InlineKeyboardButton(
+                    text=catalogue_t(language, "button.cancel"), callback_data="join_cancel"
+                )],
         ]
     )
 
@@ -201,33 +190,33 @@ async def start_handler(
                     session, invite_token
                 )
                 if budget is None:
-                    await message.answer(invite_link_invalid())
+                    await message.answer(invite_link_invalid(existing_user))
                     return
 
                 if existing_user.family_budget_id == budget.id:
-                    await message.answer(invite_already_member(budget.name))
+                    await message.answer(invite_already_member(budget.name, existing_user))
                     return
 
                 if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
-                    await message.answer(invite_family_full_chat())
+                    await message.answer(invite_family_full_chat(existing_user))
                     return
 
                 block = await evaluate_join_from_own_budget(
                     session, existing_user, budget
                 )
                 if block == JoinBlockReason.HAS_OTHER_MEMBERS:
-                    await message.answer(join_has_other_members())
+                    await message.answer(join_has_other_members(existing_user))
                     return
                 if block == JoinBlockReason.PERSONAL_WALLET_CAP:
                     wallet_count = await count_all_wallets_for_user_budget(
                         session, existing_user
                     )
-                    await message.answer(join_personal_wallet_cap(wallet_count))
+                    await message.answer(join_personal_wallet_cap(wallet_count, existing_user))
                     return
 
                 await message.answer(
-                    join_confirm_prompt(budget.name),
-                    reply_markup=join_confirm_keyboard(invite_token),
+                    join_confirm_prompt(budget.name, existing_user),
+                    reply_markup=join_confirm_keyboard(invite_token, existing_user.language),
                 )
                 return
 
@@ -304,14 +293,14 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 budget = await session.get(FamilyBudget, budget_id)
                 if budget is None or budget.is_deleted:
                     existing_language = language
-                    await callback.message.edit_text(invite_link_invalid())
+                    await callback.message.edit_text(invite_link_invalid(language))
                     await state.clear()
                     await callback.answer()
                     return
                 await lock_family_budget(session, budget_id)
                 if await count_active_members(session, budget_id) >= MEMBER_LIMIT:
                     existing_language = language
-                    await callback.message.edit_text(invite_family_full_chat())
+                    await callback.message.edit_text(invite_family_full_chat(language))
                     await state.clear()
                     await callback.answer()
                     return
@@ -335,13 +324,13 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
         return
 
     if flow == "owner":
-        welcome = welcome_solo()
+        welcome = welcome_solo(language)
     else:
-        welcome = welcome_invited(escape_markdown(member_budget_name))
+        welcome = welcome_invited(escape_markdown(member_budget_name), language)
 
     await callback.message.answer(
         welcome,
-        reply_markup=greeting_inline_keyboard(),
+        reply_markup=greeting_inline_keyboard(language),
         parse_mode="Markdown",
     )
     await callback.message.answer(

@@ -9,6 +9,7 @@ from app.models.family_budget import FamilyBudget
 from app.models.ownership_transfer import OwnershipTransfer
 from app.models.user import User
 from app.services.goal_notify import resolve_bot
+from app.services.bot_texts import t
 from app.services.member_texts import (
     transfer_accepted_to_former,
     transfer_accepted_to_others,
@@ -43,16 +44,18 @@ def display_name(user: User) -> str:
     return user.first_name or user.username or "Участник"
 
 
-def transfer_offer_keyboard(transfer_id: uuid.UUID) -> InlineKeyboardMarkup:
+def transfer_offer_keyboard(
+    transfer_id: uuid.UUID, language: str = "ru"
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Принять",
+                    text=t(language, "button.transfer_accept"),
                     callback_data=f"own_xfer_accept:{transfer_id}",
                 ),
                 InlineKeyboardButton(
-                    text="Отказаться",
+                    text=t(language, "button.transfer_refuse"),
                     callback_data=f"own_xfer_refuse:{transfer_id}",
                 ),
             ]
@@ -168,8 +171,8 @@ async def request_ownership_transfer(
     try:
         await resolved_bot.send_message(
             recipient.telegram_id,
-            transfer_offer(budget.name),
-            reply_markup=transfer_offer_keyboard(transfer.id),
+            transfer_offer(budget.name, recipient),
+            reply_markup=transfer_offer_keyboard(transfer.id, recipient.language),
         )
     finally:
         if owned:
@@ -226,12 +229,12 @@ async def accept_ownership_transfer(
     try:
         await resolved_bot.send_message(
             former_owner.telegram_id,
-            transfer_accepted_to_former(new_owner_name, budget_name),
+            transfer_accepted_to_former(new_owner_name, budget_name, former_owner),
         )
         for member in remaining:
             await resolved_bot.send_message(
                 member.telegram_id,
-                transfer_accepted_to_others(new_owner_name, budget_name),
+                transfer_accepted_to_others(new_owner_name, budget_name, member),
             )
     finally:
         if owned:
@@ -270,7 +273,7 @@ async def refuse_ownership_transfer(
     try:
         await resolved_bot.send_message(
             former_owner.telegram_id,
-            transfer_refused_to_former(recipient_name),
+            transfer_refused_to_former(recipient_name, former_owner),
         )
     finally:
         if owned:

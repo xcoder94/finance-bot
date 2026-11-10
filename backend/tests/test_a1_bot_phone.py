@@ -138,7 +138,7 @@ class TestNewUserPrompt:
             monkeypatch.setattr("bot.onboarding.assign_default_card_uzs", AsyncMock())
             user, message = await _new_user_callback(session, monkeypatch, language=language)
             calls = message.answer.await_args_list
-            assert [c.args[0] for c in calls] == [welcome_solo(), text]
+            assert [c.args[0] for c in calls] == [welcome_solo(language), text]
             markup = calls[1].kwargs["reply_markup"]
             assert isinstance(markup, ReplyKeyboardMarkup)
             assert _buttons(markup) == [(share, True), (skip, False)]
@@ -166,7 +166,7 @@ class TestNewUserPrompt:
             bot = FakeBot()
             await _feed(bot, _update(user.telegram_id, text="/start",
                                      entities=[{"type": "bot_command", "offset": 0, "length": 6}]))
-            assert [m.text for m in bot.sent] == ["Вы уже состоите в Family Budget."]
+            assert [m.text for m in bot.sent] == ["Вы уже состоите в Chontak."]
             assert (await _fresh(session, user)).phone_prompted_at is None
 
 
@@ -326,7 +326,7 @@ class TestSkipAndOtherMessage:
             bot = FakeBot()
             await _feed(bot, _update(user.telegram_id, text="/start",
                                      entities=[{"type": "bot_command", "offset": 0, "length": 6}]))
-            assert [m.text for m in bot.sent] == ["Вы уже состоите в Family Budget."]
+            assert [m.text for m in bot.sent] == ["Вы уже состоите в Chontak."]
             assert phone_prompt.pending_keyboard_restore == {}
 
 

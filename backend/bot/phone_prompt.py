@@ -24,34 +24,15 @@ from sqlalchemy import update
 
 from app.db import async_session_factory
 from app.models.user import User
+from app.services.bot_texts import CATALOGUE
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="phone_prompt")
 
 STRINGS: dict[str, dict[str, str]] = {
-    "prompt": {
-        "ru": (
-            "Если хотите, поделитесь номером телефона — так нам проще связаться с вами, "
-            "если что-то пойдёт не так. Можно пропустить."
-        ),
-        "uz": (
-            "Xohlasangiz, telefon raqamingizni yuboring — biror muammo bo'lsa, "
-            "siz bilan bog'lanish osonroq bo'ladi. O'tkazib yuborish mumkin."
-        ),
-    },
-    "share": {"ru": "Поделиться номером", "uz": "Raqamni yuborish"},
-    "skip": {"ru": "Пропустить", "uz": "O'tkazib yuborish"},
-    "saved": {"ru": "Спасибо, номер сохранён.", "uz": "Rahmat, raqam saqlandi."},
-    "skipped": {
-        "ru": "Хорошо. Записывайте траты сообщением.",
-        "uz": "Mayli. Xarajatlarni xabar bilan yozing.",
-    },
-    "restored": {"ru": "Хорошо.", "uz": "Mayli."},
-    "foreign": {
-        "ru": "Нужен ваш номер — кнопка ниже.",
-        "uz": "Sizning raqamingiz kerak — pastdagi tugma.",
-    },
+    key: CATALOGUE[f"phone.{key}"]
+    for key in ("prompt", "share", "skip", "saved", "skipped", "restored", "foreign")
 }
 
 _SKIP_LABELS = frozenset(STRINGS["skip"].values())

@@ -3,6 +3,7 @@ import uuid
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from app.services.bot_texts import t
 from app.db import async_session_factory
 from app.services.member_texts import (
     invite_already_member,
@@ -43,9 +44,9 @@ async def _refusal_for_join_block(
     session, user, block: JoinBlockReason
 ) -> str:
     if block == JoinBlockReason.HAS_OTHER_MEMBERS:
-        return join_has_other_members()
+        return join_has_other_members(user)
     wallet_count = await count_all_wallets_for_user_budget(session, user)
-    return join_personal_wallet_cap(wallet_count)
+    return join_personal_wallet_cap(wallet_count, user)
 
 
 @router.callback_query(F.data.startswith("join_accept:"))
@@ -59,6 +60,7 @@ async def join_accept(callback: CallbackQuery) -> None:
         return
 
     budget_name = ""
+    user_language = "ru"
 
     async with async_session_factory() as session:
         async with session.begin():
@@ -69,22 +71,23 @@ async def join_accept(callback: CallbackQuery) -> None:
                 await callback.answer()
                 return
 
+            user_language = user.language
             budget = await get_family_budget_by_invite_token(session, token)
             if budget is None:
-                await callback.message.edit_text(invite_link_invalid())
+                await callback.message.edit_text(invite_link_invalid(user))
                 await callback.answer()
                 return
 
             budget_name = budget.name
 
             if user.family_budget_id == budget.id:
-                await callback.message.edit_text(invite_already_member(budget.name))
+                await callback.message.edit_text(invite_already_member(budget.name, user))
                 await callback.answer()
                 return
 
             await lock_family_budget(session, budget.id)
             if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
-                await callback.message.edit_text(invite_family_full_chat())
+                await callback.message.edit_text(invite_family_full_chat(user))
                 await callback.answer()
                 return
 
@@ -101,13 +104,13 @@ async def join_accept(callback: CallbackQuery) -> None:
                     session, user=user, target=budget
                 )
             except FamilyFullError:
-                await callback.message.edit_text(invite_family_full_chat())
+                await callback.message.edit_text(invite_family_full_chat(user))
                 await callback.answer()
                 return
 
     await callback.message.answer(
-        welcome_invited(escape_markdown(budget_name)),
-        reply_markup=greeting_inline_keyboard(),
+        welcome_invited(escape_markdown(budget_name), user_language),
+        reply_markup=greeting_inline_keyboard(user_language),
         parse_mode="Markdown",
     )
     await callback.message.delete()
@@ -152,9 +155,9 @@ async def own_xfer_accept(callback: CallbackQuery) -> None:
                     actor=user,
                     bot=None,
                 )
-            except TransferStaleError as exc:
+            except TransferStaleError:
                 await callback.message.edit_reply_markup(reply_markup=None)
-                await callback.answer(exc.message)
+                await callback.answer(t(user, "member.transfer_stale"))
                 return
             except (TransferNotFoundError, TransferNotPendingError, TransferActorError):
                 await callback.answer()
