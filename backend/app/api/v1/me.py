@@ -124,12 +124,26 @@ async def _build_onboarding(session: AsyncSession, user: User) -> OnboardingResp
         .select_from(User)
         .where(User.family_budget_id == budget_id, User.is_deleted.is_(False))
     )
+    # Step 2 ("add this month's income") is done once the budget has any income.
+    has_income = await session.scalar(
+        select(
+            select(Transaction.id)
+            .where(
+                Transaction.family_budget_id == budget_id,
+                Transaction.type == "income",
+                Transaction.is_deleted.is_(False),
+                Transaction.is_demo.is_(False),
+            )
+            .limit(1)
+            .exists()
+        )
+    )
     link_opened_at = await session.scalar(
         select(FamilyBudget.invite_link_opened_at).where(FamilyBudget.id == budget_id)
     )
     steps = OnboardingSteps(
         first_operation=bool(has_operation),
-        default_wallet_checked=user.default_wallet_screen_opened_at is not None,
+        default_wallet_checked=bool(has_income),
         family_invited=(member_count or 0) > 1 or link_opened_at is not None,
     )
     show = user.role == "owner" and not all(

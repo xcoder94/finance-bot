@@ -40,6 +40,19 @@ async def _add_expense(session: AsyncSession, user, budget, *, is_demo: bool = F
     await session.flush()
 
 
+async def _add_income(session: AsyncSession, user, budget) -> None:
+    wallet = Wallet(family_budget_id=budget.id, name="WI", currency="UZS")
+    session.add(wallet)
+    await session.flush()
+    session.add(
+        Transaction(
+            family_budget_id=budget.id, type="income", wallet_id=wallet.id, amount=1000,
+            created_by_user_id=user.id, transaction_date=datetime.now(UTC),
+        )
+    )
+    await session.flush()
+
+
 async def test_new_family_shows_all_steps_false(api_client) -> None:
     client, session = api_client
     tid = _tid()
@@ -67,26 +80,15 @@ async def test_first_operation_step_by_any_member_and_demo_ignored(api_client) -
     assert r.json()["steps"]["first_operation"] is True
 
 
-async def test_default_wallet_post_sets_step_and_is_idempotent(api_client) -> None:
+async def test_default_wallet_post_is_idempotent_and_does_not_set_step(api_client) -> None:
+    # step 2 is now "has income" (see test_ux_fix2_backend); the legacy POST no longer marks it
     client, session = api_client
     tid = _tid()
     await create_user_with_budget(session, telegram_id=tid)
     r1 = await client.post(POST_URL, headers=auth_headers(tid))
     r2 = await client.post(POST_URL, headers=auth_headers(tid))
     assert r1.status_code == 200 and r2.status_code == 200
-    assert r2.json()["steps"]["default_wallet_checked"] is True
-    r = await client.get(URL, headers=auth_headers(tid))
-    assert r.json()["steps"]["default_wallet_checked"] is True
-
-
-async def test_flag_is_per_user(api_client) -> None:
-    client, session = api_client
-    tid = _tid()
-    _, budget = await create_user_with_budget(session, telegram_id=tid)
-    await create_user_with_budget(session, telegram_id=tid + 1, role="member", family_budget_id=budget.id)
-    await client.post(POST_URL, headers=auth_headers(tid + 1))
-    r = await client.get(URL, headers=auth_headers(tid))
-    assert r.json()["steps"]["default_wallet_checked"] is False
+    assert r2.json()["steps"]["default_wallet_checked"] is False
 
 
 async def test_second_member_marks_family_invited(api_client) -> None:
@@ -120,7 +122,7 @@ async def test_all_done_hides_for_owner(api_client) -> None:
     owner, budget = await create_user_with_budget(session, telegram_id=tid)
     await create_user_with_budget(session, telegram_id=tid + 1, role="member", family_budget_id=budget.id)
     await _add_expense(session, owner, budget)
-    await client.post(POST_URL, headers=auth_headers(tid))
+    await _add_income(session, owner, budget)
     r = await client.get(URL, headers=auth_headers(tid))
     assert r.json()["show"] is False
     assert all(r.json()["steps"].values())

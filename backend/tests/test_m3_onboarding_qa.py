@@ -45,27 +45,3 @@ async def test_removed_member_does_not_count_as_invited(api_client) -> None:
     await session.flush()
     r = await client.get(URL, headers=auth_headers(tid))
     assert r.json()["steps"]["family_invited"] is False
-
-
-async def test_default_wallet_flag_is_persisted_not_only_in_memory(api_client) -> None:
-    client, session = api_client
-    tid = _tid()
-    await create_user_with_budget(session, telegram_id=tid)
-    await session.commit()
-    assert (await client.post(POST_URL, headers=auth_headers(tid))).status_code == 200
-    await session.rollback()  # drop anything the endpoint did not commit
-    session.expire_all()
-    r = await client.get(URL, headers=auth_headers(tid))
-    assert r.json()["steps"]["default_wallet_checked"] is True
-
-
-async def test_member_post_sets_only_own_flag_and_owner_card_unchanged(api_client) -> None:
-    client, session = api_client
-    tid = _tid()
-    _, budget = await create_user_with_budget(session, telegram_id=tid)
-    await create_user_with_budget(session, telegram_id=tid + 1, role="member", family_budget_id=budget.id)
-    r = await client.post(POST_URL, headers=auth_headers(tid + 1))
-    assert r.status_code == 200 and r.json()["show"] is False
-    assert r.json()["steps"]["default_wallet_checked"] is True
-    owner = (await client.get(URL, headers=auth_headers(tid))).json()
-    assert owner["steps"]["default_wallet_checked"] is False and owner["show"] is True

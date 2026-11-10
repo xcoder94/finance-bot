@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.user_deps import CurrentUserDep
 from app.db import get_session
-from app.schemas.history_analytics import HistoryResponse
+from app.schemas.history_analytics import Currency, HistoryResponse
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import get_active_wallet
 from app.services.history_analytics import get_history, should_include_created_by
@@ -26,6 +26,7 @@ async def list_transaction_history(
     expense_category_id: uuid.UUID | None = None,
     wallet_id: uuid.UUID | None = None,
     uncategorized: bool = False,
+    currency: Currency | None = None,
 ) -> HistoryResponse:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
@@ -45,6 +46,7 @@ async def list_transaction_history(
         expense_category_id,
         wallet_id,
         uncategorized,
+        currency,
     )
     serialized_items = [
         item.model_dump() if include_created_by else item.model_dump(exclude={"created_by"})

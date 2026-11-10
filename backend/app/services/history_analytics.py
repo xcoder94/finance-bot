@@ -243,6 +243,7 @@ async def get_history(
     expense_category_id: uuid.UUID | None = None,
     wallet_id: uuid.UUID | None = None,
     uncategorized: bool = False,
+    currency: str | None = None,
 ) -> tuple[list[HistoryItem], int]:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
@@ -288,6 +289,12 @@ async def get_history(
     from_wallet = aliased(Wallet)
     to_wallet = aliased(Wallet)
     visibility = personal_ops_hidden_clause(viewer, from_wallet, to_wallet)
+    if currency is not None:
+        # a row matches by its wallet currency; a transfer also by its destination currency
+        base_filters = (
+            *base_filters,
+            or_(from_wallet.currency == currency, to_wallet.currency == currency),
+        )
 
     count_stmt = (
         select(func.count())
