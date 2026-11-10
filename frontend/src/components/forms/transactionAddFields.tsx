@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { Wallet } from '../../api/transactions'
 import { getDisplayName } from '../../utils/getDisplayName'
+import { isSelectableDate } from '../../utils/dateChips'
 import {
   countDigitsBeforeCursor,
   cursorPosAfterDigits,
@@ -16,10 +17,8 @@ import {
   deleteDigitBefore,
   deleteDigitRange,
   extractDigits,
-  formatDateDigits,
   formatThousandsDigits,
   insertDigitAt,
-  isValidMaskedDate,
   MAX_AMOUNT_DIGITS,
 } from '../../utils/transactionForm'
 import {
@@ -28,6 +27,7 @@ import {
   MAX_COMMENT_LENGTH,
   transferRateFieldSuffix,
 } from '../../utils/transactionFormFields'
+import { DateChips } from '../DateChips'
 import { FormSheet } from './FormSheet'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheetField } from './FormSheetField'
@@ -228,88 +228,30 @@ export function FormSheetCommentField({ value, onChange }: FormSheetCommentField
 }
 
 type FormSheetDateFieldProps = {
+  /** `YYYY-MM-DD` (Tashkent calendar day). */
   value: string
   hasError: boolean
   onChange: (value: string) => void
-  onBlur: () => void
-  onEdit: () => void
 }
 
-export function FormSheetDateField({
-  value,
-  hasError,
-  onChange,
-  onBlur,
-  onEdit,
-}: FormSheetDateFieldProps) {
+export function FormSheetDateField({ value, hasError, onChange }: FormSheetDateFieldProps) {
   const { t } = useTranslation()
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Backspace') {
-      event.preventDefault()
-      onChange(formatDateDigits(extractDigits(value).slice(0, -1)))
-      onEdit()
-      return
-    }
-
-    if (event.key.length === 1 && /\d/.test(event.key)) {
-      event.preventDefault()
-      const digits = extractDigits(value)
-      if (digits.length >= 8) {
-        return
-      }
-      onChange(formatDateDigits(digits + event.key))
-      onEdit()
-      return
-    }
-
-    if (
-      event.key.length === 1 &&
-      event.key !== 'Tab' &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey
-    ) {
-      event.preventDefault()
-    }
-  }
-
-  const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault()
-    const pasted = extractDigits(event.clipboardData.getData('text'))
-    const combined = (extractDigits(value) + pasted).slice(0, 8)
-    onChange(formatDateDigits(combined))
-    onEdit()
-  }
-
   return (
-    <FormSheetField
-      label={t('formSheet.date')}
-      right="›"
-      hint={hasError ? t('addTransaction.invalidDate') : undefined}
-      hintError={hasError}
-    >
-      <input
-        className="form-sheet-field__input"
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        value={value}
-        aria-invalid={hasError}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        onBlur={onBlur}
-        onChange={(event) => {
-          onChange(formatDateDigits(extractDigits(event.target.value).slice(0, 8)))
-          onEdit()
-        }}
-      />
-    </FormSheetField>
+    <div className="form-sheet-field">
+      <div className="form-sheet-field__label">{t('formSheet.date')}</div>
+      <DateChips value={value} onChange={onChange} hasError={hasError} />
+      {hasError ? (
+        <div className="form-sheet-field__hint form-sheet-field__hint--error" role="alert">
+          {t('addTransaction.invalidDate')}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
 export function isFormSheetDateValid(value: string): boolean {
-  return isValidMaskedDate(value)
+  return isSelectableDate(value)
 }
 
 type FormSheetRateFieldProps = {

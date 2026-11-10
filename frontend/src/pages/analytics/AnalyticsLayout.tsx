@@ -194,10 +194,6 @@ export function AnalyticsLayout() {
             rangeTo={rangeTo}
             onRangeFromChange={setRangeFrom}
             onRangeToChange={setRangeTo}
-            rangeFromTouched={rangeFromTouched}
-            rangeToTouched={rangeToTouched}
-            onRangeFromTouched={() => setRangeFromTouched(true)}
-            onRangeToTouched={() => setRangeToTouched(true)}
             rangeOrderInvalid={rangeOrderInvalid}
             periodHint={t('analytics.sharedPeriodHint')}
           />

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   buildEditSheetTitle,
@@ -9,7 +9,6 @@ import {
   isCommentTooLong,
   isTransferCrossCurrency,
   MAX_COMMENT_LENGTH,
-  nowMaskedDateInTashkent,
   resolveDefaultWalletId,
   resolveEditSheetLabel,
   shouldShowTransferRateField,
@@ -75,17 +74,6 @@ describe('resolveDefaultWalletId', () => {
   it('falls back to first wallet when default is missing', () => {
     expect(resolveDefaultWalletId(wallets, 'missing')).toBe('w1')
     expect(resolveDefaultWalletId(wallets, null)).toBe('w1')
-  })
-})
-
-describe('nowMaskedDateInTashkent', () => {
-  it('returns masked date for Asia/Tashkent', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-08-03T10:00:00.000Z'))
-
-    expect(nowMaskedDateInTashkent()).toBe('03.08.2026')
-
-    vi.useRealTimers()
   })
 })
 

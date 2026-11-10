@@ -1,71 +1,83 @@
 import { describe, expect, it } from 'vitest'
 
-// transactionForm.ts pulls in formatCurrency -> ../i18n, which touches
-// `document.documentElement` at module load time. The vitest environment for
-// this suite is `node` (see vitest.config.ts), so stub the minimal shape
-// `../i18n` needs before importing anything that transitively loads it.
+// periodFilter.ts pulls in ../i18n, which touches `document.documentElement` at module
+// load time; the vitest environment is `node`, so stub the minimal shape first.
 ;(globalThis as unknown as { document: { documentElement: { lang: string } } }).document ??= {
   documentElement: { lang: '' },
 }
 
 const { monthDateRange } = await import('../api/home')
-const { maskedDateToUtcEndIso, maskedDateToUtcStartIso, isoDateToMaskedDate } = await import('./transactionForm')
-const { initializeRangeFromMonth } = await import('./periodFilter')
+const { dayEndIso, dayStartIso, tashkentDateOf } = await import('./dateChips')
+const { initializeRangeFromMonth, resolveRange } = await import('./periodFilter')
+
+const MONTH = { year: 2026, month: 8 }
 
 describe('manual date range resolves Tashkent calendar boundaries', () => {
-  it('resolves the start of 01.08.2026 to the Tashkent midnight instant', () => {
-    const start = maskedDateToUtcStartIso('01.08.2026')
-    expect(start).not.toBeNull()
-    expect(new Date(start as string).toISOString()).toBe('2026-07-31T19:00:00.000Z')
+  it('resolves the start of 2026-08-01 to the Tashkent midnight instant', () => {
+    expect(new Date(dayStartIso('2026-08-01')).toISOString()).toBe('2026-07-31T19:00:00.000Z')
   })
 
-  it('resolves the end of 31.08.2026 to the Tashkent end-of-day instant', () => {
-    const end = maskedDateToUtcEndIso('31.08.2026')
-    expect(end).not.toBeNull()
-    expect(new Date(end as string).toISOString()).toBe('2026-08-31T18:59:59.999Z')
+  it('resolves the end of 2026-08-31 to the Tashkent end-of-day instant', () => {
+    expect(new Date(dayEndIso('2026-08-31')).toISOString()).toBe('2026-08-31T18:59:59.999Z')
   })
 
   it('produces byte-identical instants to monthDateRange for a whole-month range', () => {
     const { dateFrom, dateTo } = monthDateRange(2026, 8)
-
-    const rangeFrom = maskedDateToUtcStartIso('01.08.2026')
-    const rangeTo = maskedDateToUtcEndIso('31.08.2026')
-
-    expect(rangeFrom).toBe(dateFrom)
-    expect(rangeTo).toBe(dateTo)
+    expect(dayStartIso('2026-08-01')).toBe(dateFrom)
+    expect(dayEndIso('2026-08-31')).toBe(dateTo)
   })
 
-  it('includes an operation timestamped 02:00 Tashkent on 1 August in the manual range 01.08-31.08', () => {
-    const dateFrom = maskedDateToUtcStartIso('01.08.2026') as string
-    const dateTo = maskedDateToUtcEndIso('31.08.2026') as string
-
-    // 02:00 Tashkent (+05:00) on 1 August 2026 is 21:00 UTC on 31 July 2026.
-    const operationTimestamp = '2026-07-31T21:00:00.000Z'
-
-    expect(operationTimestamp >= new Date(dateFrom).toISOString()).toBe(true)
-    expect(operationTimestamp <= new Date(dateTo).toISOString()).toBe(true)
+  it('includes an operation timestamped 02:00 Tashkent on 1 August in the range 08-01..08-31', () => {
+    const { range } = resolveRange('range', MONTH, '2026-08-01', '2026-08-31')
+    const operation = new Date('2026-07-31T21:00:00.000Z').getTime()
+    expect(operation >= new Date(range!.dateFrom).getTime()).toBe(true)
+    expect(operation <= new Date(range!.dateTo).getTime()).toBe(true)
   })
 })
 
-describe('month → manual range round trip (Tashkent calendar day)', () => {
-  it('pre-fills the first day of the month, not the previous day', () => {
-    // `initializeRangeFromMonth` feeds `monthDateRange`'s `+05:00` strings straight
-    // back into `isoDateToMaskedDate`. Reading the UTC calendar day off those returns
-    // 31.07 for a range that starts on 01.08.
-    const { rangeFrom, rangeTo } = initializeRangeFromMonth({ year: 2026, month: 8 })
-    expect(rangeFrom).toBe('01.08.2026')
-    expect(rangeTo).toBe('31.08.2026')
+describe('resolveRange', () => {
+  it('flags From later than To and returns no range', () => {
+    expect(resolveRange('range', MONTH, '2026-08-10', '2026-08-01')).toEqual({
+      range: null,
+      rangeOrderInvalid: true,
+    })
   })
 
-  it('round trips every month boundary of the year', () => {
+  it('accepts a single-day range', () => {
+    const { range, rangeOrderInvalid } = resolveRange('range', MONTH, '2026-08-05', '2026-08-05')
+    expect(rangeOrderInvalid).toBe(false)
+    expect(range).not.toBeNull()
+  })
+
+  it('returns no range and no order error while a date is empty', () => {
+    expect(resolveRange('range', MONTH, '', '2026-08-05')).toEqual({
+      range: null,
+      rangeOrderInvalid: false,
+    })
+  })
+})
+
+describe('month -> manual range round trip (Tashkent calendar day)', () => {
+  it('pre-fills the first and last day of a past month', () => {
+    const { rangeFrom, rangeTo } = initializeRangeFromMonth(MONTH)
+    expect(rangeFrom).toBe('2026-08-01')
+    expect(rangeTo).toBe('2026-08-31')
+  })
+
+  it('round trips every month boundary of a past year', () => {
     for (let month = 1; month <= 12; month += 1) {
-      const { rangeFrom } = initializeRangeFromMonth({ year: 2026, month })
-      expect(rangeFrom.slice(0, 5)).toBe(`01.${String(month).padStart(2, '0')}`)
+      const { rangeFrom } = initializeRangeFromMonth({ year: 2025, month })
+      expect(rangeFrom).toBe(`2025-${String(month).padStart(2, '0')}-01`)
     }
   })
 
+  it('clamps the end of a month that has not finished to today', () => {
+    const now = new Date()
+    const { rangeTo } = initializeRangeFromMonth({ year: now.getFullYear() + 1, month: 1 })
+    expect(rangeTo <= tashkentDateOf(new Date())).toBe(true)
+  })
+
   it('reads the Tashkent day, not the UTC day, for an instant that straddles midnight', () => {
-    // 2026-08-01T02:00 Tashkent is still 2026-07-31 in UTC.
-    expect(isoDateToMaskedDate('2026-07-31T21:00:00.000Z')).toBe('01.08.2026')
+    expect(tashkentDateOf('2026-07-31T21:00:00.000Z')).toBe('2026-08-01')
   })
 })

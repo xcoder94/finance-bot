@@ -462,7 +462,8 @@
       "nameHint": "По умолчанию — имя кошелька",
       "deadlineLabel": "Срок · необязательно",
       "deadlineNotSelected": "не выбран",
-      "deadlineInvalid": "Введите дату в формате ДД.ММ.ГГГГ"
+      "deadlineInvalid": "Введите дату в формате ДД.ММ.ГГГГ",
+      "deadlineClear": "Убрать срок"
     },
     "closedBadge": "Закрыта",
     "ofTarget": "из {{amount}}",
@@ -599,5 +600,16 @@
     "empty": "Кошельков пока нет",
     "balanceNow": "Сейчас на кошельке",
     "opsEmptyHint": "Выберите другой месяц."
+  },
+  "dateChips": {
+    "today": "Сегодня",
+    "yesterday": "Вчера",
+    "dayBefore": "Позавчера",
+    "other": "Другая дата",
+    "days7": "7 дней",
+    "days30": "30 дней",
+    "thisMonth": "Этот месяц",
+    "lastMonth": "Прошлый месяц",
+    "pickDate": "Выберите дату"
   }
 }

@@ -16,7 +16,6 @@ import {
   deleteDigitBefore,
   deleteDigitRange,
   extractDigits,
-  formatDatetimeDigits,
   formatThousandsDigits,
   insertDigitAt,
   MAX_AMOUNT_DIGITS,
@@ -168,88 +167,6 @@ export function TransactionReceiveRow({
       <Text className="transaction-form__receive-value" weight="2">
         {value}
       </Text>
-    </div>
-  )
-}
-
-type MaskedDateTimeInputProps = {
-  value: string
-  onChange: (value: string) => void
-  hasError: boolean
-  onBlur: () => void
-  onEdit: () => void
-}
-
-export function MaskedDateTimeInput({
-  value,
-  onChange,
-  hasError,
-  onBlur,
-  onEdit,
-}: MaskedDateTimeInputProps) {
-  const { t } = useTranslation()
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Backspace') {
-      event.preventDefault()
-      onChange(formatDatetimeDigits(extractDigits(value).slice(0, -1)))
-      onEdit()
-      return
-    }
-
-    if (event.key.length === 1 && /\d/.test(event.key)) {
-      event.preventDefault()
-      const digits = extractDigits(value)
-      if (digits.length >= 12) {
-        return
-      }
-      onChange(formatDatetimeDigits(digits + event.key))
-      onEdit()
-      return
-    }
-
-    if (
-      event.key.length === 1 &&
-      event.key !== 'Tab' &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey
-    ) {
-      event.preventDefault()
-    }
-  }
-
-  const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault()
-    const pasted = extractDigits(event.clipboardData.getData('text'))
-    const combined = (extractDigits(value) + pasted).slice(0, 12)
-    onChange(formatDatetimeDigits(combined))
-    onEdit()
-  }
-
-  return (
-    <div className="transaction-form__field-control">
-      <Input
-        header={t('addTransaction.dateTime')}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        value={value}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        onBlur={onBlur}
-        onChange={(event) => {
-          const digits = extractDigits(event.target.value).slice(0, 12)
-          onChange(formatDatetimeDigits(digits))
-          onEdit()
-        }}
-        status={hasError ? 'error' : 'default'}
-      />
-      {hasError ? (
-        <Text className="transaction-form__field-error" role="alert">
-          {t('addTransaction.invalidDateTime')}
-        </Text>
-      ) : null}
     </div>
   )
 }

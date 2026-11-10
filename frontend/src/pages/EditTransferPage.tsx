@@ -36,12 +36,11 @@ import { getDisplayName } from '../utils/getDisplayName'
 import { historyBackTarget } from '../utils/historyBackTarget'
 import type { TFunction } from 'i18next'
 import { computeTransferToAmount, parsePositiveInt } from '../utils/transactionForm'
+import { tashkentDateOf, dateToTransactionIso } from '../utils/dateChips'
 import {
   buildEditSheetTitle,
   formatTransferResultLine,
-  isoToMaskedDateInTashkent,
   isTransferCrossCurrency,
-  maskedDateToTashkentIso,
   pickAlternateWalletId,
   resolveEditSheetLabel,
   shouldShowTransferRateField,
@@ -124,7 +123,7 @@ export function EditTransferPage() {
         return
       }
 
-      setTransactionDate(isoToMaskedDateInTashkent(transaction.transaction_date))
+      setTransactionDate(tashkentDateOf(transaction.transaction_date))
       setSourceWalletId(transaction.wallet_id)
       setDestWalletId(transaction.to_wallet_id ?? '')
       setAmount(String(transaction.amount))
@@ -235,7 +234,7 @@ export function EditTransferPage() {
       parsedRate = rateValue
     }
 
-    const transactionDateIso = maskedDateToTashkentIso(transactionDate)
+    const transactionDateIso = dateToTransactionIso(transactionDate, loadState.status === 'success' ? loadState.transaction.transaction_date : undefined)
     if (!transactionDateIso) {
       setDateError(true)
       return
@@ -397,9 +396,10 @@ export function EditTransferPage() {
         <FormSheetDateField
           value={transactionDate}
           hasError={dateError}
-          onChange={setTransactionDate}
-          onBlur={validateDate}
-          onEdit={() => setDateError(false)}
+          onChange={(next) => {
+            setTransactionDate(next)
+            setDateError(false)
+          }}
         />
 
         <FormSheetCommentField value={comment} onChange={setComment} />

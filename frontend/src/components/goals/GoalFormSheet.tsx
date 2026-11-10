@@ -1,6 +1,6 @@
 import {
-  type ClipboardEvent,
   type KeyboardEvent,
+  type ClipboardEvent,
   useEffect,
   useMemo,
   useLayoutEffect,
@@ -19,17 +19,17 @@ import {
   deleteDigitBefore,
   deleteDigitRange,
   extractDigits,
-  formatDateDigits,
   formatThousandsDigits,
   insertDigitAt,
   MAX_AMOUNT_DIGITS,
 } from '../../utils/transactionForm'
 import {
-  isoToMaskedDateInTashkent,
-  maskedDateToTashkentIso,
   walletCurrencySuffix,
 } from '../../utils/transactionFormFields'
 import { goalDeadlineValidation } from './goalFormDeadline'
+import { formatChipDate, todayTashkent } from '../../utils/dateChips'
+import { getLocale } from '../../utils/periodFilter'
+import { NativeDatePicker } from '../NativeDatePicker'
 import { useNativeBackButtonOverlay } from '../nativeBackButtonContext'
 import { FormSheet } from '../forms/FormSheet'
 import { FormSheetField } from '../forms/FormSheetField'
@@ -64,11 +64,6 @@ function formatWalletPickerLabel(
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
   return `${getDisplayName(wallet, t)} ${wallet.currency}`
-}
-
-function maskedDateToIsoDate(value: string): string | null {
-  const iso = maskedDateToTashkentIso(value)
-  return iso ? iso.slice(0, 10) : null
 }
 
 type GoalAmountFieldProps = {
@@ -212,7 +207,7 @@ export function GoalFormSheet({
   const [targetAmountDigits, setTargetAmountDigits] = useState('')
   const [amountOverLimit, setAmountOverLimit] = useState(false)
   const [name, setName] = useState('')
-  const [deadlineMasked, setDeadlineMasked] = useState('')
+  const [deadline, setDeadline] = useState('')
   const [deadlineTouched, setDeadlineTouched] = useState(false)
   const [walletPickerOpen, setWalletPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -244,16 +239,14 @@ export function GoalFormSheet({
       setWalletId(goal.wallet_id)
       setTargetAmountDigits(String(goal.target_amount))
       setName(goal.name)
-      setDeadlineMasked(
-        goal.deadline ? isoToMaskedDateInTashkent(`${goal.deadline}T12:00:00.000Z`) : '',
-      )
+      setDeadline(goal.deadline ?? '')
       setDeadlineTouched(false)
     } else {
       const firstWallet = selectableWallets[0]
       setWalletId(firstWallet?.id ?? '')
       setTargetAmountDigits('')
       setName('')
-      setDeadlineMasked('')
+      setDeadline('')
       setDeadlineTouched(false)
     }
 
@@ -265,13 +258,10 @@ export function GoalFormSheet({
 
   useNativeBackButtonOverlay(open && !walletPickerOpen, onClose)
 
-  const existingDeadlineMasked =
-    mode === 'edit' && goal?.deadline
-      ? isoToMaskedDateInTashkent(`${goal.deadline}T12:00:00.000Z`)
-      : ''
-  const deadlineValidation = goalDeadlineValidation(deadlineMasked, {
+  const existingDeadline = mode === 'edit' && goal?.deadline ? goal.deadline : ''
+  const deadlineValidation = goalDeadlineValidation(deadline, {
     mode,
-    existingDeadlineMasked,
+    existingDeadline,
   })
   const deadlineValid = deadlineValidation.valid
   const deadlineHintKey = deadlineTouched ? deadlineValidation.hintKey : null
@@ -292,37 +282,12 @@ export function GoalFormSheet({
   const walletDisplay =
     selectedWallet != null ? formatWalletPickerLabel(selectedWallet, t) : '—'
 
-  const handleDeadlineKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Backspace') {
-      event.preventDefault()
-      setDeadlineMasked(formatDateDigits(extractDigits(deadlineMasked).slice(0, -1)))
-      setDeadlineTouched(true)
-      return
-    }
-
-    if (event.key.length === 1 && /\d/.test(event.key)) {
-      event.preventDefault()
-      const digits = extractDigits(deadlineMasked)
-      if (digits.length >= 8) {
-        return
-      }
-      setDeadlineMasked(formatDateDigits(digits + event.key))
-      setDeadlineTouched(true)
-    }
-  }
-
   const handleSave = async () => {
     if (!canSave) {
       return
     }
 
-    const deadline =
-      deadlineMasked.length > 0 ? maskedDateToIsoDate(deadlineMasked) : null
-
-    if (deadlineMasked.length > 0 && deadline === null) {
-      setDeadlineTouched(true)
-      return
-    }
+    const deadlineValue = deadline.length > 0 ? deadline : null
 
     const trimmedName = name.trim()
 
@@ -334,13 +299,13 @@ export function GoalFormSheet({
           wallet_id: walletId,
           target_amount: targetAmount,
           name: trimmedName.length > 0 ? trimmedName : null,
-          deadline,
+          deadline: deadlineValue,
         })
       } else if (goal) {
         await onUpdate(goal.id, {
           target_amount: targetAmount,
           name: trimmedName.length > 0 ? trimmedName : null,
-          deadline,
+          deadline: deadlineValue,
         })
       }
       onClose()
@@ -411,28 +376,44 @@ export function GoalFormSheet({
         />
       </FormSheetField>
 
-      <FormSheetField
-        label={t('goals.form.deadlineLabel')}
-        right="›"
-        muted={deadlineMasked.length === 0}
-        hint={deadlineHintKey ? t(deadlineHintKey) : undefined}
-        hintError={deadlineTouched && !deadlineValid}
+      <NativeDatePicker
+        value={deadline}
+        onChange={(next) => {
+          setDeadline(next)
+          setDeadlineTouched(true)
+        }}
+        min={existingDeadline && existingDeadline < todayTashkent() ? existingDeadline : todayTashkent()}
+        max="2100-12-31"
       >
-        <input
-          className={[
-            'form-sheet-field__input',
-            deadlineMasked.length === 0 ? 'form-sheet-field__input--placeholder' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          value={deadlineMasked.length > 0 ? deadlineMasked : ''}
-          placeholder={t('goals.form.deadlineNotSelected')}
-          inputMode="numeric"
-          onBlur={() => setDeadlineTouched(true)}
-          onKeyDown={handleDeadlineKeyDown}
-          onChange={() => undefined}
-        />
-      </FormSheetField>
+        {(openCalendar) => (
+          <FormSheetField
+            label={t('goals.form.deadlineLabel')}
+            right="›"
+            muted={deadline.length === 0}
+            hint={deadlineHintKey ? t(deadlineHintKey) : undefined}
+            hintError={deadlineTouched && !deadlineValid}
+            onClick={openCalendar}
+          >
+            <span>
+              {deadline.length > 0
+                ? formatChipDate(deadline, todayTashkent(), getLocale())
+                : t('goals.form.deadlineNotSelected')}
+            </span>
+          </FormSheetField>
+        )}
+      </NativeDatePicker>
+      {deadline.length > 0 ? (
+        <button
+          type="button"
+          className="goal-deadline-clear"
+          onClick={() => {
+            setDeadline('')
+            setDeadlineTouched(false)
+          }}
+        >
+          {t('goals.form.deadlineClear')}
+        </button>
+      ) : null}
 
       {saveError ? (
         <div className="form-sheet-load-error" role="alert">

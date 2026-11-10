@@ -453,7 +453,8 @@
       "nameHint": "Standart — hamyon nomi",
       "deadlineLabel": "Muddat · ixtiyoriy",
       "deadlineNotSelected": "tanlanmagan",
-      "deadlineInvalid": "Sanani KK.OO.YYYY formatida kiriting"
+      "deadlineInvalid": "Sanani KK.OO.YYYY formatida kiriting",
+      "deadlineClear": "Muddatni olib tashlash"
     },
     "closedBadge": "Yopilgan",
     "ofTarget": "{{amount}} dan",
@@ -580,5 +581,16 @@
     "empty": "Hozircha hamyonlar yo'q",
     "balanceNow": "Hozir hamyonda",
     "opsEmptyHint": "Boshqa oyni tanlang."
+  },
+  "dateChips": {
+    "today": "Bugun",
+    "yesterday": "Kecha",
+    "dayBefore": "Evvalgi kun",
+    "other": "Boshqa sana",
+    "days7": "7 kun",
+    "days30": "30 kun",
+    "thisMonth": "Shu oy",
+    "lastMonth": "O'tgan oy",
+    "pickDate": "Sanani tanlang"
   }
 }

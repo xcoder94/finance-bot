@@ -3,12 +3,12 @@ import { useMemo } from 'react'
 
 import { monthDateRange } from '../api/home'
 import i18n from '../i18n'
-import {
-  isoDateToMaskedDate,
-  isValidMaskedDate,
-  maskedDateToUtcEndIso,
-  maskedDateToUtcStartIso,
-} from '../utils/transactionForm'
+import { dayEndIso, dayStartIso, isValidIsoDate, tashkentDateOf, todayTashkent } from './dateChips'
+
+function clampToToday(iso: string): string {
+  const today = todayTashkent()
+  return iso > today ? today : iso
+}
 
 export type PeriodTab = 'month' | 'range'
 
@@ -69,21 +69,18 @@ export function resolveRange(
     return { range: monthDateRange(selectedMonth.year, selectedMonth.month), rangeOrderInvalid: false }
   }
 
-  if (!isValidMaskedDate(rangeFrom) || !isValidMaskedDate(rangeTo)) {
+  if (!isValidIsoDate(rangeFrom) || !isValidIsoDate(rangeTo)) {
     return { range: null, rangeOrderInvalid: false }
   }
 
-  const dateFrom = maskedDateToUtcStartIso(rangeFrom)
-  const dateTo = maskedDateToUtcEndIso(rangeTo)
-  if (!dateFrom || !dateTo) {
-    return { range: null, rangeOrderInvalid: false }
-  }
-
-  if (dateFrom > dateTo) {
+  if (rangeFrom > rangeTo) {
     return { range: null, rangeOrderInvalid: true }
   }
 
-  return { range: { dateFrom, dateTo }, rangeOrderInvalid: false }
+  return {
+    range: { dateFrom: dayStartIso(rangeFrom), dateTo: dayEndIso(rangeTo) },
+    rangeOrderInvalid: false,
+  }
 }
 
 export function useResolvedRange(
@@ -104,7 +101,7 @@ export function initializeRangeFromMonth(selectedMonth: SelectedMonth): {
 } {
   const monthRange = monthDateRange(selectedMonth.year, selectedMonth.month)
   return {
-    rangeFrom: isoDateToMaskedDate(monthRange.dateFrom),
-    rangeTo: isoDateToMaskedDate(monthRange.dateTo),
+    rangeFrom: tashkentDateOf(monthRange.dateFrom),
+    rangeTo: clampToToday(tashkentDateOf(monthRange.dateTo)),
   }
 }

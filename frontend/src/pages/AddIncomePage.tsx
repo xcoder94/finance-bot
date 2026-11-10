@@ -32,10 +32,9 @@ import {
 } from '../store/dataCacheStore'
 import { getDisplayName } from '../utils/getDisplayName'
 import { parsePositiveInt } from '../utils/transactionForm'
+import { todayTashkent, dateToTransactionIso } from '../utils/dateChips'
 import {
   filterUncategorizedCategories,
-  maskedDateToTashkentIso,
-  nowMaskedDateInTashkent,
   resolveDefaultWalletId,
   walletCurrencySuffix,
 } from '../utils/transactionFormFields'
@@ -62,7 +61,7 @@ export function AddIncomePage() {
   })
   const [referenceRetry, setReferenceRetry] = useState(0)
 
-  const [transactionDate, setTransactionDate] = useState(nowMaskedDateInTashkent)
+  const [transactionDate, setTransactionDate] = useState(todayTashkent)
   const [dateError, setDateError] = useState(false)
   const [amount, setAmount] = useState('')
   const [amountOverLimit, setAmountOverLimit] = useState(false)
@@ -143,7 +142,7 @@ export function AddIncomePage() {
       return
     }
 
-    const transactionDateIso = maskedDateToTashkentIso(transactionDate)
+    const transactionDateIso = dateToTransactionIso(transactionDate)
     if (!transactionDateIso) {
       setDateError(true)
       return
@@ -246,9 +245,10 @@ export function AddIncomePage() {
         <FormSheetDateField
           value={transactionDate}
           hasError={dateError}
-          onChange={setTransactionDate}
-          onBlur={validateDate}
-          onEdit={() => setDateError(false)}
+          onChange={(next) => {
+            setTransactionDate(next)
+            setDateError(false)
+          }}
         />
 
         <FormSheetCommentField value={comment} onChange={setComment} />

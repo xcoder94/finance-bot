@@ -1,30 +1,22 @@
 import {
-  type ClipboardEvent,
-  type KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
-import { Button, Input, SegmentedControl, Text, Title } from '@telegram-apps/telegram-ui'
+import { Button, SegmentedControl, Text, Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { monthDateRange } from '../api/home'
 import { fetchHistoryPage, fetchSummaryForRange, type SummaryResponse } from '../api/history'
 import { HistoryTransactionList } from '../components/history/HistoryTransactionList'
-import { formatMonthLabel } from '../utils/periodFilter'
+import { formatMonthLabel, resolveRange } from '../utils/periodFilter'
 import { editRouteForItem } from '../utils/editRouteForItem'
 import { formatCurrency, type Currency } from '../utils/formatCurrency'
-import {
-  extractDigits,
-  formatDateDigits,
-  isoDateToMaskedDate,
-  isValidMaskedDate,
-  maskedDateToUtcEndIso,
-  maskedDateToUtcStartIso,
-} from '../utils/transactionForm'
+import { DateRangeFields } from '../components/DateRangeFields'
+import { tashkentDateOf } from '../utils/dateChips'
 import {
   createWalletOpsController,
   type WalletOpsController,
@@ -48,11 +40,6 @@ type PeriodTab = 'month' | 'range'
 type SelectedMonth = {
   year: number
   month: number
-}
-
-type ResolvedRange = {
-  dateFrom: string
-  dateTo: string
 }
 
 function currentMonth(): SelectedMonth {
@@ -134,115 +121,6 @@ function MetricValue({ loading, unavailable, className, children }: MetricValueP
   )
 }
 
-type MaskedDateInputProps = {
-  header: string
-  value: string
-  onChange: (value: string) => void
-  hasError: boolean
-  errorText?: string
-  onBlur: () => void
-  onEdit: () => void
-}
-
-function MaskedDateInput({
-  header,
-  value,
-  onChange,
-  hasError,
-  errorText,
-  onBlur,
-  onEdit,
-}: MaskedDateInputProps) {
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Backspace') {
-      event.preventDefault()
-      onChange(formatDateDigits(extractDigits(value).slice(0, -1)))
-      onEdit()
-      return
-    }
-
-    if (event.key.length === 1 && /\d/.test(event.key)) {
-      event.preventDefault()
-      const digits = extractDigits(value)
-      if (digits.length >= 8) {
-        return
-      }
-      onChange(formatDateDigits(digits + event.key))
-      onEdit()
-      return
-    }
-
-    if (
-      event.key.length === 1 &&
-      event.key !== 'Tab' &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey
-    ) {
-      event.preventDefault()
-    }
-  }
-
-  const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault()
-    const pasted = extractDigits(event.clipboardData.getData('text'))
-    const combined = (extractDigits(value) + pasted).slice(0, 8)
-    onChange(formatDateDigits(combined))
-    onEdit()
-  }
-
-  return (
-    <div className="history-range-field">
-      <Input
-        header={header}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        value={value}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        onBlur={onBlur}
-        onChange={(event) => {
-          const digits = extractDigits(event.target.value).slice(0, 8)
-          onChange(formatDateDigits(digits))
-          onEdit()
-        }}
-        status={hasError ? 'error' : 'default'}
-      />
-      {hasError && errorText ? (
-        <Text className="history-range-field__error" role="alert">{errorText}</Text>
-      ) : null}
-    </div>
-  )
-}
-
-function resolveRange(
-  periodTab: PeriodTab,
-  selectedMonth: SelectedMonth,
-  rangeFrom: string,
-  rangeTo: string,
-): { range: ResolvedRange | null; rangeOrderInvalid: boolean } {
-  if (periodTab === 'month') {
-    return { range: monthDateRange(selectedMonth.year, selectedMonth.month), rangeOrderInvalid: false }
-  }
-
-  if (!isValidMaskedDate(rangeFrom) || !isValidMaskedDate(rangeTo)) {
-    return { range: null, rangeOrderInvalid: false }
-  }
-
-  const dateFrom = maskedDateToUtcStartIso(rangeFrom)
-  const dateTo = maskedDateToUtcEndIso(rangeTo)
-  if (!dateFrom || !dateTo) {
-    return { range: null, rangeOrderInvalid: false }
-  }
-
-  if (dateFrom > dateTo) {
-    return { range: null, rangeOrderInvalid: true }
-  }
-
-  return { range: { dateFrom, dateTo }, rangeOrderInvalid: false }
-}
-
 export function HistoryPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -251,8 +129,6 @@ export function HistoryPage() {
   const [rangeFrom, setRangeFrom] = useState('')
   const [rangeTo, setRangeTo] = useState('')
   const [rangeInitialized, setRangeInitialized] = useState(false)
-  const [rangeFromTouched, setRangeFromTouched] = useState(false)
-  const [rangeToTouched, setRangeToTouched] = useState(false)
 
   const [list, setList] = useState<WalletOpsState>(LOADING_LIST)
   const controller = useRef<WalletOpsController | null>(null)
@@ -276,15 +152,11 @@ export function HistoryPage() {
     rangeFetchEnabled,
   )
 
-  const rangeFromInvalid = periodTab === 'range' && rangeFromTouched && !isValidMaskedDate(rangeFrom)
-  const rangeToInvalid = periodTab === 'range' && rangeToTouched && !isValidMaskedDate(rangeTo)
-  const showRangeOrderError = periodTab === 'range' && rangeOrderInvalid && rangeFromTouched && rangeToTouched
-
   const handlePeriodTabChange = (tab: PeriodTab) => {
     if (tab === 'range' && !rangeInitialized) {
       const monthRange = monthDateRange(selectedMonth.year, selectedMonth.month)
-      setRangeFrom(isoDateToMaskedDate(monthRange.dateFrom))
-      setRangeTo(isoDateToMaskedDate(monthRange.dateTo))
+      setRangeFrom(tashkentDateOf(monthRange.dateFrom))
+      setRangeTo(tashkentDateOf(monthRange.dateTo))
       setRangeInitialized(true)
     }
     setPeriodTab(tab)
@@ -383,42 +255,13 @@ export function HistoryPage() {
           </button>
         </div>
       ) : (
-        <div className="history-page__range-fields">
-          <MaskedDateInput
-            header={t('history.dateFrom')}
-            value={rangeFrom}
-            onChange={setRangeFrom}
-            hasError={rangeFromInvalid}
-            errorText={rangeFromInvalid ? t('history.invalidDate') : undefined}
-            onBlur={() => setRangeFromTouched(true)}
-            onEdit={() => {
-              setRangeFromTouched(true)
-              if (rangeToTouched) {
-                setRangeToTouched(true)
-              }
-            }}
-          />
-          <MaskedDateInput
-            header={t('history.dateTo')}
-            value={rangeTo}
-            onChange={setRangeTo}
-            hasError={rangeToInvalid || showRangeOrderError}
-            errorText={
-              rangeToInvalid
-                ? t('history.invalidDate')
-                : showRangeOrderError
-                  ? t('history.invalidRange')
-                  : undefined
-            }
-            onBlur={() => setRangeToTouched(true)}
-            onEdit={() => {
-              setRangeToTouched(true)
-              if (rangeFromTouched) {
-                setRangeFromTouched(true)
-              }
-            }}
-          />
-        </div>
+        <DateRangeFields
+          rangeFrom={rangeFrom}
+          rangeTo={rangeTo}
+          onRangeFromChange={setRangeFrom}
+          onRangeToChange={setRangeTo}
+          rangeOrderInvalid={rangeOrderInvalid}
+        />
       )}
 
       <div className="home-summary-section">

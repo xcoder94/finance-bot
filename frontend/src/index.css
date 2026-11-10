@@ -4273,3 +4273,82 @@ a.tabbar-link:active {
     scroll-behavior: auto !important;
   }
 }
+
+.date-chips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.date-chip {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--sep);
+  border-radius: 22px;
+  background: var(--chip);
+  color: var(--tx);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.date-chip--selected {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: var(--acct);
+}
+
+.date-chip--error {
+  border-color: var(--exp);
+}
+
+.date-chips__native {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+}
+
+.date-chips__native--visible {
+  position: static;
+  width: 100%;
+  height: auto;
+  opacity: 1;
+  pointer-events: auto;
+  min-height: 44px;
+  border: 1px solid var(--sep);
+  border-radius: 11px;
+  background: var(--bg);
+  color: var(--tx);
+  font-size: 16px;
+}
+
+.date-range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.date-range-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.goal-deadline-clear {
+  align-self: flex-start;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: var(--acc);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
