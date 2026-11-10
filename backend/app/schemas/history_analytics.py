@@ -48,7 +48,19 @@ class CategoryAmount(BaseModel):
     category_translation_key: str | None = None
     color_index: int
     amount: int = Field(ge=0)
+    prev_amount: int = Field(default=0, ge=0)  # same category in the previous period
+    share_percent: float = 0.0  # income-by-category only: share of the period total, 0..100
     uncategorized: bool = False
+
+
+class ExpenseComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str
+    total: int = Field(ge=0)
+    prev_total: int = Field(ge=0)
+    prev_date_from: datetime
+    prev_date_to: datetime
 
 
 class SubcategoryAmount(BaseModel):
@@ -59,6 +71,7 @@ class SubcategoryAmount(BaseModel):
     subcategory_translation_key: str | None = None
     color_index: int
     amount: int = Field(ge=0)
+    prev_amount: int = Field(default=0, ge=0)
 
 
 class TrendEntry(BaseModel):

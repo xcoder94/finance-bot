@@ -10,6 +10,7 @@ from app.db import get_session
 from app.schemas.history_analytics import (
     CategoryAmount,
     Currency,
+    ExpenseComparison,
     PersonalSummaryResponse,
     PersonalWalletBalancesResponse,
     SubcategoryAmount,
@@ -18,6 +19,7 @@ from app.schemas.history_analytics import (
     WalletBalancesResponse,
 )
 from app.services.history_analytics import (
+    get_expense_comparison,
     get_expenses_by_category,
     get_expenses_by_subcategory,
     get_income_by_category,
@@ -47,6 +49,20 @@ async def expenses_by_category(
         currency,
         resolved_from,
         resolved_to,
+    )
+
+
+@router.get("/expense-comparison")
+async def expense_comparison(
+    user: CurrentUserDep,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    currency: Annotated[Currency, Query()],
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> ExpenseComparison:
+    resolved_from, resolved_to = resolve_analytics_date_range(date_from, date_to)
+    return await get_expense_comparison(
+        session, user.family_budget_id, currency, resolved_from, resolved_to
     )
 
 

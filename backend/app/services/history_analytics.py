@@ -1,3 +1,4 @@
+import math
 import uuid
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ from app.models.wallet import Wallet
 from app.schemas.history_analytics import (
     CategoryAmount,
     CurrencyBalance,
+    ExpenseComparison,
     HistoryItem,
     PerCurrencySummary,
     PersonalPerCurrencySummary,
@@ -51,6 +53,35 @@ def resolve_analytics_date_range(
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
     return date_from, date_to
+
+
+def resolve_previous_period(date_from: datetime, date_to: datetime) -> tuple[datetime, datetime]:
+    """Period right before [date_from, date_to].
+
+    A full Tashkent calendar month -> the previous calendar month. Anything else -> a range of the
+    same length (rounded up to whole seconds) ending 1 microsecond before date_from.
+    """
+    if date_from.tzinfo is None:
+        date_from = date_from.replace(tzinfo=UTC)
+    if date_to.tzinfo is None:
+        date_to = date_to.replace(tzinfo=UTC)
+    local_from = date_from.astimezone(TASHKENT)
+    local_to = date_to.astimezone(TASHKENT)
+    is_month = (
+        local_from.day == 1
+        and local_from.time() == datetime.min.time()
+        and (local_to.year, local_to.month) == (local_from.year, local_from.month)
+        and (local_to + timedelta(seconds=1)).month != local_to.month
+    )
+    if is_month:
+        prev_last_day = local_from - timedelta(days=1)
+        prev_from = prev_last_day.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        prev_to = local_from - timedelta(microseconds=1)
+        return prev_from.astimezone(date_from.tzinfo), prev_to.astimezone(date_to.tzinfo)
+    span_seconds = math.ceil((date_to - date_from + timedelta(microseconds=1)).total_seconds())
+    prev_to = date_from - timedelta(microseconds=1)
+    prev_from = date_from - timedelta(seconds=span_seconds)
+    return prev_from, prev_to
 
 
 async def count_family_users(session: AsyncSession, family_budget_id: uuid.UUID) -> int:
@@ -231,7 +262,16 @@ async def get_history(
         base_filters = (
             *base_filters,
             Transaction.type == "expense",
-            Transaction.expense_category_id == expense_category_id,
+            Transaction.expense_category_id.in_(
+                # the category itself plus its subcategories (soft-deleted ones included)
+                select(ExpenseCategory.id).where(
+                    ExpenseCategory.family_budget_id == family_budget_id,
+                    or_(
+                        ExpenseCategory.id == expense_category_id,
+                        ExpenseCategory.parent_id == expense_category_id,
+                    ),
+                )
+            ),
         )
     if uncategorized:
         base_filters = (
@@ -357,6 +397,16 @@ async def get_history(
     return items, total_count
 
 
+def _period_sums(date_from: datetime, date_to: datetime):
+    """Current-period and previous-period sums over one scan of [prev_from, date_to]."""
+    prev_from, prev_to = resolve_previous_period(date_from, date_to)
+    in_current = (Transaction.transaction_date >= date_from) & (Transaction.transaction_date <= date_to)
+    in_prev = (Transaction.transaction_date >= prev_from) & (Transaction.transaction_date <= prev_to)
+    cur = func.coalesce(func.sum(Transaction.amount).filter(in_current), 0)
+    prev = func.coalesce(func.sum(Transaction.amount).filter(in_prev), 0)
+    return prev_from, cur, prev
+
+
 async def get_expenses_by_category(
     session: AsyncSession,
     family_budget_id: uuid.UUID,
@@ -367,6 +417,7 @@ async def get_expenses_by_category(
     expense_sub = aliased(ExpenseCategory)
     expense_parent = aliased(ExpenseCategory)
     wallet = aliased(Wallet)
+    prev_from, cur_sum, prev_sum = _period_sums(date_from, date_to)
 
     # Expense booked directly on a parent (no subcategory) belongs to that parent itself.
     stmt = (
@@ -375,7 +426,8 @@ async def get_expenses_by_category(
             expense_parent.name.label("category_name"),
             expense_parent.translation_key.label("category_translation_key"),
             expense_parent.color_index.label("color_index"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
+            cur_sum.label("amount"),
+            prev_sum.label("prev_amount"),
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
         .join(expense_sub, Transaction.expense_category_id == expense_sub.id)
@@ -389,7 +441,7 @@ async def get_expenses_by_category(
             Transaction.type == "expense",
             wallet.currency == currency,
             wallet.is_personal.is_(False),
-            Transaction.transaction_date >= date_from,
+            Transaction.transaction_date >= prev_from,
             Transaction.transaction_date <= date_to,
         )
         .group_by(
@@ -398,7 +450,8 @@ async def get_expenses_by_category(
             expense_parent.translation_key,
             expense_parent.color_index,
         )
-        .order_by(func.sum(Transaction.amount).desc())
+        .having(cur_sum > 0)
+        .order_by(cur_sum.desc())
     )
 
     rows = (await session.execute(stmt)).all()
@@ -409,13 +462,14 @@ async def get_expenses_by_category(
             category_translation_key=row.category_translation_key,
             color_index=row.color_index,
             amount=int(row.amount),
+            prev_amount=int(row.prev_amount),
         )
         for row in rows
     ]
 
     # Expenses without any category: shown as a separate row so sectors sum to the total.
     uncategorized_stmt = (
-        select(func.coalesce(func.sum(Transaction.amount), 0))
+        select(cur_sum, prev_sum)
         .join(wallet, Transaction.wallet_id == wallet.id)
         .where(
             Transaction.family_budget_id == family_budget_id,
@@ -424,11 +478,12 @@ async def get_expenses_by_category(
             Transaction.expense_category_id.is_(None),
             wallet.currency == currency,
             wallet.is_personal.is_(False),
-            Transaction.transaction_date >= date_from,
+            Transaction.transaction_date >= prev_from,
             Transaction.transaction_date <= date_to,
         )
     )
-    uncategorized = int(await session.scalar(uncategorized_stmt) or 0)
+    unc_cur, unc_prev = (await session.execute(uncategorized_stmt)).one()
+    uncategorized = int(unc_cur or 0)
     if uncategorized > 0:
         result.append(
             CategoryAmount(
@@ -437,11 +492,45 @@ async def get_expenses_by_category(
                 category_translation_key=None,
                 color_index=0,
                 amount=uncategorized,
+                prev_amount=int(unc_prev or 0),
                 uncategorized=True,
             )
         )
         result.sort(key=lambda c: c.amount, reverse=True)
     return result
+
+
+async def get_expense_comparison(
+    session: AsyncSession,
+    family_budget_id: uuid.UUID,
+    currency: str,
+    date_from: datetime,
+    date_to: datetime,
+) -> ExpenseComparison:
+    wallet = aliased(Wallet)
+    prev_from, cur_sum, prev_sum = _period_sums(date_from, date_to)
+    _, prev_to = resolve_previous_period(date_from, date_to)
+    stmt = (
+        select(cur_sum, prev_sum)
+        .join(wallet, Transaction.wallet_id == wallet.id)
+        .where(
+            Transaction.family_budget_id == family_budget_id,
+            Transaction.is_deleted.is_(False),
+            Transaction.type == "expense",
+            wallet.currency == currency,
+            wallet.is_personal.is_(False),
+            Transaction.transaction_date >= prev_from,
+            Transaction.transaction_date <= date_to,
+        )
+    )
+    total, prev_total = (await session.execute(stmt)).one()
+    return ExpenseComparison(
+        currency=currency,
+        total=int(total or 0),
+        prev_total=int(prev_total or 0),
+        prev_date_from=prev_from,
+        prev_date_to=prev_to,
+    )
 
 
 async def get_expenses_by_subcategory(
@@ -460,6 +549,7 @@ async def get_expenses_by_subcategory(
 
     expense_sub = aliased(ExpenseCategory)
     wallet = aliased(Wallet)
+    prev_from, cur_sum, prev_sum = _period_sums(date_from, date_to)
 
     stmt = (
         select(
@@ -467,7 +557,8 @@ async def get_expenses_by_subcategory(
             expense_sub.name.label("subcategory_name"),
             expense_sub.translation_key.label("subcategory_translation_key"),
             expense_sub.color_index.label("color_index"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
+            cur_sum.label("amount"),
+            prev_sum.label("prev_amount"),
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
         .join(expense_sub, Transaction.expense_category_id == expense_sub.id)
@@ -481,7 +572,7 @@ async def get_expenses_by_subcategory(
                 expense_sub.parent_id == parent_category_id,
                 expense_sub.id == parent_category_id,
             ),
-            Transaction.transaction_date >= date_from,
+            Transaction.transaction_date >= prev_from,
             Transaction.transaction_date <= date_to,
         )
         .group_by(
@@ -490,7 +581,8 @@ async def get_expenses_by_subcategory(
             expense_sub.translation_key,
             expense_sub.color_index,
         )
-        .order_by(func.sum(Transaction.amount).desc())
+        .having(cur_sum > 0)
+        .order_by(cur_sum.desc())
     )
 
     rows = (await session.execute(stmt)).all()
@@ -501,6 +593,7 @@ async def get_expenses_by_subcategory(
             subcategory_translation_key=row.subcategory_translation_key,
             color_index=row.color_index,
             amount=int(row.amount),
+            prev_amount=int(row.prev_amount),
         )
         for row in rows
     ]
@@ -514,6 +607,7 @@ async def get_income_by_category(
     date_to: datetime,
 ) -> list[CategoryAmount]:
     wallet = aliased(Wallet)
+    prev_from, cur_sum, prev_sum = _period_sums(date_from, date_to)
 
     stmt = (
         select(
@@ -521,7 +615,8 @@ async def get_income_by_category(
             IncomeCategory.name.label("category_name"),
             IncomeCategory.translation_key.label("category_translation_key"),
             IncomeCategory.color_index.label("color_index"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
+            cur_sum.label("amount"),
+            prev_sum.label("prev_amount"),
         )
         .join(wallet, Transaction.wallet_id == wallet.id)
         .join(IncomeCategory, Transaction.income_category_id == IncomeCategory.id)
@@ -531,7 +626,7 @@ async def get_income_by_category(
             Transaction.type == "income",
             wallet.currency == currency,
             wallet.is_personal.is_(False),
-            Transaction.transaction_date >= date_from,
+            Transaction.transaction_date >= prev_from,
             Transaction.transaction_date <= date_to,
         )
         .group_by(
@@ -540,10 +635,12 @@ async def get_income_by_category(
             IncomeCategory.translation_key,
             IncomeCategory.color_index,
         )
-        .order_by(func.sum(Transaction.amount).desc())
+        .having(cur_sum > 0)
+        .order_by(cur_sum.desc())
     )
 
     rows = (await session.execute(stmt)).all()
+    total = sum(int(row.amount) for row in rows)
     return [
         CategoryAmount(
             category_id=row.category_id,
@@ -551,6 +648,8 @@ async def get_income_by_category(
             category_translation_key=row.category_translation_key,
             color_index=row.color_index,
             amount=int(row.amount),
+            prev_amount=int(row.prev_amount),
+            share_percent=round(int(row.amount) * 100 / total, 1) if total else 0.0,
         )
         for row in rows
     ]
