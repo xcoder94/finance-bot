@@ -81,6 +81,7 @@ from app.services.quick_entry_wallets import (
     resolve_wallet,
 )
 from app.services.bot_texts import t as catalogue_t
+from app.services.display_name import display_name
 from app.services.shopping import add_shopping_items, cancel_purchase, find_open_purchase
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id, greeting_inline_keyboard
 from bot.quick_entry.cards import (
@@ -111,14 +112,6 @@ from bot.quick_entry.pending_texts import (
 )
 from bot.quick_entry.pending import consume_pending, create_pending, get_pending
 from bot.quick_entry.texts import (
-    MSG_EXCHANGE_RATE_REQUIRED,
-    MSG_GONE,
-    MSG_MODEL_FAIL,
-    MSG_NO_AMOUNT,
-    MSG_TOO_LONG,
-    MSG_TOO_MANY_OPS,
-    MSG_TYPE_QUESTION,
-    MSG_VOICE_NOT_RECOGNIZED,
     SHOPPING_ITEMS_PER_MESSAGE,
     currency_missing_text,
     model_limit_text,
@@ -198,18 +191,22 @@ def _filter_countable(ops: list[ParsedOperation]) -> list[ParsedOperation]:
     ]
 
 
-def _category_label(category: str | None) -> str:
+def _category_label(category: str | None) -> str | None:
+    """Name of the category as the parser returned it; None = no category."""
     if category is None or not category.strip():
-        return "Без категории"
+        return None
     stripped = strip_parent_category(category.strip())
-    return stripped if stripped else "Без категории"
+    return stripped if stripped else None
 
 
-def _format_type_question(amount: int, currency: str, category: str | None) -> str:
-    line = f"**{format_amount(amount, currency)}**"
-    if category is not None and category.strip():
-        line += f" · {escape_markdown(_category_label(category))}"
-    return f"{line}\n{MSG_TYPE_QUESTION}"
+def _format_type_question(
+    amount: int, currency: str, category: str | None, language: str | None = None
+) -> str:
+    line = f"**{format_amount(amount, currency, language)}**"
+    label = _category_label(category)
+    if label is not None:
+        line += f" · {escape_markdown(label)}"
+    return f"{line}\n{catalogue_t(language, 'quick.type_question')}"
 
 
 def _operation_date_to_datetime(op_date: date) -> datetime:
@@ -233,28 +230,31 @@ async def _check_wallets_after_write(
 
 
 async def _txn_category_label(
-    session: AsyncSession, transaction: Transaction
-) -> str:
+    session: AsyncSession, transaction: Transaction, language: str | None = None
+) -> str | None:
+    """Category name in the reader's language (renamed ones keep the user's own name)."""
     if transaction.type == "expense":
         if transaction.expense_category_id is None:
-            return "Без категории"
+            return None
         category = await session.get(ExpenseCategory, transaction.expense_category_id)
-        if category is None or category.is_deleted:
-            return "Без категории"
-        return category.name
-
-    if transaction.income_category_id is None:
-        return "Без категории"
-    category = await session.get(IncomeCategory, transaction.income_category_id)
+    else:
+        if transaction.income_category_id is None:
+            return None
+        category = await session.get(IncomeCategory, transaction.income_category_id)
     if category is None or category.is_deleted:
-        return "Без категории"
-    return category.name
+        return None
+    return display_name(category.name, category.translation_key, language=language or "ru")
+
+
+def _wallet_label(wallet: Wallet, language: str | None) -> str:
+    return display_name(wallet.name, wallet.translation_key, language=language or "ru")
 
 
 async def _format_transaction_card(
     session: AsyncSession,
     transaction: Transaction,
     wallet: Wallet,
+    language: str | None = None,
 ) -> str:
     sign = "➖" if transaction.type == "expense" else "➕"
     balance = await wallet_balance(session, wallet.id)
@@ -263,16 +263,18 @@ async def _format_transaction_card(
         sign=sign,
         amount=transaction.amount,
         currency=wallet.currency,  # type: ignore[arg-type]
-        category_label=await _txn_category_label(session, transaction),
+        category_label=await _txn_category_label(session, transaction, language),
         comment=transaction.comment,
-        wallet_name=wallet.name,
+        wallet_name=_wallet_label(wallet, language),
         op_date=op_date,
         balance=balance,
+        language=language,
     )
 
 
-async def _answer_gone(callback: CallbackQuery) -> None:
-    await callback.answer(MSG_GONE)
+async def _answer_gone(callback: CallbackQuery, who: object = None) -> None:
+    """`who`: the User, or just a language code (safe after a rollback)."""
+    await callback.answer(catalogue_t(who, "quick.gone"))
 
 
 async def _list_expense_category_names(
@@ -383,7 +385,7 @@ async def _try_add_shopping_items(
         over_limit=bool(result.over_limit),
     )
     await message.answer(
-        text, parse_mode="Markdown", reply_markup=greeting_inline_keyboard()
+        text, parse_mode="Markdown", reply_markup=greeting_inline_keyboard(user.language),
     )
     return True
 
@@ -423,11 +425,11 @@ async def _process_parsed_response(
 
     if len(countable) > MAX_OPERATIONS:
         if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-            await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+            await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
             return
         await spend_unparsed(session, budget)
         await session.commit()
-        await message.answer(MSG_TOO_MANY_OPS)
+        await message.answer(catalogue_t(user, "quick.too_many_ops"))
         return
 
     if not clear_ops and not ambiguous_ops and not transfer_ops:
@@ -442,11 +444,11 @@ async def _process_parsed_response(
             )
             return
         if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-            await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+            await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
             return
         await spend_unparsed(session, budget)
         await session.commit()
-        await message.answer(MSG_NO_AMOUNT)
+        await message.answer(catalogue_t(user, "quick.no_amount"))
         return
 
     op_date = _resolve_op_date(source_text, response, today)
@@ -468,11 +470,11 @@ async def _process_parsed_response(
         )
         if isinstance(resolved, CurrencyMissing):
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(currency_missing_text(resolved.currency))
+            await message.answer(currency_missing_text(resolved.currency, user.language))
             continue
 
         rate_val = _resolve_rate(op, source_text)
@@ -482,11 +484,11 @@ async def _process_parsed_response(
             rate=rate_val,
         ):
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
+            await message.answer(catalogue_t(user, "quick.exchange_rate_required"))
             continue
 
         create_rate = Decimal(rate_val) if rate_val is not None else None
@@ -505,11 +507,11 @@ async def _process_parsed_response(
             )
         except HTTPException:
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(MSG_EXCHANGE_RATE_REQUIRED)
+            await message.answer(catalogue_t(user, "quick.exchange_rate_required"))
             continue
 
         await _check_wallets_after_write(
@@ -531,24 +533,26 @@ async def _process_parsed_response(
                 to_currency=resolved.to_wallet.currency,  # type: ignore[arg-type]
                 rate=rate_val,
                 op_date=op_date,
-                from_wallet_name=resolved.from_wallet.name,
-                to_wallet_name=resolved.to_wallet.name,
+                from_wallet_name=_wallet_label(resolved.from_wallet, user.language),
+                to_wallet_name=_wallet_label(resolved.to_wallet, user.language),
                 from_balance=from_balance,
                 to_balance=to_balance,
+                language=user.language,
             )
         else:
             card_text = format_transfer_card(
                 amount=op.amount,
                 currency=amount_currency,
-                from_wallet_name=resolved.from_wallet.name,
-                to_wallet_name=resolved.to_wallet.name,
+                from_wallet_name=_wallet_label(resolved.from_wallet, user.language),
+                to_wallet_name=_wallet_label(resolved.to_wallet, user.language),
                 op_date=op_date,
                 from_balance=from_balance,
                 to_balance=to_balance,
+                language=user.language,
             )
         await message.answer(
             card_text,
-            reply_markup=transfer_card_keyboard(txn.id),
+            reply_markup=transfer_card_keyboard(txn.id, user.language),
             parse_mode="Markdown",
         )
 
@@ -565,11 +569,11 @@ async def _process_parsed_response(
         )
         if isinstance(resolved, CurrencyMissing):
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(currency_missing_text(resolved.currency))
+            await message.answer(currency_missing_text(resolved.currency, user.language))
             continue
 
         wallet = resolved
@@ -613,15 +617,16 @@ async def _process_parsed_response(
             sign=sign,
             amount=op.amount,
             currency=currency,
-            category_label=_category_label(op.category if category_id else None),
+            category_label=await _txn_category_label(session, txn, user.language),
             comment=comment,
-            wallet_name=wallet.name,
+            wallet_name=_wallet_label(wallet, user.language),
             op_date=op_date,
             balance=balance,
+            language=user.language,
         )
         await message.answer(
             card_text,
-            reply_markup=card_keyboard(txn.id),
+            reply_markup=card_keyboard(txn.id, user.language),
             parse_mode="Markdown",
         )
 
@@ -638,11 +643,11 @@ async def _process_parsed_response(
         )
         if isinstance(resolved, CurrencyMissing):
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(currency_missing_text(resolved.currency))
+            await message.answer(currency_missing_text(resolved.currency, user.language))
             continue
 
         pending = await create_pending(
@@ -659,8 +664,8 @@ async def _process_parsed_response(
             charge_on_confirm=not bool(clear_ops),
         )
         await message.answer(
-            _format_type_question(op.amount, currency, op.category),
-            reply_markup=type_question_keyboard(str(pending.id)),
+            _format_type_question(op.amount, currency, op.category, user.language),
+            reply_markup=type_question_keyboard(str(pending.id), user.language),
             parse_mode="Markdown",
         )
 
@@ -684,7 +689,7 @@ async def process_quick_entry_text(
             return
 
         if len(text) > MAX_MESSAGE_LEN:
-            await message.answer(MSG_TOO_LONG)
+            await message.answer(catalogue_t(user, "quick.too_long"))
             return
 
         budget = await session.get(FamilyBudget, user.family_budget_id)
@@ -743,7 +748,7 @@ async def process_quick_entry_text(
         if prefilter_hit:
             await ai_usage.record_message("prefilter", "text", "ok")
             if default_wallet is None:
-                await message.answer(MSG_NO_AMOUNT)
+                await message.answer(catalogue_t(user, "quick.no_amount"))
                 return
             response = ParseResponse(operations=[prefilter_op])
         else:
@@ -752,7 +757,7 @@ async def process_quick_entry_text(
             )
             await session.commit()
             if not granted:
-                await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+                await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT, user.language))
                 return
 
             # Log only messages that actually reach the parser — a message
@@ -802,7 +807,7 @@ async def process_quick_entry_text(
                     exc,
                 )
                 await refund_model_call(session, budget)
-                await message.answer(MSG_MODEL_FAIL)
+                await message.answer(catalogue_t(user, "quick.model_fail"))
                 await session.commit()
                 await ai_usage.record_message(None, "text", "error")
                 return
@@ -823,7 +828,7 @@ async def process_quick_entry_text(
         if default_wallet is None:
             await refund_model_call(session, budget)
             await session.commit()
-            await message.answer(MSG_NO_AMOUNT)
+            await message.answer(catalogue_t(user, "quick.no_amount"))
             return
 
         await _process_parsed_response(
@@ -884,25 +889,25 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
 
         file = await bot.get_file(message.voice.file_id)
         if file.file_path is None:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
         if file.file_size is not None and file.file_size > MAX_VOICE_BYTES:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
         buffer = await bot.download_file(file.file_path)
         audio = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
         if len(audio) > MAX_VOICE_BYTES:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
 
         if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
 
         granted = await try_spend_model_call(session, budget, DAILY_MODEL_CALL_LIMIT)
         await session.commit()
         if not granted:
-            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT, user.language))
             return
 
         audio_b64 = base64.b64encode(audio).decode()
@@ -932,7 +937,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
                 exc,
             )
             await refund_model_call(session, budget)
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             await session.commit()
             await ai_usage.record_message(None, "voice", "error")
             return
@@ -942,7 +947,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
         )
         if response.speech_status is None:
             await refund_model_call(session, budget)
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             await session.commit()
             return
 
@@ -954,12 +959,12 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
                 )
                 return
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language))
                 await session.commit()
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(MSG_VOICE_NOT_RECOGNIZED)
+            await message.answer(catalogue_t(user, "quick.voice_not_recognized"))
             return
 
         if pending is not None:
@@ -979,7 +984,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
         if default_wallet is None:
             await refund_model_call(session, budget)
             await session.commit()
-            await message.answer(MSG_NO_AMOUNT)
+            await message.answer(catalogue_t(user, "quick.no_amount"))
             return
 
         await _process_parsed_response(
@@ -1014,14 +1019,14 @@ async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, callback.from_user.id)
         if user is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         transaction = await get_active_transaction(
             session, txn_id, user.family_budget_id
         )
         if transaction is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         from_wallet, to_wallet = await get_transaction_wallets(
@@ -1032,7 +1037,7 @@ async def handle_quick_entry_delete(callback: CallbackQuery, bot: Bot) -> None:
                 user, transaction, from_wallet, to_wallet
             )
         except HTTPException:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         soft_delete_transaction(transaction)
@@ -1060,14 +1065,14 @@ async def handle_quick_entry_wallet_list(callback: CallbackQuery, bot: Bot) -> N
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, callback.from_user.id)
         if user is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         transaction = await get_active_transaction(
             session, txn_id, user.family_budget_id
         )
         if transaction is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         from_wallet, to_wallet = await get_transaction_wallets(
@@ -1078,12 +1083,12 @@ async def handle_quick_entry_wallet_list(callback: CallbackQuery, bot: Bot) -> N
                 user, transaction, from_wallet, to_wallet
             )
         except HTTPException:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
         await callback.message.edit_reply_markup(
-            reply_markup=wallet_picker_keyboard(transaction.id, wallets)
+            reply_markup=wallet_picker_keyboard(transaction.id, wallets, user.language)
         )
         await callback.answer()
 
@@ -1101,14 +1106,14 @@ async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> No
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, callback.from_user.id)
         if user is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         transaction = await get_active_transaction(
             session, txn_id, user.family_budget_id
         )
         if transaction is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         from_wallet, to_wallet = await get_transaction_wallets(
@@ -1119,13 +1124,13 @@ async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> No
                 user, transaction, from_wallet, to_wallet
             )
         except HTTPException:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
         wallet = next((w for w in wallets if w.id == wallet_id), None)
         if wallet is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         old_wallet_id = transaction.wallet_id
@@ -1138,10 +1143,12 @@ async def handle_quick_entry_wallet_set(callback: CallbackQuery, bot: Bot) -> No
             bot,
         )
 
-        card_text = await _format_transaction_card(session, transaction, wallet)
+        card_text = await _format_transaction_card(
+            session, transaction, wallet, user.language
+        )
         await callback.message.edit_text(
             card_text,
-            reply_markup=card_keyboard(transaction.id),
+            reply_markup=card_keyboard(transaction.id, user.language),
             parse_mode="Markdown",
         )
         await callback.answer()
@@ -1167,17 +1174,17 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, callback.from_user.id)
         if user is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         pending = await get_pending(session, pending_id)
         if pending is None or pending.user_id != user.id:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         budget = await session.get(FamilyBudget, user.family_budget_id)
         if budget is None or budget.is_deleted:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         today = tashkent_today_for_counters()
@@ -1189,7 +1196,7 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
             )
             await session.commit()
             if not granted:
-                await callback.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+                await callback.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT, user.language))
                 return
 
         consumed = await consume_pending(session, pending_id)
@@ -1197,7 +1204,7 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
             if pending.charge_on_confirm:
                 await refund_model_call(session, budget)
                 await session.commit()
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         txn_datetime = _operation_date_to_datetime(consumed.operation_date)
@@ -1234,15 +1241,15 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
 
         wallet = await session.get(Wallet, consumed.wallet_id)
         if wallet is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
 
         await _check_wallets_after_write(session, {consumed.wallet_id}, bot)
 
-        card_text = await _format_transaction_card(session, txn, wallet)
+        card_text = await _format_transaction_card(session, txn, wallet, user.language)
         await callback.message.edit_text(
             card_text,
-            reply_markup=card_keyboard(txn.id),
+            reply_markup=card_keyboard(txn.id, user.language),
             parse_mode="Markdown",
         )
         await callback.answer()
@@ -1260,7 +1267,7 @@ async def handle_purchase_cancel(callback: CallbackQuery) -> None:
     async with async_session_factory() as session:
         user = await get_active_user_by_telegram_id(session, callback.from_user.id)
         if user is None:
-            await _answer_gone(callback)
+            await _answer_gone(callback, user)
             return
         language = user.language
         try:
@@ -1269,7 +1276,7 @@ async def handle_purchase_cancel(callback: CallbackQuery) -> None:
         except HTTPException as exc:
             await session.rollback()
             if exc.status_code != 410:
-                await _answer_gone(callback)
+                await _answer_gone(callback, language)
                 return
             text = already_recorded_text(language)
     await callback.answer()

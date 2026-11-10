@@ -8,14 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.services.bot_texts import CATALOGUE, t
 from bot.onboarding import greeting_inline_keyboard
 
-RELEASE_ANNOUNCEMENT_TEXT = (
-    "Теперь трату можно записать прямо здесь, сообщением.\n"
-    "Напишите, например: `такси 25 тысяч`\n"
-    "\n"
-    "В приложении появились личные кошельки, цели и управление участниками."
-)
+RELEASE_ANNOUNCEMENT_TEXT = CATALOGUE["release.announcement"]["ru"]
+
+
+def release_announcement_text(language: str | None = None) -> str:
+    return t(language, "release.announcement")
 
 
 async def eligible_users(
@@ -48,13 +48,13 @@ async def send_release_announcements(
     delivered_at = now or datetime.now(timezone.utc)
     sent = 0
     for user in users:
-        markup = greeting_inline_keyboard()
+        markup = greeting_inline_keyboard(user.language)
         kwargs: dict = {"parse_mode": "Markdown"}
         if markup is not None:
             kwargs["reply_markup"] = markup
         await bot.send_message(
             user.telegram_id,
-            RELEASE_ANNOUNCEMENT_TEXT,
+            release_announcement_text(user.language),
             **kwargs,
         )
         user.release_announcement_delivered_at = delivered_at

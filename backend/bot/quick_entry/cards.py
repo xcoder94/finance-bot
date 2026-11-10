@@ -8,22 +8,8 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from app.config import MINI_APP_URL
 from app.models.wallet import Wallet
-
-_MONTH_GENITIVE = (
-    "января",
-    "февраля",
-    "марта",
-    "апреля",
-    "мая",
-    "июня",
-    "июля",
-    "августа",
-    "сентября",
-    "октября",
-    "ноября",
-    "декабря",
-)
-
+from app.services.bot_texts import resolve_language, t
+from app.services.display_name import display_name
 
 _MARKDOWN_SPECIAL_CHARS = ("_", "*", "`", "[", "]")
 
@@ -53,15 +39,15 @@ def format_number(amount: int) -> str:
 _format_number = format_number
 
 
-def format_amount(amount: int, currency: str) -> str:
+def format_amount(amount: int, currency: str, language: str | None = None) -> str:
     number = format_number(amount)
     if currency == "USD":
         return f"{number} $"
-    return f"{number} сум"
+    return f"{number} {t(language, 'card.unit_sum')}"
 
 
-def _format_date(op_date: date) -> str:
-    return f"{op_date.day} {_MONTH_GENITIVE[op_date.month - 1]}"
+def _format_date(op_date: date, language: str | None = None) -> str:
+    return f"{op_date.day} {t(language, f'month.{op_date.month}')}"
 
 
 def format_card(
@@ -69,19 +55,22 @@ def format_card(
     sign: str,
     amount: int,
     currency: str,
-    category_label: str,
+    category_label: str | None,
     comment: str | None,
     wallet_name: str,
     op_date: date,
     balance: int,
+    language: str | None = None,
 ) -> str:
+    """`category_label=None` means no category (shown in the reader's language)."""
+    label = category_label if category_label else t(language, "card.no_category")
     lines = [
-        f"{sign} **{format_amount(amount, currency)}** · {escape_markdown(category_label)}",
+        f"{sign} **{format_amount(amount, currency, language)}** · {escape_markdown(label)}",
     ]
     if comment:
         lines.append(escape_markdown(comment))
-    lines.append(f"{escape_markdown(wallet_name)} · {_format_date(op_date)}")
-    lines.append(f"Осталось: {format_amount(balance, currency)}")
+    lines.append(f"{escape_markdown(wallet_name)} · {_format_date(op_date, language)}")
+    lines.append(t(language, "card.remaining", amount=format_amount(balance, currency, language)))
     return "\n".join(lines)
 
 
@@ -94,6 +83,7 @@ def format_transfer_card(
     op_date: date,
     from_balance: int,
     to_balance: int,
+    language: str | None = None,
 ) -> str:
     from_bal = _format_number(from_balance)
     to_bal = _format_number(to_balance)
@@ -101,8 +91,9 @@ def format_transfer_card(
     to_name = escape_markdown(to_wallet_name)
     return "\n".join(
         [
-            f"↔️ **{format_amount(amount, currency)}** · Перевод",
-            f"{from_name} → {to_name} · {_format_date(op_date)}",
+            f"↔️ **{format_amount(amount, currency, language)}** · "
+            f"{t(language, 'card.transfer')}",
+            f"{from_name} → {to_name} · {_format_date(op_date, language)}",
             f"{from_name}: {from_bal} · {to_name}: {to_bal}",
         ]
     )
@@ -120,33 +111,37 @@ def format_exchange_card(
     to_wallet_name: str,
     from_balance: int,
     to_balance: int,
+    language: str | None = None,
 ) -> str:
-    amount_from = format_amount(amount, from_currency)
-    amount_to = format_amount(to_amount, to_currency)
+    amount_from = format_amount(amount, from_currency, language)
+    amount_to = format_amount(to_amount, to_currency, language)
     from_name = escape_markdown(from_wallet_name)
     to_name = escape_markdown(to_wallet_name)
     return "\n".join(
         [
-            f"🔄 **{amount_from} → {amount_to}** · Обмен",
-            f"Курс {_format_number(rate)} · {_format_date(op_date)}",
+            f"🔄 **{amount_from} → {amount_to}** · {t(language, 'card.exchange')}",
+            f"{t(language, 'card.rate', rate=_format_number(rate))} · "
+            f"{_format_date(op_date, language)}",
             (
-                f"{from_name}: {format_amount(from_balance, from_currency)}"
-                f" · {to_name}: {format_amount(to_balance, to_currency)}"
+                f"{from_name}: {format_amount(from_balance, from_currency, language)}"
+                f" · {to_name}: {format_amount(to_balance, to_currency, language)}"
             ),
         ]
     )
 
 
-def transfer_card_keyboard(transaction_id: uuid.UUID) -> InlineKeyboardMarkup:
+def transfer_card_keyboard(
+    transaction_id: uuid.UUID, language: str | None = None
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Изменить",
+                    text=t(language, "button.edit"),
                     web_app=WebAppInfo(url=f"{MINI_APP_URL}?tx={transaction_id}"),
                 ),
                 InlineKeyboardButton(
-                    text="Удалить",
+                    text=t(language, "button.delete"),
                     callback_data=f"qe:del:{transaction_id}",
                 ),
             ]
@@ -154,20 +149,22 @@ def transfer_card_keyboard(transaction_id: uuid.UUID) -> InlineKeyboardMarkup:
     )
 
 
-def card_keyboard(transaction_id: uuid.UUID) -> InlineKeyboardMarkup:
+def card_keyboard(
+    transaction_id: uuid.UUID, language: str | None = None
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Кошелёк",
+                    text=t(language, "button.wallet"),
                     callback_data=f"qe:wal:{transaction_id}",
                 ),
                 InlineKeyboardButton(
-                    text="Изменить",
+                    text=t(language, "button.edit"),
                     web_app=WebAppInfo(url=f"{MINI_APP_URL}?tx={transaction_id}"),
                 ),
                 InlineKeyboardButton(
-                    text="Удалить",
+                    text=t(language, "button.delete"),
                     callback_data=f"qe:del:{transaction_id}",
                 ),
             ]
@@ -175,16 +172,18 @@ def card_keyboard(transaction_id: uuid.UUID) -> InlineKeyboardMarkup:
     )
 
 
-def type_question_keyboard(pending_id: str) -> InlineKeyboardMarkup:
+def type_question_keyboard(
+    pending_id: str, language: str | None = None
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Потратил",
+                    text=t(language, "button.expense"),
                     callback_data=f"qe:type:{pending_id}:expense",
                 ),
                 InlineKeyboardButton(
-                    text="Получил",
+                    text=t(language, "button.income"),
                     callback_data=f"qe:type:{pending_id}:income",
                 ),
             ]
@@ -225,12 +224,13 @@ def parse_wallet_set_callback(data: str) -> tuple[uuid.UUID, uuid.UUID] | None:
 def wallet_picker_keyboard(
     transaction_id: uuid.UUID,
     wallets: list[Wallet],
+    language: str | None = None,
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=wallet.name,
+                    text=display_name(wallet.name, wallet.translation_key, language=resolve_language(language)),
                     callback_data=wallet_set_callback_data(transaction_id, wallet.id),
                 )
             ]

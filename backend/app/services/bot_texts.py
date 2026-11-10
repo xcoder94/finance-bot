@@ -65,6 +65,138 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "ru": "Слишком большая сумма — больше {max} сум записать нельзя. Проверьте число.",
         "uz": "Summa juda katta — {max} so'mdan ko'p yozib bo'lmaydi. Raqamni tekshiring.",
     },
+    # --- quick entry: errors and limits (ux-p5-backend-b) ---
+    "quick.too_long": {
+        "ru": "Сообщение слишком длинное — максимум 500 символов. Разбейте на несколько.",
+        "uz": "Xabar juda uzun — ko'pi bilan 500 belgi. Bir nechta xabarga bo'ling.",
+    },
+    "quick.too_many_ops": {
+        "ru": "В одном сообщении можно записать не больше 5 операций. "
+        "Разбейте на несколько сообщений.",
+        "uz": "Bitta xabarda 5 tadan ko'p amal yozib bo'lmaydi. Bir nechta xabarga bo'ling.",
+    },
+    "quick.no_amount": {
+        "ru": "Не нашёл сумму в сообщении.\n"
+        "Напишите так: `такси 25 тысяч` или `продукты 200 тыс с карты`",
+        "uz": "Xabarda summani topa olmadim.\n"
+        "Mana bunday yozing: `taksi 25 ming` yoki `oziq-ovqat 200 ming kartadan`",
+    },
+    "quick.model_fail": {
+        "ru": "Не получилось записать — дело не в вашем сообщении. "
+        "Попробуйте отправить его ещё раз через минуту или "
+        "запишите операцию в приложении.",
+        "uz": "Yozib bo'lmadi — gap xabaringizda emas. Bir daqiqadan so'ng yana yuboring "
+        "yoki amalni ilovada yozing.",
+    },
+    "quick.gone": {"ru": "Запись больше не существует.", "uz": "Yozuv endi mavjud emas."},
+    "quick.type_question": {
+        "ru": "Не понял, это трата или доход?",
+        "uz": "Tushunmadim, bu xarajatmi yoki daromadmi?",
+    },
+    "quick.exchange_rate_required": {
+        "ru": "Перевод между кошельками в разных валютах — это обмен, для него нужен курс.\n"
+        "Сделайте его в приложении.",
+        "uz": "Turli valyutadagi hamyonlar o'rtasidagi o'tkazma — bu ayirboshlash, buning "
+        "uchun kurs kerak.\nUni ilovada bajaring.",
+    },
+    "quick.voice_not_recognized": {
+        "ru": "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом.",
+        "uz": "Ovozli xabarni tushunmadim. Qayta yozib yuboring yoki matn bilan yozing.",
+    },
+    "quick.receipt_unreadable": {
+        "ru": "Не разобрал чек. Сфотографируйте его целиком при хорошем свете или запишите\n"
+        "сумму текстом.",
+        "uz": "Chekni o'qiy olmadim. Uni to'liq va yorug'da suratga oling yoki\n"
+        "summani matn bilan yozing.",
+    },
+    "quick.currency_missing_usd": {
+        "ru": "Кошелька в долларах у вас нет. Добавьте его в приложении, в настройках.",
+        "uz": "Sizda dollar hamyoni yo'q. Uni ilovada, sozlamalarda qo'shing.",
+    },
+    "quick.currency_missing_uzs": {
+        "ru": "Кошелька в сумах у вас нет. Добавьте его в приложении, в настройках.",
+        "uz": "Sizda so'm hamyoni yo'q. Uni ilovada, sozlamalarda qo'shing.",
+    },
+    "quick.model_limit": {
+        "ru": "Сегодня записано {limit} операций — это дневной предел на семью. "
+        "Новые записи можно вносить с полуночи.",
+        "uz": "Bugun {limit} ta amal yozildi — bu oila uchun kunlik chegara. "
+        "Yangi yozuvlarni yarim tundan keyin kiritish mumkin.",
+    },
+    "quick.unparsed_limit": {
+        "ru": "Сегодня не удалось разобрать {limit} сообщений — это дневной предел. "
+        "Записи можно добавить в приложении.",
+        "uz": "Bugun {limit} ta xabarni tushunib bo'lmadi — bu kunlik chegara. "
+        "Yozuvlarni ilovada qo'shish mumkin.",
+    },
+    # --- quick-entry cards and their buttons ---
+    "card.remaining": {"ru": "Осталось: {amount}", "uz": "Qoldiq: {amount}"},
+    "card.transfer": {"ru": "Перевод", "uz": "O'tkazma"},
+    "card.exchange": {"ru": "Обмен", "uz": "Ayirboshlash"},
+    "card.rate": {"ru": "Курс {rate}", "uz": "Kurs {rate}"},
+    "card.no_category": {"ru": "Без категории", "uz": "Toifasiz"},
+    "card.unit_sum": {"ru": "сум", "uz": "so'm"},
+    "button.wallet": {"ru": "Кошелёк", "uz": "Hamyon"},
+    "button.edit": {"ru": "Изменить", "uz": "Tahrirlash"},
+    "button.delete": {"ru": "Удалить", "uz": "O'chirish"},
+    "button.expense": {"ru": "Потратил", "uz": "Xarajat"},
+    "button.income": {"ru": "Получил", "uz": "Daromad"},
+    "month.1": {"ru": "января", "uz": "yanvar"},
+    "month.2": {"ru": "февраля", "uz": "fevral"},
+    "month.3": {"ru": "марта", "uz": "mart"},
+    "month.4": {"ru": "апреля", "uz": "aprel"},
+    "month.5": {"ru": "мая", "uz": "may"},
+    "month.6": {"ru": "июня", "uz": "iyun"},
+    "month.7": {"ru": "июля", "uz": "iyul"},
+    "month.8": {"ru": "августа", "uz": "avgust"},
+    "month.9": {"ru": "сентября", "uz": "sentyabr"},
+    "month.10": {"ru": "октября", "uz": "oktyabr"},
+    "month.11": {"ru": "ноября", "uz": "noyabr"},
+    "month.12": {"ru": "декабря", "uz": "dekabr"},
+    # --- reminder, weekly digest, goal notice, release announcement ---
+    "reminder.evening": {
+        "ru": "Сегодня не было ни одной записи.\n"
+        "Напишите трату одной строкой — например, `продукты 150 тысяч`",
+        "uz": "Bugun bironta ham yozuv bo'lmadi.\n"
+        "Xarajatni bir qatorda yozing — masalan, `bozorlik 150 ming`",
+    },
+    "digest.title": {"ru": "Итоги недели", "uz": "Hafta yakunlari"},
+    "digest.expenses": {"ru": "Расходы: {amount}", "uz": "Xarajatlar: {amount}"},
+    "digest.more": {
+        "ru": "На {amount} больше, чем на прошлой неделе",
+        "uz": "O'tgan haftadan {amount} ko'p",
+    },
+    "digest.less": {
+        "ru": "На {amount} меньше, чем на прошлой неделе",
+        "uz": "O'tgan haftadan {amount} kam",
+    },
+    "digest.leader": {
+        "ru": "Больше всего — {name}, {amount}",
+        "uz": "Eng ko'pi — {name}, {amount}",
+    },
+    "digest.goal": {
+        "ru": "Цель «{name}»: отложили {set_aside}, накоплено {balance} из {target}",
+        "uz": "«{name}» maqsadi: {set_aside} ajratildi, jami {balance} / {target}",
+    },
+    "digest.goal_done": {
+        "ru": "Цель «{name}» достигнута — можно закрыть в разделе «Цели»",
+        "uz": "«{name}» maqsadiga erishildi — uni «Maqsadlar» bo'limida yopish mumkin",
+    },
+    "goal.achieved": {
+        "ru": "🎯 Цель «{name}» достигнута\nНакоплено {balance} из {target}",
+        "uz": "🎯 «{name}» maqsadiga erishildi\nYig'ildi: {balance} / {target}",
+    },
+    "goal.close": {"ru": "Закрыть цель", "uz": "Maqsadni yopish"},
+    "release.announcement": {
+        "ru": "Теперь трату можно записать прямо здесь, сообщением.\n"
+        "Напишите, например: `такси 25 тысяч`\n"
+        "\n"
+        "В приложении появились личные кошельки, цели и управление участниками.",
+        "uz": "Endi xarajatni shu yerning o'zida xabar bilan yozish mumkin.\n"
+        "Masalan, yozing: `taksi 25 ming`\n"
+        "\n"
+        "Ilovada shaxsiy hamyonlar, maqsadlar va a'zolarni boshqarish paydo bo'ldi.",
+    },
     # --- buttons ---
     "button.open_app": {"ru": "Открыть приложение", "uz": "Ilovani ochish"},
     "button.join": {"ru": "Присоединиться", "uz": "Qo'shilish"},

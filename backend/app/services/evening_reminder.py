@@ -8,13 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.family_budget import FamilyBudget
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.services.bot_texts import CATALOGUE, t
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
 
-EVENING_REMINDER_TEXT = (
-    "Сегодня не было ни одной записи.\n"
-    "Напишите трату одной строкой — например, `продукты 150 тысяч`"
-)
+EVENING_REMINDER_TEXT = CATALOGUE["reminder.evening"]["ru"]
 
 
 def _day_bounds(day: date) -> tuple[datetime, datetime]:
@@ -55,7 +53,7 @@ async def send_evening_reminders_for_family(
     for user in users:
         await bot.send_message(
             user.telegram_id,
-            EVENING_REMINDER_TEXT,
+            t(user, "reminder.evening"),
             parse_mode="Markdown",
         )
         sent += 1

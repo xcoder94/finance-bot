@@ -86,6 +86,15 @@ _THOUSAND_RE = re.compile(
     r"(?P<num>\d[\d\s_]*)\s*(?:тысяч(?:а|и)?|тыс\.?)",
     re.IGNORECASE,
 )
+# Uzbek / short magnitude words after a number: "25 ming", "25 минг", "25k", "3 mln".
+_THOUSAND_WORD_RE = re.compile(
+    r"(?P<num>\d[\d\s_]*)\s*(?:ming\w*|минг[\w\u0400-\u04ff]*|k|к)(?![\w\u0400-\u04ff])",
+    re.IGNORECASE,
+)
+_MILLION_WORD_RE = re.compile(
+    r"(?P<num>\d[\d\s_]*)\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?(?![\w\u0400-\u04ff])",
+    re.IGNORECASE,
+)
 _PLAIN_AMOUNT_RE = re.compile(
     r"(?<!\d)(?P<num>\d[\d\s_]*)\s*"
     r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов)?|долл\.?)?(?!\d)",
@@ -138,7 +147,7 @@ def _parse_currency(token: str | None) -> Literal["UZS", "USD"] | None:
     return None
 
 
-def _find_amounts(text: str) -> list[_ParsedAmount]:
+def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmount]:
     covered = [False] * len(text)
     amounts: list[_ParsedAmount] = []
 
@@ -150,6 +159,20 @@ def _find_amounts(text: str) -> list[_ParsedAmount]:
         amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
         for i in range(start, end):
             covered[i] = True
+
+    for pattern, factor in (
+        ((_MILLION_WORD_RE, 1_000_000), (_THOUSAND_WORD_RE, 1000))
+        if magnitude_words
+        else ()
+    ):
+        for match in pattern.finditer(text):
+            start, end = match.span()
+            if any(covered[start:end]):
+                continue
+            value = _normalize_number(match.group("num")) * factor
+            amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
+            for i in range(start, end):
+                covered[i] = True
 
     for match in _PLAIN_AMOUNT_RE.finditer(text):
         start, end = match.span()
@@ -188,6 +211,10 @@ def _single_word_pattern(term: str) -> re.Pattern[str]:
 
 
 def _find_term_spans(text: str, term: str) -> list[tuple[int, int]]:
+    # Uzbek users type o'/g' with typographic marks or a backtick: compare with the plain apostrophe
+    # (one char for one char, so spans still point into the original text).
+    text = text.translate(_APOSTROPHES)
+    term = term.translate(_APOSTROPHES)
     if re.search(r"[\s']", term):
         folded_text = text.casefold()
         folded_term = term.casefold()

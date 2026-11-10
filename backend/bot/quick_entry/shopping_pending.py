@@ -156,7 +156,7 @@ def bare_text_amount(text: str) -> int | None:
     if _ONLY_DIGITS_AND_SEPARATORS_RE.match(stripped):
         # "12 3", "41 2000", "1.5": digits with a wrong separator layout are never a sum
         return None
-    amounts = _find_amounts(stripped)
+    amounts = _find_amounts(stripped, magnitude_words=False)
     if len(amounts) == 1:
         start, end = amounts[0].span
         if not stripped[:start].strip() and not stripped[end:].strip():
@@ -239,7 +239,7 @@ async def finish_unrecognized(
             await session.commit()
             await mark_unrecognized(session, purchase_id)
             await message.answer(
-                unparsed_limit_text(daily_unparsed_limit),
+                unparsed_limit_text(daily_unparsed_limit, user.language),
                 reply_markup=waiting_keyboard(user.language, purchase_id, launcher=True),
             )
             return

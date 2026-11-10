@@ -8,26 +8,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import BOT_TOKEN
 from app.models.goal import Goal
 from app.models.user import User
+from app.services.bot_texts import t
 from bot.quick_entry.cards import format_amount, format_number
 
 
 def format_achievement_message(
-    name: str, balance: int, target: int, currency: str
+    name: str, balance: int, target: int, currency: str, language: str | None = None
 ) -> str:
-    sum_s = format_amount(balance, currency)
-    target_num = format_number(target)
-    return (
-        f"🎯 Цель «{name}» достигнута\n"
-        f"Накоплено {sum_s} из {target_num}"
+    return t(
+        language,
+        "goal.achieved",
+        name=name,
+        balance=format_amount(balance, currency, language),
+        target=format_number(target),
     )
 
 
-def owner_close_keyboard(goal_id: uuid.UUID) -> InlineKeyboardMarkup:
+def owner_close_keyboard(
+    goal_id: uuid.UUID, language: str | None = None
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Закрыть цель",
+                    text=t(language, "goal.close"),
                     callback_data=f"goal:close:{goal_id}",
                 )
             ]
@@ -41,17 +45,19 @@ async def fan_out_achievement(
     balance: int,
     bot: Bot,
 ) -> None:
-    text = format_achievement_message(
-        goal.name, balance, goal.target_amount, goal.currency
-    )
     stmt = select(User).where(
         User.family_budget_id == goal.family_budget_id,
         User.is_deleted.is_(False),
     )
     users = (await session.scalars(stmt)).all()
     for user in users:
+        text = format_achievement_message(
+            goal.name, balance, goal.target_amount, goal.currency, user.language
+        )
         reply_markup = (
-            owner_close_keyboard(goal.id) if user.role == "owner" else None
+            owner_close_keyboard(goal.id, user.language)
+            if user.role == "owner"
+            else None
         )
         await bot.send_message(
             user.telegram_id, text, reply_markup=reply_markup

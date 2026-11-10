@@ -2,58 +2,34 @@ from __future__ import annotations
 
 from typing import Literal
 
-MSG_TOO_LONG = (
-    "Сообщение слишком длинное — максимум 500 символов. Разбейте на несколько."
-)
-MSG_TOO_MANY_OPS = (
-    "В одном сообщении можно записать не больше 5 операций. "
-    "Разбейте на несколько сообщений."
-)
-MSG_NO_AMOUNT = (
-    "Не нашёл сумму в сообщении.\n"
-    "Напишите так: `такси 25 тысяч` или `продукты 200 тыс с карты`"
-)
-MSG_MODEL_FAIL = (
-    "Не получилось записать — дело не в вашем сообщении. "
-    "Попробуйте отправить его ещё раз через минуту или "
-    "запишите операцию в приложении."
-)
-MSG_GONE = "Запись больше не существует."
-MSG_TYPE_QUESTION = "Не понял, это трата или доход?"
-MSG_EXCHANGE_RATE_REQUIRED = (
-    "Перевод между кошельками в разных валютах — это обмен, для него нужен курс.\n"
-    "Сделайте его в приложении."
-)
-MSG_VOICE_NOT_RECOGNIZED = (
-    "Не разобрал голосовое. Попробуйте записать ещё раз или напишите текстом."
-)
-MSG_RECEIPT_UNREADABLE = (
-    "Не разобрал чек. Сфотографируйте его целиком при хорошем свете или запишите\n"
-    "сумму текстом."
-)
+from app.services.bot_texts import CATALOGUE, t
+
+# RU defaults (kept as constants for callers/tests that pin the Russian text); the handlers use
+# the `*_text(language)` helpers / `t(user, key)` so the person's language wins.
+MSG_TOO_LONG = CATALOGUE["quick.too_long"]["ru"]
+MSG_TOO_MANY_OPS = CATALOGUE["quick.too_many_ops"]["ru"]
+MSG_NO_AMOUNT = CATALOGUE["quick.no_amount"]["ru"]
+MSG_MODEL_FAIL = CATALOGUE["quick.model_fail"]["ru"]
+MSG_GONE = CATALOGUE["quick.gone"]["ru"]
+MSG_TYPE_QUESTION = CATALOGUE["quick.type_question"]["ru"]
+MSG_EXCHANGE_RATE_REQUIRED = CATALOGUE["quick.exchange_rate_required"]["ru"]
+MSG_VOICE_NOT_RECOGNIZED = CATALOGUE["quick.voice_not_recognized"]["ru"]
+MSG_RECEIPT_UNREADABLE = CATALOGUE["quick.receipt_unreadable"]["ru"]
 
 
-def currency_missing_text(currency: Literal["UZS", "USD"]) -> str:
-    if currency == "USD":
-        return (
-            "Кошелька в долларах у вас нет. "
-            "Добавьте его в приложении, в настройках."
-        )
-    return "Кошелька в сумах у вас нет. Добавьте его в приложении, в настройках."
+def currency_missing_text(
+    currency: Literal["UZS", "USD"], language: str | None = None
+) -> str:
+    key = "quick.currency_missing_usd" if currency == "USD" else "quick.currency_missing_uzs"
+    return t(language, key)
 
 
-def model_limit_text(limit: int) -> str:
-    return (
-        f"Сегодня записано {limit} операций — это дневной предел на семью. "
-        "Новые записи можно вносить с полуночи."
-    )
+def model_limit_text(limit: int, language: str | None = None) -> str:
+    return t(language, "quick.model_limit", limit=limit)
 
 
-def unparsed_limit_text(limit: int) -> str:
-    return (
-        f"Сегодня не удалось разобрать {limit} сообщений — это дневной предел. "
-        "Записи можно добавить в приложении."
-    )
+def unparsed_limit_text(limit: int, language: str | None = None) -> str:
+    return t(language, "quick.unparsed_limit", limit=limit)
 
 
 # --- Shopping list replies (MVP 3). Source: work/design/mvp3-strings.md, "Бот". ---

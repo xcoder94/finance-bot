@@ -59,10 +59,9 @@ from app.services.quick_entry_wallets import (
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id
 from bot.quick_entry.shopping_pending import finish_unrecognized, finish_with_amount, op_sum
 from bot.quick_entry.cards import card_keyboard, format_card
+from app.services.bot_texts import t as catalogue_t
+from app.services.display_name import display_name
 from bot.quick_entry.texts import (
-    MSG_MODEL_FAIL,
-    MSG_NO_AMOUNT,
-    MSG_RECEIPT_UNREADABLE,
     model_limit_text,
     unparsed_limit_text,
     currency_missing_text,
@@ -90,11 +89,23 @@ def _get_parser() -> MessageParser:
     return get_parser()
 
 
-def _category_label(category: str | None) -> str:
+def _category_label(category: str | None) -> str | None:
     if category is None or not category.strip():
-        return "Без категории"
+        return None
     stripped = strip_parent_category(category.strip())
-    return stripped if stripped else "Без категории"
+    return stripped if stripped else None
+
+
+async def _receipt_category_label(
+    session: AsyncSession, txn: object, language: str | None
+) -> str | None:
+    category_id = getattr(txn, "expense_category_id", None)
+    if category_id is None:
+        return None
+    category = await session.get(ExpenseCategory, category_id)
+    if category is None or category.is_deleted:
+        return None
+    return display_name(category.name, category.translation_key, language=language or "ru")
 
 
 def _operation_date_to_datetime(op_date: date) -> datetime:
@@ -189,13 +200,14 @@ async def _reply_unreadable(
     message: Message,
     session: AsyncSession,
     budget: FamilyBudget,
+    user: User | None = None,
 ) -> None:
     if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-        await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+        await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language if user else None))
         return
     await spend_unparsed(session, budget)
     await session.commit()
-    await message.answer(MSG_RECEIPT_UNREADABLE)
+    await message.answer(catalogue_t(user, "quick.receipt_unreadable"))
 
 
 async def handle_receipt_photo(message: Message, bot: Bot) -> None:
@@ -221,7 +233,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         open_purchase = await find_open_purchase(session, user.id)
         pending = open_purchase
         if default_wallet is None and pending is None:
-            await message.answer(MSG_NO_AMOUNT)
+            await message.answer(catalogue_t(user, "quick.no_amount"))
             return
 
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
@@ -229,25 +241,25 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         largest = message.photo[-1]
         file = await bot.get_file(largest.file_id)
         if file.file_path is None:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
         if file.file_size is not None and file.file_size > MAX_PHOTO_BYTES:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
         buffer = await bot.download_file(file.file_path)
         image_bytes = buffer.read() if hasattr(buffer, "read") else bytes(buffer)
         if len(image_bytes) > MAX_PHOTO_BYTES:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
 
         if (PARSER_PROVIDER or "").lower() != "google" or not PARSER_API_KEY:
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             return
 
         granted = await try_spend_model_call(session, budget, DAILY_MODEL_CALL_LIMIT)
         await session.commit()
         if not granted:
-            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT))
+            await message.answer(model_limit_text(DAILY_MODEL_CALL_LIMIT, user.language))
             return
 
         image_b64 = base64.b64encode(image_bytes).decode()
@@ -278,7 +290,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
                 exc,
             )
             await refund_model_call(session, budget)
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             await session.commit()
             await ai_usage.record_message(None, "photo", "error")
             return
@@ -288,7 +300,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         )
         if response.receipt_status is None:
             await refund_model_call(session, budget)
-            await message.answer(MSG_MODEL_FAIL)
+            await message.answer(catalogue_t(user, "quick.model_fail"))
             await session.commit()
             return
 
@@ -310,13 +322,13 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             return
 
         if response.receipt_status == "unreadable":
-            await _reply_unreadable(message, session, budget)
+            await _reply_unreadable(message, session, budget, user)
             return
 
         assert default_wallet is not None  # pending purchases returned above
         expense_op = _first_expense_op(response.operations)
         if expense_op is None:
-            await _reply_unreadable(message, session, budget)
+            await _reply_unreadable(message, session, budget, user)
             return
 
         assert expense_op.amount is not None
@@ -334,11 +346,11 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         )
         if isinstance(resolved, CurrencyMissing):
             if not can_unparsed(budget, DAILY_UNPARSED_LIMIT):
-                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT))
+                await message.answer(unparsed_limit_text(DAILY_UNPARSED_LIMIT, user.language if user else None))
                 return
             await spend_unparsed(session, budget)
             await session.commit()
-            await message.answer(currency_missing_text(resolved.currency))
+            await message.answer(currency_missing_text(resolved.currency, user.language))
             return
 
         wallet = resolved
@@ -369,15 +381,18 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             sign="➖",
             amount=expense_op.amount,
             currency=currency,
-            category_label=_category_label(expense_op.category),
+            category_label=await _receipt_category_label(session, txn, user.language),
             comment=comment,
-            wallet_name=wallet.name,
+            wallet_name=display_name(
+                wallet.name, wallet.translation_key, language=user.language or "ru"
+            ),
             op_date=op_date,
             balance=balance,
+            language=user.language,
         )
         await message.answer(
             card_text,
-            reply_markup=card_keyboard(txn.id),
+            reply_markup=card_keyboard(txn.id, user.language),
             parse_mode="Markdown",
         )
 
@@ -389,4 +404,9 @@ async def receipt_photo_handler(message: Message, bot: Bot) -> None:
 
 @disabled_router.message(F.photo)
 async def receipt_photo_disabled_handler(message: Message) -> None:
-    await message.answer(MSG_MODEL_FAIL)
+    user = None
+    from_user = getattr(message, "from_user", None)
+    if from_user is not None:
+        async with async_session_factory() as session:
+            user = await get_active_user_by_telegram_id(session, from_user.id)
+    await message.answer(catalogue_t(user, "quick.model_fail"))

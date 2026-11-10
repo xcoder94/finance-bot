@@ -15,12 +15,14 @@ from app.services.history_analytics import (
     get_expenses_by_category,
     get_expenses_by_subcategory,
 )
+from app.services.bot_texts import CATALOGUE, resolve_language, t
+from app.services.display_name import display_name
 from app.services.quick_entry_balance import wallet_balance
 from bot.quick_entry.cards import format_amount, format_number
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
 
-DIGEST_TITLE = "Итоги недели"
+DIGEST_TITLE = CATALOGUE["digest.title"]["ru"]
 SHOPPING_LEISURE_NAME = "Покупки и досуг"
 
 
@@ -45,17 +47,24 @@ def format_currency_block(
     last_total: int,
     leader_name: str,
     leader_amount: int,
+    language: str | None = None,
 ) -> str:
-    lines = [f"Расходы: {format_amount(total, currency)}"]
+    lines = [
+        t(language, "digest.expenses", amount=format_amount(total, currency, language))
+    ]
     delta = total - last_total
     if last_total > 0 and delta != 0:
-        direction = "больше" if delta > 0 else "меньше"
+        key = "digest.more" if delta > 0 else "digest.less"
         lines.append(
-            f"На {format_amount(abs(delta), currency)} {direction}, "
-            "чем на прошлой неделе"
+            t(language, key, amount=format_amount(abs(delta), currency, language))
         )
     lines.append(
-        f"Больше всего — {leader_name}, {format_amount(leader_amount, currency)}"
+        t(
+            language,
+            "digest.leader",
+            name=leader_name,
+            amount=format_amount(leader_amount, currency, language),
+        )
     )
     return "\n".join(lines)
 
@@ -67,15 +76,20 @@ def format_goal_line(
     balance: int,
     target: int,
     currency: str,
+    language: str | None = None,
 ) -> str:
-    return (
-        f"Цель «{name}»: отложили {format_amount(set_aside, currency)}, "
-        f"накоплено {format_amount(balance, currency)} из {format_number(target)}"
+    return t(
+        language,
+        "digest.goal",
+        name=name,
+        set_aside=format_amount(set_aside, currency, language),
+        balance=format_amount(balance, currency, language),
+        target=format_number(target),
     )
 
 
-def format_owner_trailing(name: str) -> str:
-    return f"Цель «{name}» достигнута — можно закрыть в разделе «Цели»"
+def format_owner_trailing(name: str, language: str | None = None) -> str:
+    return t(language, "digest.goal_done", name=name)
 
 
 async def goal_set_aside_this_week(
@@ -136,6 +150,7 @@ async def _leader_for_currency(
     currency: str,
     date_from: datetime,
     date_to: datetime,
+    language: str | None = None,
 ) -> tuple[str, int] | None:
     cats = await get_expenses_by_category(
         session, family_budget_id, currency, date_from, date_to
@@ -144,7 +159,9 @@ async def _leader_for_currency(
     if not cats:
         return None
     top = cats[0]
-    leader_name = top.category_name
+    leader_name = display_name(
+        top.category_name, top.category_translation_key, language=language or "ru"
+    )
     leader_amount = top.amount
     if (
         top.category_name == SHOPPING_LEISURE_NAME
@@ -159,7 +176,11 @@ async def _leader_for_currency(
             date_to,
         )
         if subs:
-            leader_name = subs[0].subcategory_name
+            leader_name = display_name(
+                subs[0].subcategory_name,
+                subs[0].subcategory_translation_key,
+                language=language or "ru",
+            )
             leader_amount = subs[0].amount
     return leader_name, leader_amount
 
@@ -169,6 +190,7 @@ async def _best_goal_line(
     family_budget_id,
     this_start: datetime,
     this_end: datetime,
+    language: str | None = None,
 ) -> str | None:
     stmt = select(Goal).where(
         Goal.family_budget_id == family_budget_id,
@@ -193,6 +215,7 @@ async def _best_goal_line(
         balance=balance,
         target=best.target_amount,
         currency=best.currency,
+        language=language,
     )
 
 
@@ -200,12 +223,13 @@ async def build_digest_body(
     session: AsyncSession,
     family_budget_id,
     monday: date,
+    language: str | None = None,
 ) -> str:
     this_start, this_end, last_start, last_end = digest_week_bounds(monday)
     this_to = _inclusive_end(this_end)
     last_to = _inclusive_end(last_end)
 
-    parts: list[str] = [DIGEST_TITLE]
+    parts: list[str] = [t(language, "digest.title")]
     currency_blocks: list[str] = []
 
     for currency in ("UZS", "USD"):
@@ -218,7 +242,7 @@ async def build_digest_body(
             session, family_budget_id, currency, last_start, last_to
         )
         leader = await _leader_for_currency(
-            session, family_budget_id, currency, this_start, this_to
+            session, family_budget_id, currency, this_start, this_to, language
         )
         if leader is None:
             continue
@@ -230,13 +254,16 @@ async def build_digest_body(
                 last_total=last_total,
                 leader_name=leader_name,
                 leader_amount=leader_amount,
+                language=language,
             )
         )
 
     if currency_blocks:
         parts.append("\n\n".join(currency_blocks))
 
-    goal_line = await _best_goal_line(session, family_budget_id, this_start, this_end)
+    goal_line = await _best_goal_line(
+        session, family_budget_id, this_start, this_end, language
+    )
     if goal_line is not None:
         if len(parts) > 1:
             parts.append("")
@@ -248,6 +275,7 @@ async def build_digest_body(
 async def build_owner_trailing_lines(
     session: AsyncSession,
     family_budget_id,
+    language: str | None = None,
 ) -> list[str]:
     stmt = (
         select(Goal)
@@ -259,7 +287,7 @@ async def build_owner_trailing_lines(
         .order_by(Goal.name, Goal.created_at)
     )
     goals = (await session.scalars(stmt)).all()
-    return [format_owner_trailing(goal.name) for goal in goals]
+    return [format_owner_trailing(goal.name, language) for goal in goals]
 
 
 async def send_weekly_digest_for_family(
@@ -268,17 +296,22 @@ async def send_weekly_digest_for_family(
     monday: date,
     bot: Bot,
 ) -> int:
-    body = await build_digest_body(session, budget.id, monday)
-    trailing = await build_owner_trailing_lines(session, budget.id)
-
     stmt = select(User).where(
         User.family_budget_id == budget.id,
         User.is_deleted.is_(False),
         User.weekly_digest_enabled.is_(True),
     )
     users = (await session.scalars(stmt)).all()
+    bodies: dict[str, tuple[str, list[str]]] = {}
     sent = 0
     for user in users:
+        language = resolve_language(user)
+        if language not in bodies:
+            bodies[language] = (
+                await build_digest_body(session, budget.id, monday, language),
+                await build_owner_trailing_lines(session, budget.id, language),
+            )
+        body, trailing = bodies[language]
         text = body
         if user.role == "owner" and trailing:
             text = body + "\n" + "\n".join(trailing)
