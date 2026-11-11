@@ -8,7 +8,6 @@ import {
 } from './getDisplayName'
 import {
   getCategoryColor,
-  getColorByIndex,
   OTHER_CATEGORY_COLOR,
   UNCATEGORIZED_COLOR,
 } from './chartColors'
@@ -346,5 +345,5 @@ export function formatSharePercents(values: number[]): string[] {
     whole[i] += 1
     left -= 1
   }
-  return values.map((value, i) => (tiny[i] ? '<1%' : `${whole[i]}%`))
+  return values.map((_, i) => (tiny[i] ? '<1%' : `${whole[i]}%`))
 }
