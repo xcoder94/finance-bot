@@ -99,7 +99,13 @@ describe('month switch label never runs under the arrow (QA #1)', () => {
     expect(wrap).toContain('flex: 1 0 auto')
     expect(wrap).not.toContain('min-width: 0')
     const bar = cssRule('.analytics-page__head-row .analytics-page__month-bar')
-    expect(bar).toContain('flex: 1 0 auto')
+    expect(bar).toContain('flex: 0 0 auto')
     expect(bar).not.toContain('min-width: 0')
+  })
+
+  it('tabs and month bar share one row at 320 px: tabs give way (small basis), bar never shrinks', () => {
+    expect(cssRule('.analytics-page__head-lead')).toMatch(/flex: 1 1 1[0-3]\dpx/)
+    expect(cssRule('.analytics-page__head-row .month-arrow')).toMatch(/width: (2\d|3[0-4])px/)
+    expect(cssRule('.analytics-page__head-row .analytics-page__month-label-wrap')).toContain('flex: 0 0 auto')
   })
 })

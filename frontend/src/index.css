@@ -1710,32 +1710,46 @@ button.home-ops-row:focus-visible {
   width: 100%;
 }
 
-/* Compact header: tabs and the month switch share one row */
+/* Compact header: tabs and the month switch share one row, also at 320 px (RU and UZ).
+   Tabs shrink to their words, the month bar keeps arrows + label on one line; only if even that
+   does not fit does the bar drop to its own row. */
 .analytics-page__head-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding-bottom: 8px;
 }
 
 .analytics-page__head-lead {
-  flex: 1 1 150px;
+  flex: 1 1 124px;
   min-width: 0;
 }
 
 .analytics-page__head-row .analytics-page__month-bar {
-  /* never narrower than its content: the month label sits between the arrows on one line; if it does not fit next to the tabs, the bar moves to its own row */
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   width: auto;
+  padding: 0;
+}
+
+.analytics-page__head-row .month-arrow {
+  width: 30px;
 }
 
 .analytics-page__head-row .analytics-tabs__btn {
   white-space: nowrap;
+  padding-inline: 4px;
+  font-size: 13px;
+}
+
+.analytics-page__head-row .analytics-page__month-label-wrap {
+  flex: 0 0 auto;
+  padding: 0 2px;
 }
 
 .analytics-page__head-row .home-month-bar__label {
   white-space: nowrap;
+  font-size: 13px;
 }
 
 .analytics-page__period {
