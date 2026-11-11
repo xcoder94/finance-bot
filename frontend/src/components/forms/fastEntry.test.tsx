@@ -98,3 +98,14 @@ describe('FormSheet delete button (B22)', () => {
     expect(html.indexOf('form-sheet-danger')).toBeLessThan(html.indexOf('form-sheet-actions'))
   })
 })
+
+describe('editing a record with a future day (P1-5)', () => {
+  it('its own stored day stays valid, another future day does not', async () => {
+    const { isFormSheetDateValid } = await import('./transactionAddFields')
+    const { addDays, todayTashkent } = await import('../../utils/dateChips')
+    const future = addDays(todayTashkent(), 1)
+    expect(isFormSheetDateValid(future)).toBe(false)
+    expect(isFormSheetDateValid(future, future)).toBe(true)
+    expect(isFormSheetDateValid(addDays(future, 1), future)).toBe(false)
+  })
+})

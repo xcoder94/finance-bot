@@ -90,7 +90,7 @@ export function initializeRangeFromMonth(selectedMonth: SelectedMonth): {
 } {
   const monthRange = monthDateRange(selectedMonth.year, selectedMonth.month)
   return {
-    rangeFrom: tashkentDateOf(monthRange.dateFrom),
+    rangeFrom: clampToToday(tashkentDateOf(monthRange.dateFrom)),
     rangeTo: clampToToday(tashkentDateOf(monthRange.dateTo)),
   }
 }

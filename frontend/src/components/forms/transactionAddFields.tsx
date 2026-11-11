@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { Wallet } from '../../api/transactions'
 import { getDisplayName } from '../../utils/getDisplayName'
-import { isSelectableDate } from '../../utils/dateChips'
+import { isSelectableDate, isValidIsoDate } from '../../utils/dateChips'
 import {
   countDigitsBeforeCursor,
   cursorPosAfterDigits,
@@ -259,8 +259,12 @@ export function FormSheetDateField({ value, hasError, onChange }: FormSheetDateF
   )
 }
 
-export function isFormSheetDateValid(value: string): boolean {
-  return isSelectableDate(value)
+/**
+ * A date is valid when it is a real day not after today. When editing, the record's own
+ * (already stored) day stays valid even if it is in the future: the API and the old form allowed it.
+ */
+export function isFormSheetDateValid(value: string, originalDate?: string): boolean {
+  return isSelectableDate(value) || (Boolean(originalDate) && value === originalDate && isValidIsoDate(value))
 }
 
 type FormSheetRateFieldProps = {

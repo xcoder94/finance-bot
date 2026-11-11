@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MAX_RECENT_CATEGORIES,
+  mergeRecentIds,
   readRecentCategories,
+  recentIdsFromHistory,
   recentCategoriesKey,
   recordRecentCategory,
   resolveRecentChips,
@@ -104,5 +106,54 @@ describe('resolveRecentChips', () => {
   it('drops the uncategorized bucket', () => {
     const withBucket = [...categories, { id: 'u', name: 'Без категории', parent_id: null }]
     expect(resolveRecentChips(['u', 'p1'], withBucket, label)).toEqual([{ id: 'p1', label: 'Еда' }])
+  })
+})
+
+describe('recent category ids from the server history (bot entries count too)', () => {
+  const categories = [
+    { id: 'food', name: 'Еда', translation_key: 'food', parent_id: null },
+    { id: 'cafe', name: 'Кафе', translation_key: null, parent_id: 'food' },
+    { id: 'home', name: 'Дом', translation_key: null, parent_id: null },
+    { id: 'salary', name: 'Зарплата', translation_key: null },
+  ]
+  const item = (over: Record<string, unknown>) => ({
+    type: 'expense',
+    expense_category_name: null,
+    expense_category_translation_key: null,
+    expense_subcategory_name: null,
+    expense_subcategory_translation_key: null,
+    income_category_name: null,
+    income_category_translation_key: null,
+    ...over,
+  })
+
+  it('takes the subcategory when there is one, the parent otherwise, newest first, deduped', () => {
+    const items = [
+      item({ expense_category_name: 'Еда', expense_category_translation_key: 'food', expense_subcategory_name: 'Кафе' }),
+      item({ expense_category_name: 'Дом' }),
+      item({ expense_category_name: 'Еда', expense_category_translation_key: 'food', expense_subcategory_name: 'Кафе' }),
+    ]
+    expect(recentIdsFromHistory(items, categories, 'expense')).toEqual(['cafe', 'home'])
+  })
+
+  it('ignores other types, transfers and unknown categories; income reads its own field', () => {
+    const items = [
+      item({ type: 'transfer' }),
+      item({ type: 'income', income_category_name: 'Зарплата' }),
+      item({ expense_category_name: 'Удалённая' }),
+    ]
+    expect(recentIdsFromHistory(items, categories, 'expense')).toEqual([])
+    expect(recentIdsFromHistory(items, categories, 'income')).toEqual(['salary'])
+  })
+
+  it('keeps at most 5', () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({ id: `c${i}`, name: `N${i}`, translation_key: null, parent_id: null }))
+    const items = many.map((c) => item({ expense_category_name: c.name }))
+    expect(recentIdsFromHistory(items, many, 'expense')).toHaveLength(MAX_RECENT_CATEGORIES)
+  })
+
+  it('server ids win; local ids are the instant fallback when the server has nothing', () => {
+    expect(mergeRecentIds(['a', 'b'], ['x'])).toEqual(['a', 'b'])
+    expect(mergeRecentIds([], ['x'])).toEqual(['x'])
   })
 })

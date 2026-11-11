@@ -204,7 +204,10 @@ export function EditTransferPage() {
   }
 
   const validateDate = () => {
-    const valid = isFormSheetDateValid(transactionDate)
+    const valid = isFormSheetDateValid(
+      transactionDate,
+      loadState.status === 'success' ? tashkentDateOf(loadState.transaction.transaction_date) : undefined,
+    )
     setDateError(!valid)
     return valid
   }
@@ -300,7 +303,10 @@ export function EditTransferPage() {
     Boolean(destWalletId) &&
     sourceWalletId !== destWalletId &&
     !amountOverLimit &&
-    isFormSheetDateValid(transactionDate) &&
+    isFormSheetDateValid(
+      transactionDate,
+      loadState.status === 'success' ? tashkentDateOf(loadState.transaction.transaction_date) : undefined,
+    ) &&
     comment.length <= 200 &&
     (!isCrossCurrency || (parsedRate !== null && !rateOverLimit))
 

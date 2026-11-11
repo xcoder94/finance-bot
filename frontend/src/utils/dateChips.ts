@@ -2,6 +2,8 @@
 // A "date" here is always a plain `YYYY-MM-DD` string meaning a Tashkent calendar day
 // (PRD: every daily boundary is Tashkent-local). Tashkent has a fixed +05:00 offset.
 
+import uz from '../i18n/locales/uz.json'
+
 const OFFSET = '+05:00'
 const OFFSET_MS = 5 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -57,6 +59,23 @@ export function isSelectableDate(iso: string, today: string = todayTashkent()): 
   return isValidIsoDate(iso) && iso <= today
 }
 
+/**
+ * A date picked in the system calendar. iOS' wheel ignores `max`/`min`, so an out-of-range day is
+ * pulled to the nearest allowed one (visible: the chip then reads «Сегодня») instead of being dropped silently.
+ */
+export function clampPickedDate(next: string, max: string, min?: string): string | null {
+  if (!isValidIsoDate(next)) {
+    return null
+  }
+  if (next > max) {
+    return max
+  }
+  if (min && next < min) {
+    return min
+  }
+  return next
+}
+
 export function chipKeyFor(iso: string, today: string): ChipKey {
   if (iso === today) {
     return 'today'
@@ -76,6 +95,11 @@ export function formatChipDate(iso: string, today: string, locale: string): stri
     return ''
   }
   const sameYear = iso.slice(0, 4) === today.slice(0, 4)
+  if (locale.toLowerCase().startsWith('uz')) {
+    // Chromium (Android WebView, Telegram Desktop) has no Uzbek month names in Intl: use the app's own strings
+    const month = (uz.months.long as Record<string, string>)[String(p.month)].toLowerCase()
+    return `${sameYear ? '' : `${p.year}-yil `}${p.day}-${month}`
+  }
   const text = new Intl.DateTimeFormat(locale, {
     timeZone: 'UTC',
     day: 'numeric',

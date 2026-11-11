@@ -14,6 +14,7 @@ import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContex
 import { CategoryPickerSheet } from '../components/forms/CategoryPickerSheet'
 import { FormSheet } from '../components/forms/FormSheet'
 import { FormSheetField } from '../components/forms/FormSheetField'
+import { useRecentCategoryIds } from '../hooks/useRecentCategoryIds'
 import { RecentCategoryChips } from '../components/forms/RecentCategoryChips'
 import {
   FormSheetAmountField,
@@ -34,7 +35,6 @@ import {
 import { evaluateAddSubmit } from '../utils/addFormGate'
 import { getDisplayName } from '../utils/getDisplayName'
 import {
-  readRecentCategories,
   recordRecentCategory,
   resolveRecentChips,
 } from '../utils/recentCategories'
@@ -119,14 +119,20 @@ export function AddIncomePage() {
     }
   }, [referenceState, walletId, defaultWalletId])
 
+  const recentIds = useRecentCategoryIds(
+    familyId,
+    'income',
+    referenceState.status === 'success' ? referenceState.categories : [],
+    referenceState.status === 'success',
+  )
   const recentChips = useMemo(
     () =>
       resolveRecentChips(
-        readRecentCategories(familyId, 'income'),
+        recentIds,
         referenceState.status === 'success' ? referenceState.categories : [],
         (category) => getDisplayName(category, t),
       ),
-    [familyId, referenceState, t],
+    [recentIds, referenceState, t],
   )
 
   const selectedWallet =

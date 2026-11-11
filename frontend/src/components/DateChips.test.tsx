@@ -84,3 +84,12 @@ describe('DateRangeFields', () => {
     expect(render(true)).toContain('history.invalidRange')
   })
 })
+
+describe('quick chips hide the fallback date field (P1-4)', () => {
+  it('pickQuickChip closes the fallback and sets the day', async () => {
+    const { pickQuickChip } = await import('./DateChips')
+    const calls: string[] = []
+    pickQuickChip('2026-11-10', -1, (v) => calls.push(`set ${v}`), () => calls.push('close'))
+    expect(calls).toEqual(['close', 'set 2026-11-09'])
+  })
+})

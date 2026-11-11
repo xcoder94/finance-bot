@@ -1458,13 +1458,6 @@ body {
 }
 
 
-.history-page__range-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 0 16px 16px;
-}
-
 .history-range-field__error {
   margin-top: 4px;
   color: var(--exp);
@@ -1595,6 +1588,12 @@ button.home-ops-row:focus-visible {
 
 .transaction-form__action-button {
   min-height: 48px;
+}
+
+/* the telegram-ui spinner paints itself in the link (= accent) colour: on a filled accent button it vanished */
+.transaction-form__action-button [role='status'],
+.form-sheet-primary [role='status'] {
+  color: var(--acct);
 }
 
 .transaction-form__field-control {

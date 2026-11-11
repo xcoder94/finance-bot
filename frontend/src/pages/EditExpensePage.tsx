@@ -174,7 +174,10 @@ export function EditExpensePage() {
       : null
 
   const validateDate = () => {
-    const valid = isFormSheetDateValid(transactionDate)
+    const valid = isFormSheetDateValid(
+      transactionDate,
+      loadState.status === 'success' ? tashkentDateOf(loadState.transaction.transaction_date) : undefined,
+    )
     setDateError(!valid)
     return valid
   }
@@ -250,7 +253,10 @@ export function EditExpensePage() {
     Boolean(walletId) &&
     Boolean(categoryId) &&
     !amountOverLimit &&
-    isFormSheetDateValid(transactionDate) &&
+    isFormSheetDateValid(
+      transactionDate,
+      loadState.status === 'success' ? tashkentDateOf(loadState.transaction.transaction_date) : undefined,
+    ) &&
     comment.length <= 200
 
   if (loadState.status === 'loading') {

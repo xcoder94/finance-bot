@@ -66,7 +66,7 @@ export function DateRangeFields({
   const today = todayTashkent()
 
   return (
-    <div className="history-page__range-fields date-range-fields">
+    <div className="date-range-fields">
       <div className="date-range-presets">
         {PRESETS.map((preset) => (
           <button

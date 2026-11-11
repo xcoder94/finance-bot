@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addDays,
   chipKeyFor,
+  clampPickedDate,
   dateToTransactionIso,
   dayEndIso,
   dayStartIso,
@@ -120,5 +121,31 @@ describe('presetRange', () => {
   })
   it('7 days across a year boundary', () => {
     expect(presetRange('days7', '2026-01-03')).toEqual({ from: '2025-12-28', to: '2026-01-03' })
+  })
+})
+
+describe('formatChipDate in Uzbek (own month names, never Intl) (P1-1)', () => {
+  it('current year: «7-noyabr»; other year: «2025-yil 8-noyabr»', () => {
+    expect(formatChipDate('2026-11-07', '2026-11-10', 'uz-UZ')).toBe('7-noyabr')
+    expect(formatChipDate('2025-11-08', '2026-11-10', 'uz-UZ')).toBe('2025-yil 8-noyabr')
+    expect(formatChipDate('2026-01-01', '2026-11-10', 'uz-UZ')).toBe('1-yanvar')
+  })
+  it('never prints the Intl fallback «M11»', () => {
+    expect(formatChipDate('2026-11-07', '2026-11-10', 'uz-UZ')).not.toMatch(/M\d/)
+  })
+})
+
+describe('clampPickedDate (P1-6: a future day from the iOS wheel is not dropped silently)', () => {
+  it('keeps an allowed day', () => {
+    expect(clampPickedDate('2026-11-08', '2026-11-10')).toBe('2026-11-08')
+  })
+  it('pulls a future day to today', () => {
+    expect(clampPickedDate('2026-11-11', '2026-11-10')).toBe('2026-11-10')
+  })
+  it('pulls a day before min to min', () => {
+    expect(clampPickedDate('2026-11-01', '2026-11-10', '2026-11-05')).toBe('2026-11-05')
+  })
+  it('rejects garbage', () => {
+    expect(clampPickedDate('', '2026-11-10')).toBeNull()
   })
 })

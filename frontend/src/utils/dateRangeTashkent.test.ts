@@ -81,3 +81,14 @@ describe('month -> manual range round trip (Tashkent calendar day)', () => {
     expect(tashkentDateOf('2026-07-31T21:00:00.000Z')).toBe('2026-08-01')
   })
 })
+
+describe('month -> range pre-fill never leaves the future (P1-3)', () => {
+  it('a future month gives from = to = today, from never after to', () => {
+    const today = tashkentDateOf(new Date())
+    const next = new Date().getFullYear() + 1
+    const { rangeFrom, rangeTo } = initializeRangeFromMonth({ year: next, month: 1 })
+    expect(rangeFrom <= today).toBe(true)
+    expect(rangeTo <= today).toBe(true)
+    expect(rangeFrom <= rangeTo).toBe(true)
+  })
+})
