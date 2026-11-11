@@ -109,3 +109,12 @@ describe('month switch label never runs under the arrow (QA #1)', () => {
     expect(cssRule('.analytics-page__head-row .analytics-page__month-label-wrap')).toContain('flex: 0 0 auto')
   })
 })
+
+describe('trend title does not strand «12» / unit on two lines at 320 px (QA N4)', () => {
+  it('number and unit are joined by a no-break space in RU and UZ', async () => {
+    const ru = (await import('../i18n/locales/ru.json')).default as { analytics: { trendTitle: string } }
+    const uz = (await import('../i18n/locales/uz.json')).default as { analytics: { trendTitle: string } }
+    expect(ru.analytics.trendTitle).toMatch(/12 месяцев$/)
+    expect(uz.analytics.trendTitle).toMatch(/12 oy$/)
+  })
+})

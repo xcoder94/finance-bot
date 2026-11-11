@@ -322,7 +322,7 @@
     "expensesByCategory": "Расходы по категориям",
     "uncategorized": "Без категории",
     "incomeByCategory": "Доходы по категориям",
-    "trendTitle": "Доход и расход, 12 месяцев",
+    "trendTitle": "Доход и расход, 12 месяцев",
     "avgDaily": "Средний расход в день",
     "weekdayExpenses": "Расход по дням недели",
     "avgDailyCaption": "сум · {{count}} {{dayWord}}",

@@ -313,7 +313,7 @@
     "expensesByCategory": "Toifalar bo'yicha xarajatlar",
     "uncategorized": "Toifasiz",
     "incomeByCategory": "Toifalar bo'yicha daromadlar",
-    "trendTitle": "Daromad va xarajat, 12 oy",
+    "trendTitle": "Daromad va xarajat, 12 oy",
     "avgDaily": "Kunlik o'rtacha xarajat",
     "weekdayExpenses": "Hafta kunlari bo'yicha xarajatlar",
     "avgDailyCaption": "so'm · {{count}} {{dayWord}}",
