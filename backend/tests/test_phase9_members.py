@@ -553,8 +553,11 @@ async def test_remove_member_remaps_personal_txn_categories_by_translation_key(
     await session.refresh(seeded_txn)
     await session.refresh(invented_txn)
     assert seeded_txn.expense_category_id == new_groceries.id
-    assert invented_txn.expense_category_id is None
+    # ux-r4: a custom category is recreated in the new budget, not dropped
+    assert invented_txn.expense_category_id is not None
     assert invented_txn.expense_category_id != old_invented_id
+    moved = await session.get(ExpenseCategory, invented_txn.expense_category_id)
+    assert moved.family_budget_id == new_budget_id and moved.name == "Моя категория"
 
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")
@@ -775,7 +778,7 @@ async def test_convert_join_deletes_all_goals_including_closed() -> None:
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")
 @pytest.mark.anyio
-async def test_convert_join_remaps_invented_category_to_null() -> None:
+async def test_convert_join_recreates_invented_category_in_target() -> None:
     async with rollback_session() as session:
         solo_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
         target_tid = solo_tid + 1
@@ -826,7 +829,9 @@ async def test_convert_join_remaps_invented_category_to_null() -> None:
         await session.flush()
 
         await session.refresh(txn)
-        assert txn.expense_category_id is None
+        assert txn.expense_category_id is not None
+        moved = await session.get(ExpenseCategory, txn.expense_category_id)
+        assert moved.family_budget_id == target.id and moved.name == "Моя"
 
 
 @pytest.mark.skipif(not _db_available(), reason="DB not configured")

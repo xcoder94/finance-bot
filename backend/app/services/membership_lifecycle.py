@@ -15,6 +15,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.budget_seed import (
     assign_default_card_uzs,
+    budget_uses_legacy_set,
     copy_seed_categories_only,
     copy_seed_wallets_only,
 )
@@ -176,7 +177,10 @@ async def detach_member_to_own_budget(
     session.add(new_budget)
     await session.flush()
 
-    await copy_seed_categories_only(session, new_budget.id)
+    # the new budget keeps the category set the person is used to (source budget's set)
+    await copy_seed_categories_only(
+        session, new_budget.id, legacy=await budget_uses_legacy_set(session, old_budget.id)
+    )
 
     personal_wallets_stmt = (
         select(Wallet)
@@ -222,7 +226,7 @@ async def detach_member_to_own_budget(
         for txn in personal_txns:
             txn.family_budget_id = new_budget.id
         await remap_transaction_categories_to_budget(
-            session, personal_txns, new_budget.id
+            session, personal_txns, new_budget.id, adopt_names=True
         )
 
     departing_user.family_budget_id = new_budget.id

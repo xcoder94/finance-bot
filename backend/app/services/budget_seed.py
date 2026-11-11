@@ -164,6 +164,32 @@ async def assign_default_card_uzs(session: AsyncSession, user: User) -> None:
         user.default_wallet_id = wallet.id
 
 
+LEGACY_ONLY_KEYS = frozenset(
+    {key for _n, key in LEGACY_SEED_INCOME_CATEGORIES}
+    | {k for _p, (_pk, subs) in LEGACY_SEED_EXPENSE_CATEGORIES.items() for _sn, k in subs}
+) - frozenset(
+    {key for _n, key in SEED_INCOME_CATEGORIES}
+    | {k for _p, (_pk, subs) in SEED_EXPENSE_CATEGORIES.items() for _sn, k in subs}
+)
+
+
+async def budget_uses_legacy_set(session: AsyncSession, family_budget_id: uuid.UUID) -> bool:
+    """True when the budget was seeded with the pre-U7 category set (any legacy-only key,
+    live or deleted, is present)."""
+    for model in (ExpenseCategory, IncomeCategory):
+        found = await session.scalar(
+            select(model.id)
+            .where(
+                model.family_budget_id == family_budget_id,
+                model.translation_key.in_(LEGACY_ONLY_KEYS),
+            )
+            .limit(1)
+        )
+        if found is not None:
+            return True
+    return False
+
+
 async def copy_seed_categories_only(
     session: AsyncSession, family_budget_id: uuid.UUID, *, legacy: bool = False
 ) -> None:
