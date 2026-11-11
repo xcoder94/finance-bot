@@ -1877,7 +1877,9 @@ button.home-ops-row:focus-visible {
   font-size: 13px;
   line-height: 1.2;
   text-overflow: ellipsis;
-  overflow-wrap: anywhere;
+  /* wrap at spaces and hyphens; a word is split only if it alone is wider than the line */
+  overflow-wrap: break-word;
+  word-break: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -2156,6 +2158,44 @@ button.home-ops-row:focus-visible {
 
 .analytics-income-row {
   grid-template-columns: 10px minmax(0, 1fr) auto auto;
+}
+
+/* Narrow screens (320): the name gets its own full-width line, the figures sit under it, so names
+   are not squeezed to 3-4 letters per line. */
+@media (max-width: 359px) {
+  .analytics-donut__legend-item:not(.analytics-income-row) {
+    grid-template-columns: 10px minmax(0, 1fr) auto auto 10px;
+    grid-template-areas:
+      'dot name name name chev'
+      '. amt pct delta chev';
+    row-gap: 2px;
+    padding: 4px 0;
+  }
+
+  .analytics-donut__legend-item:not(.analytics-income-row) .analytics-donut__legend-dot {
+    grid-area: dot;
+  }
+
+  .analytics-donut__legend-item:not(.analytics-income-row) .analytics-donut__legend-name {
+    grid-area: name;
+  }
+
+  .analytics-donut__legend-item:not(.analytics-income-row) .analytics-donut__legend-amount {
+    grid-area: amt;
+    text-align: left;
+  }
+
+  .analytics-donut__legend-item:not(.analytics-income-row) .analytics-donut__legend-percent {
+    grid-area: pct;
+  }
+
+  .analytics-donut__legend-item:not(.analytics-income-row) .analytics-donut__legend-delta {
+    grid-area: delta;
+  }
+
+  .analytics-donut__legend-item:not(.analytics-income-row) .analytics-donut__legend-chevron {
+    grid-area: chev;
+  }
 }
 
 .analytics-charts-donut-card__back {

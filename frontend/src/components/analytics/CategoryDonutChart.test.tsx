@@ -43,6 +43,16 @@ describe('CategoryDonutChart list', () => {
     expect(rule).toContain('min-width: 0')
   })
 
+  it('names wrap at word boundaries, never mid-word, and 320 px gives them a full-width line (QA #9)', () => {
+    const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
+    const rule = css.match(/\.analytics-donut__legend-name \{[^}]*\}/)?.[0] ?? ''
+    expect(rule).toContain('overflow-wrap: break-word')
+    expect(rule).not.toContain('anywhere')
+    const media = css.slice(css.indexOf('@media (max-width: 359px) {\n  .analytics-donut__legend-item'))
+    expect(media).toContain("'dot name name name chev'")
+    expect(media).toContain('grid-area: name')
+  })
+
   it('centre amount carries a fit-to-ring font size', () => {
     const big = renderToStaticMarkup(
       <CategoryDonutChart
