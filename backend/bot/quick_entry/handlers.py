@@ -610,6 +610,7 @@ async def _process_parsed_response(
             continue
 
         wallet = resolved
+        currency = wallet.currency  # type: ignore[assignment]  # card, limits and wallet agree
         comment = _strip_op_comment(op, source_text)
         category_id = await resolve_category_id(
             session,
@@ -683,6 +684,7 @@ async def _process_parsed_response(
             await message.answer(currency_missing_text(resolved.currency, user.language))
             continue
 
+        currency = resolved.currency  # type: ignore[assignment]
         pending = await create_pending(
             session,
             user_id=user.id,

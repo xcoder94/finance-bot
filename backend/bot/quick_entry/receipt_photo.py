@@ -354,6 +354,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             return
 
         wallet = resolved
+        currency = wallet.currency  # type: ignore[assignment]
         comment = _strip_op_comment(expense_op, caption)
         category_id = await resolve_category_id(
             session,

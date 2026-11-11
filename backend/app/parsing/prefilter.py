@@ -97,7 +97,7 @@ _MILLION_WORD_RE = re.compile(
 )
 _PLAIN_AMOUNT_RE = re.compile(
     r"(?<!\d)(?P<num>\d[\d\s_]*)\s*"
-    r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов)?|долл\.?)?(?!\d)",
+    r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?)?(?!\d)",
     re.IGNORECASE,
 )
 
@@ -140,7 +140,7 @@ def _parse_currency(token: str | None) -> Literal["UZS", "USD"] | None:
     if token is None:
         return None
     lowered = token.casefold()
-    if lowered in ("$", "usd", "доллар", "долларов", "долл", "долл."):
+    if lowered in ("$", "usd", "долл", "долл.") or lowered.startswith(("доллар", "dollar")):
         return "USD"
     if lowered in ("сум", "uzs"):
         return "UZS"
