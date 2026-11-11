@@ -1,3 +1,5 @@
+import datetime
+import logging
 import uuid
 from collections.abc import Sequence
 
@@ -9,6 +11,9 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.services.budget_seed import LEGACY_TO_NEW_KEY, NEW_TO_LEGACY_KEY, PARENT_FALLBACK
 from app.services.category_colors import assign_category_color
+
+
+logger = logging.getLogger(__name__)
 
 
 def _fold(name: str) -> str:
@@ -24,30 +29,31 @@ def _candidate_keys(key: str) -> list[str]:
     return keys
 
 
+def _best(rows: list):
+    """Several rows may carry the same identity in budgets made by older code: live first, then oldest."""
+    return min(rows, key=lambda c: (c.is_deleted, c.created_at)) if rows else None
+
+
 def _pick(candidates: list, old):
-    """First target category matching the old one: by key (then successor keys), custom by name."""
+    """Target category with the same identity as `old`. Liveness is NOT part of identity: whether a
+    row is deleted is the target budget's own decision, so a deleted row matches as well as a live one.
+    Seed category: its key, then successor keys in the other seed set. Custom: folded name."""
     if old.translation_key is not None:
         for key in _candidate_keys(old.translation_key):
-            hit = next((c for c in candidates if c.translation_key == key), None)
+            hit = _best([c for c in candidates if c.translation_key == key])
             if hit is not None:
                 return hit
         return None
-    return next(
-        (c for c in candidates if c.translation_key is None and _fold(c.name) == _fold(old.name)),
-        None,
-    )
+    return _best([c for c in candidates if _fold(c.name) == _fold(old.name)])
 
 
-def _pick_preferring_state(candidates: list, old):
-    """Same liveness first. A LIVE old category whose counterpart exists in the target only as
-    deleted resolves to that deleted one (the family deleted it: it must not come back to life,
-    and the operation keeps its own category so no sums move). A deleted old category never
-    matches a live one."""
-    same = [c for c in candidates if c.is_deleted == old.is_deleted]
-    hit = _pick(same, old)
-    if hit is None and not old.is_deleted:
-        hit = _pick([c for c in candidates if c.is_deleted], old)
-    return hit
+def _created_state(old, *, fresh: bool, parent_deleted: bool) -> tuple[bool, datetime.datetime | None]:
+    """Liveness of a row created by the remap. Joining: the joiner's own deletion travels, and a row
+    never lives under a deleted parent. Leaving (fresh budget): live, unless the parent is deleted."""
+    deleted = (old.is_deleted and not fresh) or parent_deleted
+    if not deleted:
+        return False, None
+    return True, old.deleted_at or datetime.datetime.now(datetime.UTC)
 
 
 async def _resolve_income(
@@ -55,7 +61,7 @@ async def _resolve_income(
     old: IncomeCategory,
     target_budget_id: uuid.UUID,
     cache: dict[uuid.UUID, uuid.UUID],
-    adopt: bool = False,
+    fresh: bool = False,
 ) -> uuid.UUID:
     if old.id in cache:
         return cache[old.id]
@@ -69,19 +75,22 @@ async def _resolve_income(
             )
         )
     ).all()
-    match = _pick_preferring_state(list(candidates), old)
+    match = _pick(list(candidates), old)
     if match is None:
+        if old.translation_key is not None:
+            logger.warning("seed key created on remap: income %s", old.translation_key)
+        is_deleted, deleted_at = _created_state(old, fresh=fresh, parent_deleted=False)
         match = IncomeCategory(
             family_budget_id=target_budget_id,
             name=old.name,
             translation_key=old.translation_key,
             color_index=await assign_category_color(session, target_budget_id, kind="income"),
-            is_deleted=old.is_deleted,
-            deleted_at=old.deleted_at,
+            is_deleted=is_deleted,
+            deleted_at=deleted_at,
         )
         session.add(match)
         await session.flush()
-    elif adopt and match.translation_key == old.translation_key:
+    elif fresh and match.translation_key == old.translation_key:
         match.name = old.name
         match.color_index = old.color_index
     cache[old.id] = match.id
@@ -93,7 +102,7 @@ async def _resolve_expense(
     old: ExpenseCategory,
     target_budget_id: uuid.UUID,
     cache: dict[uuid.UUID, uuid.UUID],
-    adopt: bool = False,
+    fresh: bool = False,
 ) -> uuid.UUID:
     if old.id in cache:
         return cache[old.id]
@@ -102,36 +111,36 @@ async def _resolve_expense(
         return old.id
 
     target_parent_id: uuid.UUID | None = None
+    parent_deleted = False
     if old.parent_id is not None:
         old_parent = await session.get(ExpenseCategory, old.parent_id)
         if old_parent is not None:
             target_parent_id = await _resolve_expense(
-                session, old_parent, target_budget_id, cache, adopt
+                session, old_parent, target_budget_id, cache, fresh
             )
+            target_parent = await session.get(ExpenseCategory, target_parent_id)
+            parent_deleted = target_parent is not None and target_parent.is_deleted
 
-    candidates = (
-        await session.scalars(
-            select(ExpenseCategory).where(
-                ExpenseCategory.family_budget_id == target_budget_id,
-                ExpenseCategory.parent_id.is_(None)
-                if target_parent_id is None
-                else ExpenseCategory.parent_id == target_parent_id,
-            )
+    if old.translation_key is not None:
+        # a seed key identifies the row by itself: search the whole budget, ignore parent and state
+        stmt = select(ExpenseCategory).where(ExpenseCategory.family_budget_id == target_budget_id)
+    else:
+        stmt = select(ExpenseCategory).where(
+            ExpenseCategory.family_budget_id == target_budget_id,
+            ExpenseCategory.parent_id.is_(None)
+            if target_parent_id is None
+            else ExpenseCategory.parent_id == target_parent_id,
         )
-    ).all()
-    match = _pick_preferring_state(list(candidates), old)
-    if (
-        match is None
-        and old.translation_key in PARENT_FALLBACK
-        and target_parent_id is not None
-        and not old.is_deleted
-    ):
-        # seed sub-category with no counterpart in the target set: nearest parent
-        parent_live = await session.get(ExpenseCategory, target_parent_id)
-        if parent_live is not None and not parent_live.is_deleted:
-            cache[old.id] = target_parent_id
-            return target_parent_id
+    match = _pick(list((await session.scalars(stmt)).all()), old)
+    if match is None and old.translation_key in PARENT_FALLBACK and target_parent_id is not None:
+        # seed sub-category with no counterpart in the target set: the operation lies on the parent,
+        # in whatever state the target budget keeps it
+        cache[old.id] = target_parent_id
+        return target_parent_id
     if match is None:
+        if old.translation_key is not None:
+            logger.warning("seed key created on remap: %s", old.translation_key)
+        is_deleted, deleted_at = _created_state(old, fresh=fresh, parent_deleted=parent_deleted)
         match = ExpenseCategory(
             family_budget_id=target_budget_id,
             name=old.name,
@@ -141,12 +150,12 @@ async def _resolve_expense(
             color_index=await assign_category_color(
                 session, target_budget_id, kind="expense", parent_id=target_parent_id
             ),
-            is_deleted=old.is_deleted,
-            deleted_at=old.deleted_at,
+            is_deleted=is_deleted,
+            deleted_at=deleted_at,
         )
         session.add(match)
         await session.flush()
-    elif adopt and match.translation_key == old.translation_key:
+    elif fresh and match.translation_key == old.translation_key:
         match.name = old.name
         match.color_index = old.color_index
     cache[old.id] = match.id
@@ -162,12 +171,16 @@ async def remap_transaction_categories_to_budget(
 ) -> None:
     """Point moved transactions at categories of the target budget.
 
-    A category is matched by translation_key, then by its successor key in the other seed set
-    (budget_seed.LEGACY_TO_NEW_KEY / NEW_TO_LEGACY_KEY); custom ones by name. A deleted category
-    is matched only among deleted ones and is created deleted, so it never comes back to life.
-    When the target has none, the category is created there with the same name, parent, key, protection and a colour per
-    the usual sibling rules. `adopt_names` (fresh budget
-    seeded for the departing person): matched categories take the old name and colour. No moved operation loses its category.
+    Identity, not state: a category is matched by translation_key (then its successor key in the
+    other seed set, budget_seed.LEGACY_TO_NEW_KEY / NEW_TO_LEGACY_KEY) over the whole target
+    budget; a custom one by name under the resolved parent. Whether the matched row is deleted is
+    the target budget's decision and is never changed; the operation keeps that row. A seed
+    sub-category without a counterpart (PARENT_FALLBACK) goes to its parent.
+    Rows are created only for the person's own custom categories (and, for old mixed budgets, a
+    missing seed key). Joining: the created row is deleted if the person deleted it or if its parent
+    is deleted in the target. `adopt_names` marks leaving into a fresh budget: created rows are live
+    (unless the parent is deleted) and matched seed rows take the old name and colour.
+    No moved operation loses its category.
     """
     if not transactions:
         return

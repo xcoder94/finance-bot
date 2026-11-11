@@ -143,10 +143,25 @@ async def _live(session, budget_id):
 
 
 async def _assert_invariants(session, budget_id):
+    # I1/I2 over ALL rows, deleted included: one row per key, no live row under a deleted parent
+    all_exp = list(
+        await session.scalars(
+            select(ExpenseCategory).where(ExpenseCategory.family_budget_id == budget_id)
+        )
+    )
+    all_inc = list(
+        await session.scalars(
+            select(IncomeCategory).where(IncomeCategory.family_budget_id == budget_id)
+        )
+    )
+    for rows, label in ((all_exp, "expense"), (all_inc, "income")):
+        counts = Counter(c.translation_key for c in rows if c.translation_key)
+        assert all(n == 1 for n in counts.values()), (label, "duplicate key", counts)
+    by_id = {c.id: c for c in all_exp}
+    assert not [
+        c.name for c in all_exp if not c.is_deleted and c.parent_id and by_id[c.parent_id].is_deleted
+    ], "live child of a deleted parent"
     exp, inc = await _live(session, budget_id)
-    for group, label in ((exp, "expense"), (inc, "income")):
-        counts = Counter(c.translation_key for c in group if c.translation_key)
-        assert all(n == 1 for n in counts.values()), (label, counts)
     keys = {c.translation_key for c in exp + inc if c.translation_key}
     assert not ((keys & (LEGACY - NEW)) and (keys & (NEW - LEGACY))), "mixed sets"
     pre = [PrefilterCategory(c.id, c.name, c.translation_key, c.parent_id) for c in exp]
@@ -399,18 +414,36 @@ async def test_member_returning_to_family_with_deleted_category_changes_nothing(
         assert new_budget is not None
 
 
-async def test_bot_word_of_deleted_category_does_not_write_into_resurrected_one() -> None:
-    """After a join the word 'такси' behaves as before the join: no live taxi category."""
+async def test_bot_word_taxi_after_join_lands_in_the_live_family_category() -> None:
+    """The joiner deleted his own (not renamed) taxi; the family has a live taxi category.
+    After the join the word 'такси' writes into the family's live category, exactly one."""
     async with rollback_session() as session:
-        user, _b, _txns = await _solo_with_ops(session, 9_800_150, legacy=True)
+        user, solo = await create_user(session, telegram_id=9_800_150)
+        await copy_seed_categories_only(session, solo.id, legacy=True)
+        taxi = await session.scalar(
+            select(ExpenseCategory).where(
+                ExpenseCategory.family_budget_id == solo.id, ExpenseCategory.translation_key == "taxi"
+            )
+        )
+        wallet = make_wallet(solo, name="Мой", is_personal=True, owner_user_id=user.id)
+        session.add(wallet)
+        await session.flush()
+        session.add(
+            Transaction(
+                family_budget_id=solo.id, wallet_id=wallet.id, amount=1, type="expense",
+                expense_category_id=taxi.id, created_by_user_id=user.id,
+                transaction_date=datetime.datetime.now(datetime.UTC),
+            )
+        )
+        taxi.is_deleted, taxi.deleted_at = True, datetime.datetime.now(datetime.UTC)
         _owner, target = await _family(session, 9_800_160, legacy=False)
-        await _delete_in(session, target.id, "taxi_transit")
         await convert_join_with_own_budget(session, user=user, target=target)
         await session.flush()
+        await _assert_invariants(session, target.id)
         exp, _inc = await _live(session, target.id)
         pre = [PrefilterCategory(c.id, c.name, c.translation_key, c.parent_id) for c in exp]
         result = try_prefilter(
             "такси 20000", wallet_names=[], expense_categories=pre, income_categories=[]
         )
-        got = result.operation.category if result.operation else None
-        assert got not in ("Такси", "Такси и проезд", "Общественный транспорт")
+        assert result.operation is not None and result.operation.category == "Такси и проезд"
+        assert len([c for c in exp if c.translation_key in ("taxi", "taxi_transit")]) == 1
