@@ -10,7 +10,7 @@ from app.db import get_session
 from app.schemas.history_analytics import Currency, HistoryResponse
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import get_active_wallet
-from app.services.history_analytics import get_history, should_include_created_by
+from app.services.history_analytics import as_utc, get_history, should_include_created_by
 
 router = APIRouter(prefix="/api/v1")
 
@@ -28,6 +28,7 @@ async def list_transaction_history(
     uncategorized: bool = False,
     currency: Currency | None = None,
 ) -> HistoryResponse:
+    date_from, date_to = as_utc(date_from), as_utc(date_to)
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
     if wallet_id is not None:

@@ -41,6 +41,11 @@ def default_calendar_year_range(now: datetime | None = None) -> tuple[datetime, 
     return date_from, date_to
 
 
+def as_utc(value: datetime) -> datetime:
+    """A date without a time zone is read as UTC, so naive and aware dates can be compared."""
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
 def resolve_analytics_date_range(
     date_from: datetime | None,
     date_to: datetime | None,
@@ -50,6 +55,7 @@ def resolve_analytics_date_range(
         return default_calendar_year_range(now)
     if date_from is None or date_to is None:
         raise HTTPException(status_code=422, detail="date_from and date_to must both be provided or both omitted")
+    date_from, date_to = as_utc(date_from), as_utc(date_to)
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must not be after date_to")
     return date_from, date_to

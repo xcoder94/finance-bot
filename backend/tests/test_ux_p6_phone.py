@@ -175,10 +175,13 @@ async def test_listener_ignores_users_that_are_not_candidates(monkeypatch) -> No
 
 
 async def test_send_failure_is_swallowed(monkeypatch) -> None:
-    async def boom(*_a, **_k):
-        raise RuntimeError("blocked by user")
+    bot = AsyncMock()
+    bot.send_message = AsyncMock(side_effect=RuntimeError("blocked by user"))
 
-    monkeypatch.setattr(dpp, "_bot_send", boom)
+    async def fake_resolve_bot(_b):
+        return bot, False
+
+    monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
     await dpp.send_prompt(dpp.Claimed(telegram_id=1, language="ru"))  # must not raise
 
 

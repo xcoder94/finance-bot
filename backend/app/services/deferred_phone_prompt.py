@@ -7,7 +7,7 @@ sent once to the bot chat. Event-driven (SQLAlchemy session events), no schedule
 Hot path: the decision is first made on the already loaded User row (is_candidate); for
 every existing user (eligible_at IS NULL) it is false and nothing else happens. Only a
 candidate costs one LIMIT-3 count and, at >= 3, one race-safe UPDATE ... RETURNING that
-claims the send. If the send fails after the claim the user is not asked again.
+claims the send. If the send fails the claim is released, so a later operation asks again (delivered -> once).
 
 The phone number is never logged.
 """
@@ -23,7 +23,6 @@ from typing import Any
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
-from app.config import BOT_TOKEN
 from app.db import async_session_factory
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -42,6 +41,7 @@ _tasks: set[asyncio.Task[None]] = set()
 class Claimed:
     telegram_id: int
     language: str
+    user_id: uuid.UUID | None = None
 
 
 def is_candidate(user: Any) -> bool:
@@ -76,29 +76,50 @@ async def claim(session: Any, user_id: uuid.UUID) -> Claimed | None:
     ).first()
     if row is None:
         return None
-    return Claimed(telegram_id=row.telegram_id, language=row.language)
+    return Claimed(telegram_id=row.telegram_id, language=row.language, user_id=user_id)
 
 
-async def _bot_send(telegram_id: int, language: str) -> None:
-    from aiogram import Bot
-
-    from bot.phone_prompt import prompt_keyboard, prompt_text
-
-    bot = Bot(token=BOT_TOKEN)
-    try:
-        await bot.send_message(
-            telegram_id, prompt_text(language), reply_markup=prompt_keyboard(language)
+async def _release_claim(user_id: uuid.UUID) -> None:
+    """The prompt did not reach the person: give the claim back so a later operation asks again."""
+    async with async_session_factory() as session:
+        await session.execute(
+            text(
+                "UPDATE users SET phone_prompted_at = NULL WHERE id = :u "
+                "AND phone_prompt_closed_at IS NULL AND phone IS NULL"
+            ),
+            {"u": user_id},
         )
-    finally:
-        await bot.session.close()
+        await session.commit()
 
 
 async def send_prompt(claimed: Claimed) -> None:
+    """Same safe path as the other notices (short timeout, errors logged by type only).
+
+    Delivered -> done, never again. Not delivered -> the claim is released, so the person is
+    asked after one of their next operations instead of never.
+    """
+    from app.services import goal_notify
+    from bot.phone_prompt import prompt_keyboard, prompt_text
+
+    bot, owned = await goal_notify.resolve_bot(None)
     try:
-        await _bot_send(claimed.telegram_id, claimed.language)
-    except Exception:
-        # Already claimed: "once" wins, refusing or missing the prompt blocks nothing.
-        logger.warning("deferred phone prompt not delivered", exc_info=True)
+        delivered = await goal_notify.send_notice_safe(
+            bot,
+            claimed.telegram_id,
+            prompt_text(claimed.language),
+            reply_markup=prompt_keyboard(claimed.language),
+        )
+    finally:
+        if owned:
+            try:
+                await bot.session.close()
+            except Exception:  # noqa: BLE001
+                pass
+    if not delivered and claimed.user_id is not None:
+        try:
+            await _release_claim(claimed.user_id)
+        except Exception:  # noqa: BLE001
+            logger.warning("deferred phone prompt claim not released", exc_info=True)
 
 
 async def run_for_user(user_id: uuid.UUID) -> None:
