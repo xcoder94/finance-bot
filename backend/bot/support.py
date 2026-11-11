@@ -43,7 +43,7 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "quick_3": {
         "ru": "Вопрос по категориям или кошелькам",
-        "uz": "Kategoriyalar yoki hamyonlar bo'yicha savol",
+        "uz": "Toifalar yoki hamyonlar bo'yicha savol",
     },
     "quick_4": {
         "ru": "Не приходят уведомления",

@@ -87,3 +87,51 @@ def test_strip_parent_category():
     assert strip_parent_category("Такси") == "Такси"
     assert strip_parent_category(None) is None
     assert strip_parent_category("  Еда: Рестораны  ") == "Рестораны"
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "kecha taksi 20 ming",
+        "taksi 20 ming kecha",
+        "Kecha taksi 20 ming",
+        "кеча такси 20 минг",
+        "такси 20 минг кеча",
+    ],
+)
+def test_uz_kecha_is_yesterday(text):
+    assert resolve_operation_date(text, now=NOW) == YESTERDAY
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "o'tgan kuni taksi 20 ming",
+        "oʻtgan kuni taksi 20 ming",
+        "o’tgan kuni taksi",
+        "avval kuni taksi 20 ming",
+        "ўтган куни такси 20 минг",
+        "аввал куни такси 20 минг",
+    ],
+)
+def test_uz_day_before_yesterday(text):
+    assert resolve_operation_date(text, now=NOW) == date(2026, 8, 3)
+
+
+@pytest.mark.parametrize("text", ["bugun taksi 20 ming", "бугун такси 20 минг"])
+def test_uz_bugun_is_today(text):
+    assert resolve_operation_date(text, now=NOW) == TODAY
+
+
+def test_uz_date_words_stripped_from_comment():
+    assert strip_date_words("kecha taksi", "kecha taksi 20 ming") == "taksi"
+    assert strip_date_words("o'tgan kuni taksi", "o'tgan kuni taksi 20 ming") == "taksi"
+    assert strip_date_words("bugun taksi", "bugun taksi 20 ming") == "taksi"
+    assert strip_date_words("кеча такси", "кеча такси 20 минг") == "такси"
+
+
+def test_uz_kechasi_not_a_date_word():
+    assert resolve_operation_date("kechasi taksi 20 ming", now=NOW) == TODAY

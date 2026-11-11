@@ -451,6 +451,20 @@ async def _process_parsed_response(
         await message.answer(catalogue_t(user, "quick.no_amount"))
         return
 
+    for big in response.operations:
+        if big.amount is not None and big.amount > MAX_AMOUNT:
+            what = (big.comment or big.category or "").strip() or (
+                "операция" if user.language == "ru" else "amal"
+            )
+            await message.answer(
+                catalogue_t(
+                    user,
+                    "quick.amount_too_large_partial",
+                    what=what[:60],
+                    amount=format_number(big.amount),
+                    max=format_number(MAX_AMOUNT),
+                )
+            )
     op_date = _resolve_op_date(source_text, response, today)
     txn_datetime = _operation_date_to_datetime(op_date)
 

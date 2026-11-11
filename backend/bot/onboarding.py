@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import MINI_APP_URL
 from app.db import async_session_factory
-from app.models.family_budget import FamilyBudget
+from app.models.family_budget import FamilyBudget, default_budget_name
 from app.models.user import User
 from app.services.budget_seed import (
     SEED_EXPENSE_CATEGORIES,
@@ -281,7 +281,9 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                 existing_language = existing_user.language
             elif flow == "owner":
                 invite_token = secrets.token_urlsafe(16)
-                budget = FamilyBudget(invite_token=invite_token)
+                budget = FamilyBudget(
+                    invite_token=invite_token, name=default_budget_name(language)
+                )
                 session.add(budget)
                 await session.flush()
 

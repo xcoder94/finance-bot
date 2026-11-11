@@ -365,3 +365,47 @@ def test_no_family_budget_string_in_bot_texts() -> None:
     for entry in CATALOGUE.values():
         for text in entry.values():
             assert "Family Budget" not in text
+
+
+# ------------------------------------------- r2 #5: partial save + notice
+
+
+class _TwoOpsParser:
+    def __init__(self, big_first: bool) -> None:
+        self.big_first = big_first
+
+    async def parse(self, request: Any) -> ParseResponse:
+        big = ParsedOperation(
+            type="expense", amount=3_000_000_000, currency="UZS",
+            wallet_hint=None, category="Такси", comment="такси",
+        )
+        ok = ParsedOperation(
+            type="expense", amount=5000, currency="UZS",
+            wallet_hint=None, category="Такси", comment="хлеб",
+        )
+        return ParseResponse(operations=[big, ok] if self.big_first else [ok, big])
+
+
+@pytest.mark.parametrize("big_first", [True, False])
+@pytest.mark.parametrize("lang", ["ru", "uz"])
+async def test_over_max_op_reported_next_to_saved_op(monkeypatch, big_first, lang) -> None:
+    async with rollback_session() as session:
+        user, budget = await create_user(
+            session, telegram_id=9_610_030 + (1 if big_first else 0) + (2 if lang == "uz" else 0)
+        )
+        user.language = lang
+        await seed_taxi_setup(session, user, budget)
+        monkeypatch.setattr(
+            "bot.quick_entry.handlers.async_session_factory", SessionFactory(session)
+        )
+        set_parser_override(_TwoOpsParser(big_first))
+        msg = _message(user.telegram_id, "такси 3000000000 хлеб 5000")
+        await handle_quick_entry_text(msg, SimpleNamespace())
+        texts = [c.args[0] for c in msg.answer.await_args_list]
+        assert len(texts) == 2
+        notice = [x for x in texts if "3 000 000 000" in x]
+        assert len(notice) == 1
+        assert "2 000 000 000" in notice[0]
+        assert "такси" in notice[0].lower() or "taksi" in notice[0].lower()
+        card = [x for x in texts if x is not notice[0]][0]
+        assert "5 000" in card

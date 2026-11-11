@@ -7,6 +7,11 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKe
 
 
 DEFAULT_BUDGET_NAME = "Семейный бюджет"
+DEFAULT_BUDGET_NAME_UZ = "Oilaviy byudjet"
+
+
+def default_budget_name(language: str | None) -> str:
+    return DEFAULT_BUDGET_NAME_UZ if language == "uz" else DEFAULT_BUDGET_NAME
 
 
 class FamilyBudget(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin):

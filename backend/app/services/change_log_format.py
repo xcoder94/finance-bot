@@ -133,6 +133,14 @@ DEFAULT_ENTITY_UZ: dict[str, str] = {
     "xls_utilities_other": "Boshqa kommunal", "xls_taxes": "Soliqlar",
     "xls_phone_installment": "Telefon nasiyasi", "xls_archive": "Excel arxivi",
     "xls_opening_balance": "Boshlang'ich qoldiq",
+    # new-budget default set (ux-p6)
+    "cafes_delivery": "Kafe va yetkazib berish", "taxi_transit": "Taksi va yo'l haqi",
+    "car": "Avtomobil", "utilities_telecom": "Kommunal va aloqa",
+    "home_repairs": "Ta'mir va uy jihozlari", "kids_learning": "O'qish va to'garaklar",
+    "drugstore": "Dorixona", "doctors": "Shifokorlar", "toi_gifts": "To'ylar va sovg'alar",
+    "family_help": "Yaqinlarga yordam", "personal_leisure": "Shaxsiy va dam olish",
+    "fun_subscriptions": "Ko'ngilochar va obunalar",
+    "business_side_job": "Biznes va qo'shimcha ish", "transfers_gifts": "O'tkazmalar va sovg'alar",
 }
 
 

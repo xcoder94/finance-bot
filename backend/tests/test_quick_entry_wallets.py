@@ -2,7 +2,7 @@ import socket
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from tests.db_helpers import db_address
 import pytest
@@ -158,8 +158,13 @@ class TestListWalletsForParse:
     async def test_limits_shared_wallets_to_ten(self) -> None:
         async with rollback_session() as session:
             user, budget = await create_user(session, telegram_id=1_003_001_001)
+            # created_at defaults to now() = the transaction start, identical for every row of
+            # one test transaction; set distinct values so the oldest-first order is deterministic.
+            base = datetime(2026, 1, 1, tzinfo=UTC)
             for i in range(12):
-                session.add(make_wallet(budget, name=f"Shared-{i:02d}"))
+                w = make_wallet(budget, name=f"Shared-{i:02d}")
+                w.created_at = base + timedelta(minutes=i)
+                session.add(w)
             session.add(
                 make_wallet(
                     budget,

@@ -31,9 +31,21 @@ _WEEKDAY_RE = re.compile(
     re.IGNORECASE,
 )
 _PROSHL_RE = re.compile(r"прошл(?:ый|ую|ое|ая)", re.IGNORECASE)
+_APOS = "['\u02bb\u02bc\u2018\u2019`\u2032]?"
+_B0 = r"(?<![\w'])"
+_B1 = r"(?!\w)"
+_UZ_DAY_BEFORE_RE = re.compile(
+    _B0 + r"(?:o" + _APOS + r"tgan|avval|avvalgi|ўтган|аввал)\s+(?:kuni|куни)" + _B1,
+    re.IGNORECASE,
+)
+_UZ_YESTERDAY_RE = re.compile(_B0 + r"(?:kecha|кеча)" + _B1, re.IGNORECASE)
+_UZ_TODAY_RE = re.compile(_B0 + r"(?:bugun|бугун)" + _B1, re.IGNORECASE)
 _DATE_MARKER_RES = [
     re.compile(r"позавчера", re.IGNORECASE),
     re.compile(r"вчера", re.IGNORECASE),
+    _UZ_DAY_BEFORE_RE,
+    _UZ_YESTERDAY_RE,
+    _UZ_TODAY_RE,
     _DAYS_AGO_RE,
     _WEEKDAY_RE,
 ]
@@ -93,6 +105,15 @@ def resolve_operation_date(text: str, now: datetime | None = None) -> date:
 
     if re.search(r"вчера", text, re.IGNORECASE):
         return _finalize_date(today - timedelta(days=1), today)
+
+    if _UZ_DAY_BEFORE_RE.search(text):
+        return _finalize_date(today - timedelta(days=2), today)
+
+    if _UZ_YESTERDAY_RE.search(text):
+        return _finalize_date(today - timedelta(days=1), today)
+
+    if _UZ_TODAY_RE.search(text):
+        return today
 
     days_ago_match = _DAYS_AGO_RE.search(text)
     if days_ago_match:

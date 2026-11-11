@@ -20,7 +20,7 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "ru": "Chontak — семейный бюджет.\n\n" + _WELCOME_TAIL_RU
         + "Кошельки, категории и аналитика — в приложении.",
         "uz": "Chontak — oilaviy byudjet.\n\n" + _WELCOME_TAIL_UZ
-        + "Hamyonlar, kategoriyalar va tahlil — ilovada.",
+        + "Hamyonlar, toifalar va tahlil — ilovada.",
     },
     "welcome.invited": {
         "ru": "Вы присоединились к бюджету «{budget_name}».\n"
@@ -64,6 +64,10 @@ CATALOGUE: dict[str, dict[str, str]] = {
     "quick.amount_too_large": {
         "ru": "Слишком большая сумма — больше {max} сум записать нельзя. Проверьте число.",
         "uz": "Summa juda katta — {max} so'mdan ko'p yozib bo'lmaydi. Raqamni tekshiring.",
+    },
+    "quick.amount_too_large_partial": {
+        "ru": "Не записал «{what}» — сумма {amount} сум больше допустимых {max}. Проверьте число.",
+        "uz": "«{what}» yozilmadi — {amount} so'm summa ruxsat etilgan {max} so'mdan katta. Raqamni tekshiring.",
     },
     # --- quick entry: errors and limits (ux-p5-backend-b) ---
     "quick.too_long": {
@@ -278,7 +282,7 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "Владелец распоряжается общими кошельками, категориями и участниками.\n"
         "Прежний владелец останется обычным участником.",
         "uz": "Sizni «{budget_name}» byudjetining egasi qilishni taklif qilishyapti.\n\n"
-        "Egasi umumiy hamyonlar, kategoriyalar va a'zolarni boshqaradi.\n"
+        "Egasi umumiy hamyonlar, toifalar va a'zolarni boshqaradi.\n"
         "Avvalgi egasi oddiy a'zo bo'lib qoladi.",
     },
     "member.transfer_accepted_to_former": {

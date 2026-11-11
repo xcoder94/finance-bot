@@ -266,3 +266,14 @@ async def test_history_parent_filter_includes_subcategories_and_deleted(api_clie
     # filtering by a subcategory still returns only that subcategory
     assert await amounts(groceries.id) == [600_000]
     assert await amounts(taxi.id) == [400_000]
+
+
+def test_resolve_previous_period_october_gives_september_dates():
+    # r2 #8: a whole 31-day month is compared with the real previous month (30 days);
+    # prev_date_from/prev_date_to carry the honest bounds, the label is the client's job.
+    pf, pt = resolve_previous_period(
+        datetime(2026, 10, 1, tzinfo=TZ), datetime(2026, 10, 31, 23, 59, 59, 999000, tzinfo=TZ)
+    )
+    assert pf == datetime(2026, 9, 1, tzinfo=TZ)
+    assert pt.astimezone(TZ).date().isoformat() == "2026-09-30"
+    assert (pt.astimezone(TZ).date() - pf.astimezone(TZ).date()).days + 1 == 30

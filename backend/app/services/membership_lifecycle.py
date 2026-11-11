@@ -8,7 +8,7 @@ from aiogram import Bot
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.family_budget import FamilyBudget
+from app.models.family_budget import FamilyBudget, default_budget_name
 from app.models.goal import Goal
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -169,7 +169,10 @@ async def detach_member_to_own_budget(
 
     old_budget_name = old_budget.name
 
-    new_budget = FamilyBudget(invite_token=secrets.token_urlsafe(16))
+    new_budget = FamilyBudget(
+        invite_token=secrets.token_urlsafe(16),
+        name=default_budget_name(departing_user.language),
+    )
     session.add(new_budget)
     await session.flush()
 
