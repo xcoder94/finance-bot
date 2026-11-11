@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { useNativeBackButtonOverlay } from '../../components/nativeBackButtonContext'
@@ -22,6 +23,7 @@ import {
   type PeriodTab,
   type SelectedMonth,
 } from '../../utils/periodFilter'
+import { createFilteredHistoryEntry } from '../../utils/filteredHistoryEntry'
 import type { Currency } from '../../utils/formatCurrency'
 import { AnalyticsChartsTab } from './AnalyticsChartsTab'
 import { AnalyticsHistoryTab } from './AnalyticsHistoryTab'
@@ -90,11 +92,33 @@ export function AnalyticsLayout() {
   }, [])
 
   const backTarget = analyticsBackTarget(activeTab, historyCategoryFilter)
-  const handleNativeBack = useCallback(() => {
-    if (backTarget) {
-      setActiveTab(backTarget)
-    }
-  }, [backTarget, setActiveTab])
+  const navigate = useNavigate()
+  const location = useLocation()
+  const latest = useRef({ navigate, location, backTarget, setActiveTab })
+  latest.current = { navigate, location, backTarget, setActiveTab }
+  const [filteredEntry] = useState(() =>
+    createFilteredHistoryEntry({
+      push: () => {
+        const { navigate: go, location: loc } = latest.current
+        go(`${loc.pathname}${loc.search}${loc.hash}`, { state: loc.state })
+      },
+      back: () => latest.current.navigate(-1),
+      leaveFilteredView: () => {
+        const { backTarget: target, setActiveTab: setTab } = latest.current
+        if (target) setTab(target)
+      },
+    }),
+  )
+  useEffect(() => {
+    const onPop = () => filteredEntry.onPopState()
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [filteredEntry])
+  const filteredHistoryShown = backTarget !== null
+  useEffect(() => {
+    filteredEntry.onActiveChange(filteredHistoryShown)
+  }, [filteredEntry, filteredHistoryShown])
+  const handleNativeBack = useCallback(() => filteredEntry.requestBack(), [filteredEntry])
   useNativeBackButtonOverlay(backTarget !== null, handleNativeBack)
 
   const { range, rangeOrderInvalid } = useResolvedRange(
