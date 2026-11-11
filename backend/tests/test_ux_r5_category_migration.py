@@ -21,6 +21,7 @@ from app.services.budget_seed import (
     PARENT_FALLBACK,
     SEED_EXPENSE_CATEGORIES,
     SEED_INCOME_CATEGORIES,
+    budget_uses_legacy_set,
     copy_seed_categories_only,
 )
 from app.services.membership_lifecycle import (
@@ -155,7 +156,7 @@ async def _assert_invariants(session, budget_id):
     taxi_keys = {"taxi", "taxi_transit"} & keys
     renamed = any(c.translation_key in taxi_keys and c.name not in ("Такси", "Такси и проезд")
                   for c in exp)
-    if not renamed:
+    if taxi_keys and not renamed:
         assert result.operation is not None, result.reason
         assert result.operation.category in ("Такси", "Такси и проезд")
 
@@ -303,3 +304,113 @@ async def test_three_cycles_join_leave_delete_keep_invariants() -> None:
         await _refresh(session, txns)
         exp, _inc = await _live(session, current.id)
         assert not {c.translation_key for c in exp} & (LEGACY - NEW)
+
+
+# ---- ux-r8: a category deleted in the TARGET family never comes back to life on join ----
+
+
+async def _delete_in(session, budget_id, *keys):
+    now = datetime.datetime.now(datetime.UTC)
+    for model in (ExpenseCategory, IncomeCategory):
+        for c in await session.scalars(
+            select(model).where(
+                model.family_budget_id == budget_id, model.translation_key.in_(keys)
+            )
+        ):
+            c.is_deleted = True
+            c.deleted_at = now
+    await session.flush()
+
+
+async def _all_keys(session, budget_id, *, live):
+    out = set()
+    for model in (ExpenseCategory, IncomeCategory):
+        stmt = select(model).where(model.family_budget_id == budget_id)
+        if live:
+            stmt = stmt.where(model.is_deleted.is_(False))
+        out |= {c.translation_key for c in await session.scalars(stmt) if c.translation_key}
+    return out
+
+
+async def _txn_cats(session, txns):
+    res = {}
+    for label, t in txns.items():
+        await session.refresh(t)
+        if t.expense_category_id:
+            res[label] = await session.get(ExpenseCategory, t.expense_category_id)
+        else:
+            res[label] = await session.get(IncomeCategory, t.income_category_id)
+    return res
+
+
+@pytest.mark.parametrize(
+    ("user_legacy", "family_legacy", "deleted", "moved"),
+    [
+        # QA repeat 1: new family deleted taxi; old user (taxi, public_transport) joins
+        (True, False, ["taxi_transit"], ["e:taxi", "e:public_transport"]),
+        # QA repeat 2: new family deleted cafes_delivery; old user with delivery joins
+        (True, False, ["cafes_delivery"], ["e:delivery", "e:cafes_restaurants"]),
+        # QA repeat 3: old family deleted fuel; new user (car) joins
+        (False, True, ["fuel"], ["e:car"]),
+        # incomes, both directions
+        (True, False, ["business_side_job"], ["i:side_job"]),
+        (False, True, ["side_job"], ["i:business_side_job"]),
+    ],
+)
+async def test_category_deleted_in_target_family_stays_deleted(
+    user_legacy, family_legacy, deleted, moved
+) -> None:
+    async with rollback_session() as session:
+        user, _b, txns = await _solo_with_ops(session, 9_800_110, legacy=user_legacy)
+        _owner, target = await _family(session, 9_800_120, legacy=family_legacy)
+        await _delete_in(session, target.id, *deleted)
+        live_before = await _all_keys(session, target.id, live=True)
+        set_before = await budget_uses_legacy_set(session, target.id)
+        await convert_join_with_own_budget(session, user=user, target=target)
+        await session.flush()
+        cats = await _txn_cats(session, txns)
+        # nothing deleted came back: live keys of the family are unchanged by the join
+        assert (await _all_keys(session, target.id, live=True)) - live_before <= set()
+        assert await budget_uses_legacy_set(session, target.id) is set_before
+        for label in moved:
+            cat = cats[label]
+            assert cat.family_budget_id == target.id
+            # the operation lies in the family's deleted category, not in a resurrected one
+            assert cat.is_deleted is True, (label, cat.name)
+        await _assert_invariants(session, target.id)
+
+
+async def test_member_returning_to_family_with_deleted_category_changes_nothing() -> None:
+    async with rollback_session() as session:
+        _owner, fam = await _family(session, 9_800_130, legacy=False)
+        await _delete_in(session, fam.id, "taxi_transit")
+        user, _b, txns = await _solo_with_ops(session, 9_800_140, legacy=True)
+        live_before = await _all_keys(session, fam.id, live=True)
+        for _ in range(2):
+            await convert_join_with_own_budget(session, user=user, target=fam)
+            await session.flush()
+            new_budget = await detach_member_to_own_budget(
+                session, departing_user=user, old_budget=fam, reason="left", bot=AsyncMock()
+            )
+            await session.flush()
+            user.role = "owner"
+            assert await _all_keys(session, fam.id, live=True) == live_before
+            assert await budget_uses_legacy_set(session, fam.id) is False
+        assert new_budget is not None
+
+
+async def test_bot_word_of_deleted_category_does_not_write_into_resurrected_one() -> None:
+    """After a join the word 'такси' behaves as before the join: no live taxi category."""
+    async with rollback_session() as session:
+        user, _b, _txns = await _solo_with_ops(session, 9_800_150, legacy=True)
+        _owner, target = await _family(session, 9_800_160, legacy=False)
+        await _delete_in(session, target.id, "taxi_transit")
+        await convert_join_with_own_budget(session, user=user, target=target)
+        await session.flush()
+        exp, _inc = await _live(session, target.id)
+        pre = [PrefilterCategory(c.id, c.name, c.translation_key, c.parent_id) for c in exp]
+        result = try_prefilter(
+            "такси 20000", wallet_names=[], expense_categories=pre, income_categories=[]
+        )
+        got = result.operation.category if result.operation else None
+        assert got not in ("Такси", "Такси и проезд", "Общественный транспорт")

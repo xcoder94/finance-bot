@@ -38,6 +38,18 @@ def _pick(candidates: list, old):
     )
 
 
+def _pick_preferring_state(candidates: list, old):
+    """Same liveness first. A LIVE old category whose counterpart exists in the target only as
+    deleted resolves to that deleted one (the family deleted it: it must not come back to life,
+    and the operation keeps its own category so no sums move). A deleted old category never
+    matches a live one."""
+    same = [c for c in candidates if c.is_deleted == old.is_deleted]
+    hit = _pick(same, old)
+    if hit is None and not old.is_deleted:
+        hit = _pick([c for c in candidates if c.is_deleted], old)
+    return hit
+
+
 async def _resolve_income(
     session: AsyncSession,
     old: IncomeCategory,
@@ -54,11 +66,10 @@ async def _resolve_income(
         await session.scalars(
             select(IncomeCategory).where(
                 IncomeCategory.family_budget_id == target_budget_id,
-                IncomeCategory.is_deleted.is_(old.is_deleted),
             )
         )
     ).all()
-    match = _pick(list(candidates), old)
+    match = _pick_preferring_state(list(candidates), old)
     if match is None:
         match = IncomeCategory(
             family_budget_id=target_budget_id,
@@ -102,14 +113,13 @@ async def _resolve_expense(
         await session.scalars(
             select(ExpenseCategory).where(
                 ExpenseCategory.family_budget_id == target_budget_id,
-                ExpenseCategory.is_deleted.is_(old.is_deleted),
                 ExpenseCategory.parent_id.is_(None)
                 if target_parent_id is None
                 else ExpenseCategory.parent_id == target_parent_id,
             )
         )
     ).all()
-    match = _pick(list(candidates), old)
+    match = _pick_preferring_state(list(candidates), old)
     if (
         match is None
         and old.translation_key in PARENT_FALLBACK
