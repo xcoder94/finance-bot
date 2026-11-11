@@ -81,3 +81,23 @@ export function isQuietHistoryRefresh(
 ): boolean {
   return hasItems && previousIdentity === identity
 }
+
+export type KeyedSummary<T> = { key: string; data: T }
+
+/** A request for another period/filter clears the old summary; the same one keeps what is shown. */
+export function summaryForRequest<T>(
+  shown: KeyedSummary<T> | null,
+  key: string,
+): KeyedSummary<T> | null {
+  return shown !== null && shown.key === key ? shown : null
+}
+
+/** A failed refresh never blanks the summary of the same period; a success replaces it. */
+export function summaryAfterResult<T>(
+  shown: KeyedSummary<T> | null,
+  key: string,
+  data: T | null,
+): KeyedSummary<T> | null {
+  if (data !== null) return { key, data }
+  return summaryForRequest(shown, key)
+}

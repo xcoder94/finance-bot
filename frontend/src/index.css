@@ -79,7 +79,7 @@
   --app-category-color-6: #357a25;
   --app-category-color-7: #6250b5;
   --app-category-color-8: #c43d44;
-  --app-category-color-neutral: #727d89;
+  --app-category-color-neutral: #4b5663;
   --app-category-color-other: #858b92;
 }
 
@@ -4614,14 +4614,6 @@ a.tabbar-link:active {
 @media (max-width: 360px) {
   .home-ops-row {
     gap: 8px;
-  }
-
-  .home-ops-row__title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    white-space: normal;
-    overflow-wrap: anywhere;
   }
 
   .home-ops-row__amount {

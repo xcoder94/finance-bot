@@ -16,6 +16,9 @@ import {
   isAnalyticsHistoryUncategorized,
   isQuietHistoryRefresh,
   planSilentHistoryRefresh,
+  summaryAfterResult,
+  summaryForRequest,
+  type KeyedSummary,
 } from '../../utils/analyticsHistoryTab'
 import { applyClearHistoryFilter } from '../../utils/analyticsTabState'
 import { HistorySummaryLine } from './HistorySummaryLine'
@@ -57,23 +60,26 @@ export function AnalyticsHistoryTab() {
   const loadedCount = useRef(0)
   loadedCount.current = historyItems.length
 
-  const [summary, setSummary] = useState<SummaryResponse | null>(null)
+  const [summaryState, setSummaryState] = useState<KeyedSummary<SummaryResponse> | null>(null)
+  const summary = summaryState?.data ?? null
 
   useEffect(() => {
     if (!range || !rangeFetchEnabled) {
-      setSummary(null)
+      setSummaryState(null)
       return
     }
     let cancelled = false
+    const key = `${range.dateFrom}|${range.dateTo}`
+    setSummaryState((shown) => summaryForRequest(shown, key))
     void fetchSummaryForRange(range.dateFrom, range.dateTo)
       .then((data) => {
         if (!cancelled) {
-          setSummary(data)
+          setSummaryState((shown) => summaryAfterResult(shown, key, data))
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setSummary(null)
+          setSummaryState((shown) => summaryAfterResult(shown, key, null))
         }
       })
     return () => {

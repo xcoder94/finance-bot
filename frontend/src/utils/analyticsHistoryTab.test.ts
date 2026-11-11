@@ -10,6 +10,8 @@ import {
   historyCurrencyParam,
   getAnalyticsHistoryExpenseCategoryId,
   isAnalyticsHistoryUncategorized,
+  summaryAfterResult,
+  summaryForRequest,
   isQuietHistoryRefresh,
   planSilentHistoryRefresh,
 } from './analyticsHistoryTab'
@@ -116,5 +118,28 @@ describe('polish2: quiet history refresh keeps loaded rows', () => {
     expect(isQuietHistoryRefresh('a', 'b', true)).toBe(false)
     expect(isQuietHistoryRefresh(null, 'a', true)).toBe(false)
     expect(isQuietHistoryRefresh('a', 'a', false)).toBe(false)
+  })
+})
+
+describe('polish3: history summary follows the period', () => {
+  const a = { by_currency: [{ currency: 'UZS', income: 1, expense: 2 }] } as never
+  const b = { by_currency: [{ currency: 'UZS', income: 3, expense: 4 }] } as never
+  it('a new period clears the old summary until the new one arrives', () => {
+    const shown = { key: 'jan', data: a }
+    expect(summaryForRequest(shown, 'feb')).toBeNull()
+  })
+  it('the same period keeps what is shown', () => {
+    const shown = { key: 'jan', data: a }
+    expect(summaryForRequest(shown, 'jan')).toBe(shown)
+  })
+  it('a failed quiet refresh of the same period keeps the old summary', () => {
+    const shown = { key: 'jan', data: a }
+    expect(summaryAfterResult(shown, 'jan', null)).toBe(shown)
+  })
+  it('a failure for a different period leaves nothing', () => {
+    expect(summaryAfterResult({ key: 'jan', data: a }, 'feb', null)).toBeNull()
+  })
+  it('a success replaces', () => {
+    expect(summaryAfterResult({ key: 'jan', data: a }, 'jan', b)).toEqual({ key: 'jan', data: b })
   })
 })

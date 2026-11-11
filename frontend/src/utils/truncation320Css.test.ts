@@ -28,10 +28,13 @@ describe('frequent-category chips are capped and truncated (designer P1)', () =>
 })
 
 describe('history rows at 320 px give the title room and never cut the amount (designer P1)', () => {
-  it('title may use two lines', () => {
-    const rule = narrowRule('.home-ops-row__title')
-    expect(rule).toContain('-webkit-line-clamp: 2')
-    expect(rule).toContain('white-space: normal')
+  it('title is never broken in the middle of a word: wraps by words or is cut with an ellipsis', () => {
+    const media = css.slice(css.indexOf('/* P1 polish: 320 px truncation */'), css.indexOf('/* end P1 polish */'))
+    expect(media).not.toContain('overflow-wrap: anywhere')
+    expect(media).not.toContain('word-break: break-all')
+    const base = css.match(/\n\.home-ops-row__title \{[^}]*\}/)?.[0] ?? ''
+    expect(base).toContain('text-overflow: ellipsis')
+    expect(base).toContain('white-space: nowrap')
   })
   it('amount steps down to 13px and still never wraps or gets cut', () => {
     const rule = narrowRule('.home-ops-row__amount')

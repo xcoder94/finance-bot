@@ -58,7 +58,7 @@ describe('«Другое» has its own colour (QA #6)', () => {
     expect(vars).toEqual([
       ['neutral', '#8e9aa7'],
       ['other', '#6b7280'],
-      ['neutral', '#727d89'],
+      ['neutral', '#4b5663'],
       ['other', '#858b92'],
     ])
     const hue = (hex: string) => {
@@ -175,6 +175,28 @@ describe('polish2: «Другое» in the light theme reads against the page (>
   it('contrast with the white page and the grey card is at least 3:1', () => {
     expect(ratio(other, '#ffffff')).toBeGreaterThanOrEqual(3)
     expect(ratio(other, '#f1f3f5')).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('polish3: «Другое» and «Без категории» are told apart in the light theme', () => {
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const ratio = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+  const light = (name: string) =>
+    [...css.matchAll(new RegExp(`--app-category-color-${name}: (#[0-9a-f]{6});`, 'g'))][1]?.[1] ?? ''
+  it('the two greys differ by at least 1.8:1 in luminance', () => {
+    expect(ratio(light('other'), light('neutral'))).toBeGreaterThanOrEqual(1.8)
+  })
+  it('both still readable on white', () => {
+    expect(ratio(light('neutral'), '#ffffff')).toBeGreaterThanOrEqual(3)
   })
 })
 
