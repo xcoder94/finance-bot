@@ -1,3 +1,4 @@
+import { useDataCacheStore } from '../../store/dataCacheStore'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -21,6 +22,7 @@ import { editRouteForItem } from '../../utils/editRouteForItem'
 const HISTORY_PAGE_SIZE = 50
 
 export function AnalyticsHistoryTab() {
+  const homeEpoch = useDataCacheStore((state) => state.homeEpoch)
   const { t } = useTranslation()
   const navigate = useNavigate()
   const {
@@ -153,7 +155,7 @@ export function AnalyticsHistoryTab() {
     return () => {
       cancelled = true
     }
-  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, currencyParam, historyRetryCount])
+  }, [range, rangeFetchEnabled, historyFetchKey, expenseCategoryId, uncategorized, currencyParam, historyRetryCount, homeEpoch])
 
   const shownItems = useMemo(
     () => (filterActive ? excludePersonalWalletRows(historyItems, personalWalletIds) : historyItems),

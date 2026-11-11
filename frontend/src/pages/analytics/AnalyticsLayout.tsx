@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useNativeBackButtonOverlay } from '../../components/nativeBackButtonContext'
 import { PeriodFilterControls } from '../../components/PeriodFilterControls'
+import { useDataCacheStore } from '../../store/dataCacheStore'
 import { AnalyticsProvider } from '../../contexts/AnalyticsContext'
 import {
   createDefaultAnalyticsShellState,
@@ -129,7 +130,9 @@ export function AnalyticsLayout() {
   )
   const rangeKey = range ? `${range.dateFrom}|${range.dateTo}` : 'invalid'
   const rangeFetchEnabled = range !== null
-  const fetchKey = `${rangeKey}|${currency}`
+  // homeEpoch moves on every data change and on a return to the app (useRefreshOnReturn)
+  const homeEpoch = useDataCacheStore((state) => state.homeEpoch)
+  const fetchKey = `${rangeKey}|${currency}|${homeEpoch}`
 
   const contextValue = useMemo(
     () => ({

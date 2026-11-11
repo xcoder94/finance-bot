@@ -62,7 +62,7 @@ describe('«Другое» has its own colour (QA #6)', () => {
       ['other', '#9aa0a6'],
     ])
     const hue = (hex: string) => {
-      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+      const [r, , b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
       return b - r
     }
     // grey: almost no blue tint

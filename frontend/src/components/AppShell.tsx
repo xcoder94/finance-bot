@@ -52,9 +52,11 @@ import { MAIN_TABS } from './mainTabs'
 import { usePageDirection } from '../hooks/usePageDirection'
 import { pageScreenKey } from '../utils/pageTransition'
 import { useShoppingStartup } from '../hooks/useShoppingStartup'
+import { useRefreshOnReturn } from '../hooks/useRefreshOnReturn'
 import { useTapHaptic } from '../hooks/useTapHaptic'
 import { useTxDeepLink } from '../hooks/useTxDeepLink'
 import { SuccessFlash } from './SuccessFlash'
+import { useAuthStore } from '../store/authStore'
 import { useChromeStore } from '../store/chromeStore'
 
 export { MAIN_TABS } from './mainTabs'
@@ -239,6 +241,7 @@ export function AppShell() {
   useTapHaptic()
   const txDeepLinkPhase = useTxDeepLink()
   useShoppingStartup()
+  useRefreshOnReturn(useAuthStore((state) => state.user?.familyBudgetId) ?? '')
 
   if (txDeepLinkPhase === 'resolving') {
     return (

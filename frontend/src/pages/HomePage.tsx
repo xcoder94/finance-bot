@@ -32,7 +32,6 @@ import {
   useDataCacheStore,
   getCachedPersonalSummary,
   getCachedPersonalWalletBalances,
-  invalidateHomeData,
   peekHomeSummary,
   peekRecentHistory,
   peekWallets,
@@ -62,7 +61,6 @@ import {
 import {
   composeBalancesFetchTrigger,
   composeHomeFetchTrigger,
-  shouldRefreshHomeOnVisibility,
 } from '../utils/homeVisibility'
 import {
   getHistoryItemMeta,
@@ -211,30 +209,18 @@ export function HomePage() {
     () => peekHomeMonth() ?? currentMonthInTashkent(),
   )
   const primaryCurrency = PRIMARY_CURRENCY
-  const [visibilityRefreshCount, setVisibilityRefreshCount] = useState(0)
 
   const { year, month } = selectedMonth
   const monthKey = `${year}-${month}`
-  const homeFetchTrigger = composeHomeFetchTrigger(monthKey, visibilityRefreshCount + homeEpoch)
-  const balancesFetchTrigger = composeBalancesFetchTrigger(visibilityRefreshCount + homeEpoch)
+  const homeFetchTrigger = composeHomeFetchTrigger(monthKey, homeEpoch)
+  const balancesFetchTrigger = composeBalancesFetchTrigger(homeEpoch)
 
   // The month parked for the /wallets round trip has been picked up; later visits start fresh.
   useEffect(() => {
     forgetHomeMonth()
   }, [])
 
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (!familyId || !shouldRefreshHomeOnVisibility(document.visibilityState)) {
-        return
-      }
-      invalidateHomeData(familyId)
-      setVisibilityRefreshCount((count) => count + 1)
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [familyId])
+  // Returning to the app is handled once for all screens by useRefreshOnReturn (AppShell): it bumps homeEpoch.
 
   const summaryFetch = useFetchBlock(
     useCallback(
@@ -281,7 +267,7 @@ export function HomePage() {
     useCallback(
       () => getCachedWallets(familyId, fetchWallets, true),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [familyId, homeEpoch, visibilityRefreshCount],
+      [familyId, homeEpoch],
     ),
     balancesFetchTrigger,
     peekWallets(familyId),
@@ -299,7 +285,7 @@ export function HomePage() {
   }, [])
   const onboardingFetch = useFetchBlock<OnboardingState>(
     fetchOnboarding,
-    visibilityRefreshCount + homeEpoch,
+    homeEpoch,
   )
 
   const summaryData =
