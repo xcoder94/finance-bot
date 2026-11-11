@@ -9,7 +9,7 @@ import {
 import {
   getCategoryColor,
   getColorByIndex,
-  OTHER_CATEGORY_COLOR_INDEX,
+  OTHER_CATEGORY_COLOR,
   UNCATEGORIZED_COLOR,
 } from './chartColors'
 
@@ -149,7 +149,7 @@ export function prepareSubcategoryDonutSlices(
       key: OTHER_CATEGORY_KEY,
       name: otherLabel,
       value: otherAmount,
-      color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+      color: OTHER_CATEGORY_COLOR,
     })
   }
 
@@ -263,7 +263,7 @@ export function prepareDonutSlices(
       key: OTHER_CATEGORY_KEY,
       name: otherLabel,
       value: otherAmount,
-      color: getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+      color: OTHER_CATEGORY_COLOR,
     })
   }
 
@@ -321,9 +321,30 @@ export function buildTrendChartRows(
   }))
 }
 
-export function formatPercent(value: number, total: number): string {
+/**
+ * Share labels for a list of values: whole percents that add up to 100 (largest remainder).
+ * A share under 1% reads «<1%» (never «0%») and is left out of the whole-number split.
+ */
+export function formatSharePercents(values: number[]): string[] {
+  const total = values.reduce((sum, value) => sum + value, 0)
   if (total <= 0) {
-    return '0%'
+    return values.map(() => '0%')
   }
-  return `${Math.round((value / total) * 100)}%`
+  const tiny = values.map((value) => value > 0 && (value / total) * 100 < 1)
+  const base = values.reduce((sum, value, i) => sum + (tiny[i] || value <= 0 ? 0 : value), 0)
+  const exact = values.map((value, i) => (tiny[i] || value <= 0 ? 0 : (value / base) * 100))
+  const whole = exact.map(Math.floor)
+  let left = 100 - whole.reduce((sum, w) => sum + w, 0)
+  const order = exact
+    .map((x, i) => ({ i, rest: x - Math.floor(x) }))
+    .filter(({ i }) => !tiny[i] && values[i] > 0)
+    .sort((a, b) => b.rest - a.rest)
+  for (const { i } of order) {
+    if (left <= 0) {
+      break
+    }
+    whole[i] += 1
+    left -= 1
+  }
+  return values.map((value, i) => (tiny[i] ? '<1%' : `${whole[i]}%`))
 }

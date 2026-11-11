@@ -35,11 +35,11 @@ describe('CategoryDonutChart list', () => {
     expect(otherRow).not.toMatch(/\+\d+%|новая|−\d+%/)
   })
 
-  it('30-char names are in the DOM in full and truncated by CSS ellipsis', () => {
+  it('30-char names are in the DOM in full and clamped to two lines by CSS', () => {
     expect(html).toContain(NAME30)
     const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
     const rule = css.match(/\.analytics-donut__legend-name \{[^}]*\}/)?.[0] ?? ''
-    expect(rule).toContain('text-overflow: ellipsis')
+    expect(rule).toContain('-webkit-line-clamp: 2')
     expect(rule).toContain('min-width: 0')
   })
 

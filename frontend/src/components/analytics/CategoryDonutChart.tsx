@@ -2,7 +2,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 import { Text } from '@telegram-apps/telegram-ui'
 
 import { shouldIgnoreDonutTap } from '../../utils/analyticsDrill'
-import { formatPercent, type DonutSlice } from '../../utils/analyticsCharts'
+import { formatSharePercents, type DonutSlice } from '../../utils/analyticsCharts'
 import { formatAnalyticsAmountDigits } from '../../utils/analyticsChartsTab'
 import { deltaLabel, donutCenterFontSize } from '../../utils/analyticsComparison'
 
@@ -41,6 +41,7 @@ export function CategoryDonutChart({
   }
 
   const total = slices.reduce((sum, slice) => sum + slice.value, 0)
+  const percents = formatSharePercents(slices.map((slice) => slice.value))
   const totalText = formatAnalyticsAmountDigits(total)
 
   const handleSliceActivate = (key: string) => {
@@ -95,7 +96,7 @@ export function CategoryDonutChart({
       </div>
 
       <div className="analytics-donut__legend">
-        {slices.map((slice) => {
+        {slices.map((slice, index) => {
           const isInteractive = Boolean(onSliceActivate) && !shouldIgnoreDonutTap(slice.key)
           const delta =
             showDelta && slice.prev !== undefined ? deltaLabel(slice.value, slice.prev) : null
@@ -113,7 +114,7 @@ export function CategoryDonutChart({
                 {formatAnalyticsAmountDigits(slice.value)}
               </span>
               <span className="analytics-donut__legend-percent">
-                {formatPercent(slice.value, total)}
+                {percents[index]}
               </span>
               <span
                 className={

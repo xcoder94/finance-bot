@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { CHART_CATEGORY_COLORS } from '../../utils/chartColors'
 import {
   applyAnalyticsCurrencyChange,
+  analyticsBackTarget,
   applyClearHistoryFilter,
   switchAnalyticsTab,
   type AnalyticsShellState,
@@ -122,5 +123,20 @@ describe('applyClearHistoryFilter', () => {
 
     expect(next.historyCategoryFilter).toBeNull()
     expect(next.activeTab).toBe('history')
+  })
+})
+
+describe('analyticsBackTarget (Back from a filtered History returns to the chart)', () => {
+  it('filtered History -> charts, with the same month and drill-down kept', () => {
+    const history: AnalyticsShellState = { ...baseState, activeTab: 'history' }
+    expect(analyticsBackTarget(history.activeTab, history.historyCategoryFilter)).toBe('charts')
+    const back = switchAnalyticsTab(history, 'charts')
+    expect(back.selectedMonth).toEqual(baseState.selectedMonth)
+    expect(back.drillParent).toEqual(baseState.drillParent)
+    expect(back.historyCategoryFilter).toBeNull()
+  })
+  it('does not intercept charts or an unfiltered History', () => {
+    expect(analyticsBackTarget('charts', baseState.historyCategoryFilter)).toBeNull()
+    expect(analyticsBackTarget('history', null)).toBeNull()
   })
 })

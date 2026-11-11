@@ -46,7 +46,7 @@ export function formatCompactAxisAmount(value: number): string {
       minimumFractionDigits: 0,
       maximumFractionDigits: 1,
     })
-    return `${sign}${formatted} ${suffix}`
+    return `${sign}${formatted}\u00A0${suffix}`
   }
 
   if (absolute >= 1_000_000_000) {

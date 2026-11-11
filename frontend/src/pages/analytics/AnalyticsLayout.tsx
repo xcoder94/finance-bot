@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useNativeBackButtonOverlay } from '../../components/nativeBackButtonContext'
 import { PeriodFilterControls } from '../../components/PeriodFilterControls'
 import { AnalyticsProvider } from '../../contexts/AnalyticsContext'
 import {
@@ -9,6 +10,7 @@ import {
 } from '../../store/analyticsShellStore'
 import type { HistoryCategoryFilter } from '../../utils/analyticsDrill'
 import {
+  analyticsBackTarget,
   historyFilterAfterTabSwitch,
   type AnalyticsShellState,
   type AnalyticsTab,
@@ -86,6 +88,14 @@ export function AnalyticsLayout() {
     setActiveTabState(tab)
     setHistoryCategoryFilter((current) => historyFilterAfterTabSwitch(current, tab))
   }, [])
+
+  const backTarget = analyticsBackTarget(activeTab, historyCategoryFilter)
+  const handleNativeBack = useCallback(() => {
+    if (backTarget) {
+      setActiveTab(backTarget)
+    }
+  }, [backTarget, setActiveTab])
+  useNativeBackButtonOverlay(backTarget !== null, handleNativeBack)
 
   const { range, rangeOrderInvalid } = useResolvedRange(
     periodTab,

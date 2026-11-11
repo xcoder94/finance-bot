@@ -35,6 +35,7 @@
   --app-category-color-7: #a99bf2;
   --app-category-color-8: #ff7b82;
   --app-category-color-neutral: #8e9aa7;
+  --app-category-color-other: #c9b27a;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -79,6 +80,7 @@
   --app-category-color-7: #6250b5;
   --app-category-color-8: #c43d44;
   --app-category-color-neutral: #727d89;
+  --app-category-color-other: #8a7340;
 }
 
 .app-theme {
@@ -276,6 +278,7 @@ body {
 }
 
 .home-month-bar__label {
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 500;
   line-height: 1;
@@ -1718,9 +1721,9 @@ button.home-ops-row:focus-visible {
 }
 
 .analytics-page__head-row .analytics-page__month-bar {
-  flex: 1 1 150px;
+  /* never narrower than its content: the month label sits between the arrows on one line; if it does not fit next to the tabs, the bar moves to its own row */
+  flex: 1 0 auto;
   width: auto;
-  min-width: 0;
 }
 
 .analytics-page__head-row .analytics-tabs__btn {
@@ -1736,8 +1739,7 @@ button.home-ops-row:focus-visible {
 }
 
 .analytics-page__month-label-wrap {
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 auto;
   text-align: center;
 }
 
@@ -1857,7 +1859,10 @@ button.home-ops-row:focus-visible {
   font-size: 13px;
   line-height: 1.2;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .analytics-donut__legend-amount,
@@ -2231,11 +2236,14 @@ button.home-ops-row:focus-visible {
 }
 
 .analytics-trend-chart__title {
+  min-width: 0;
   font-size: 14px;
   line-height: 1;
 }
 
 .analytics-trend-chart__unit {
+  flex: none;
+  white-space: nowrap;
   font-size: 11px;
   line-height: 1;
   color: var(--hint);

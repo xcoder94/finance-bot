@@ -123,3 +123,19 @@ describe('helpers', () => {
     expect(donutCenterFontSize('9 999 999 999 999', 100)).toBeGreaterThanOrEqual(9)
   })
 })
+
+describe('range comparison label counts the PREVIOUS period (QA #8)', () => {
+  it('Oct 1-31 vs September (30 days): «за прошлые 30 дней», not 31', () => {
+    const days = rangeLengthDays('2026-09-01T00:00:00+05:00', '2026-09-30T23:59:59.999+05:00')
+    expect(days).toBe(30)
+    const line = buildComparisonLine({
+      total: 120,
+      prevTotal: 100,
+      periodTab: 'range',
+      selectedMonth: { year: 2026, month: 10 },
+      rangeDays: days,
+    })
+    expect(line).toContain('30')
+    expect(line).not.toContain('31')
+  })
+})

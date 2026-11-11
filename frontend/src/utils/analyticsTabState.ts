@@ -79,3 +79,15 @@ export function historyFilterAfterTabSwitch(
 ): HistoryCategoryFilter | null {
   return tab === 'charts' ? null : current
 }
+
+/**
+ * Telegram «Back» inside Analytics: from History opened through a category (donut tap, «Все операции»)
+ * it returns to the charts where the user came from. The month and the drill-down stay in the shell state;
+ * only the history filter is cleared by the tab switch. Null = nothing to intercept (normal navigation).
+ */
+export function analyticsBackTarget(
+  activeTab: AnalyticsTab,
+  filter: HistoryCategoryFilter | null,
+): AnalyticsTab | null {
+  return activeTab === 'history' && filter !== null ? 'charts' : null
+}

@@ -47,6 +47,7 @@ import {
 } from '../../utils/analyticsChartsTab'
 import {
   getColorByIndex,
+  OTHER_CATEGORY_COLOR,
   OTHER_CATEGORY_COLOR_INDEX,
   resolveEffectiveColorIndices,
 } from '../../utils/chartColors'
@@ -499,7 +500,7 @@ export function AnalyticsChartsTab() {
   const headline = buildHeadline({
     periodTab,
     selectedMonth,
-    amount: `${formatAnalyticsAmountDigits(expenseTotal)} ${sumUnit()}`,
+    amount: `${formatAnalyticsAmountDigits(expenseTotal)}\u00A0${sumUnit()}`,
   })
   const comparisonLine =
     comparisonFetch.state.status === 'success' && range
@@ -508,7 +509,10 @@ export function AnalyticsChartsTab() {
           prevTotal: comparisonFetch.state.data.prev_total,
           periodTab,
           selectedMonth,
-          rangeDays: rangeLengthDays(range.dateFrom, range.dateTo),
+          rangeDays: rangeLengthDays(
+            comparisonFetch.state.data.prev_date_from,
+            comparisonFetch.state.data.prev_date_to,
+          ),
         })
       : null
 
@@ -525,7 +529,7 @@ export function AnalyticsChartsTab() {
     setHistoryCategoryFilter({
       id: drillParent.id,
       name: drillParent.name,
-      color: slice?.color ?? getColorByIndex(OTHER_CATEGORY_COLOR_INDEX),
+      color: slice?.color ?? OTHER_CATEGORY_COLOR,
     })
     setActiveTab('history')
   }
@@ -605,7 +609,15 @@ export function AnalyticsChartsTab() {
             {t('analytics.incomeByCategory')}
           </Text>
           <div className="analytics-income-list">
-            {incomeRows.map((entry) => (
+            {incomeRows.map((entry) => {
+              const displayName = entry.category_id
+                ? resolveCategoryAmountDisplayName(
+                    { ...entry, category_id: entry.category_id },
+                    undefined,
+                    t,
+                  )
+                : entry.category_name
+              return (
               <div
                 key={entry.category_id ?? entry.category_name}
                 className="analytics-donut__legend-item analytics-income-row"
@@ -614,14 +626,8 @@ export function AnalyticsChartsTab() {
                   className="analytics-donut__legend-dot"
                   style={{ backgroundColor: getColorByIndex(entry.color_index ?? 1) }}
                 />
-                <span className="analytics-donut__legend-name" title={entry.category_name}>
-                  {entry.category_id
-                    ? resolveCategoryAmountDisplayName(
-                        { ...entry, category_id: entry.category_id },
-                        undefined,
-                        t,
-                      )
-                    : entry.category_name}
+                <span className="analytics-donut__legend-name" title={displayName}>
+                  {displayName}
                 </span>
                 <span className="analytics-donut__legend-amount">
                   {formatAnalyticsAmountDigits(entry.amount)}
@@ -630,7 +636,8 @@ export function AnalyticsChartsTab() {
                   {formatSharePercent(entry.share_percent ?? 0)}
                 </span>
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       ) : null}

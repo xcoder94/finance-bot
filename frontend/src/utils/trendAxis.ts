@@ -31,5 +31,5 @@ export function formatTrendAxisTick(value: number, scale: TrendAxisScale): strin
 /** Caption that names the same unit the ticks use. */
 export function trendAxisCaption(scale: TrendAxisScale, currency: string): string {
   const unit = currency === 'USD' ? '$' : sumUnit()
-  return scale.unitKey ? `${i18n.t(`analytics.compactUnits.${scale.unitKey}`)} ${unit}` : unit
+  return scale.unitKey ? `${i18n.t(`analytics.compactUnits.${scale.unitKey}`)}\u00A0${unit}` : unit
 }
