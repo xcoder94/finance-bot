@@ -1882,3 +1882,65 @@ async def test_shared_wallet_delete_reassigns_member_default_silently(
     await session.refresh(newer_shared)
     assert newer_shared.is_deleted is True
     assert member.default_wallet_id == older_shared.id
+
+
+async def _two_member_family(session: AsyncSession):
+    owner_tid = int(uuid.uuid4().int % 9_000_000_000) + 1_000_000_000
+    owner, budget = await create_user_with_budget(session, telegram_id=owner_tid)
+    member, _ = await create_user_with_budget(
+        session, telegram_id=owner_tid + 1, role="member", family_budget_id=budget.id
+    )
+    return owner_tid, owner, member, budget
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_leave_survives_telegram_failure(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, _owner, member, budget = await _two_member_family(session)
+    bot = _mock_bot(monkeypatch)
+    bot.send_message.side_effect = RuntimeError("Forbidden: bot was blocked by the user")
+
+    resp = await client.post("/api/v1/members/leave", headers=auth_headers(owner_tid + 1))
+    assert resp.status_code == 200
+    await session.refresh(member)
+    assert member.role == "owner"
+    assert member.family_budget_id != budget.id
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_remove_member_survives_telegram_failure(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, _owner, member, budget = await _two_member_family(session)
+    bot = _mock_bot(monkeypatch)
+    bot.send_message.side_effect = RuntimeError("Forbidden: bot was blocked by the user")
+
+    resp = await client.delete(f"/api/v1/members/{member.id}", headers=auth_headers(owner_tid))
+    assert resp.status_code == 200
+    await session.refresh(member)
+    assert member.family_budget_id != budget.id
+
+
+@pytest.mark.skipif(not _db_available(), reason="DB not configured")
+@pytest.mark.anyio
+async def test_transfer_request_survives_telegram_failure(
+    api_client: tuple[AsyncClient, AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session = api_client
+    owner_tid, _owner, member, _budget = await _two_member_family(session)
+    bot = _mock_bot(monkeypatch)
+    bot.send_message.side_effect = RuntimeError("Forbidden: bot was blocked by the user")
+
+    resp = await client.post(
+        f"/api/v1/members/{member.id}/transfer", headers=auth_headers(owner_tid)
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "pending"

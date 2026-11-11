@@ -19,7 +19,7 @@ from app.services.budget_seed import (
     copy_seed_wallets_only,
 )
 from app.services.entity_limits import MEMBER_LIMIT, PERSONAL_WALLET_LIMIT, lock_family_budget
-from app.services.goal_notify import resolve_bot
+from app.services.goal_notify import resolve_bot, send_notice_safe
 from app.services.member_texts import left_notice, removed_notice
 from app.services.ownership_transfer import cancel_pending_transfers_for_user
 from app.services.shopping import cancel_open_purchase_for_user, clear_family_shopping_list
@@ -240,7 +240,7 @@ async def detach_member_to_own_budget(
             text = removed_notice(old_budget_name, departing_user)
         else:
             text = left_notice(old_budget_name, departing_user)
-        await resolved_bot.send_message(departing_user.telegram_id, text)
+        await send_notice_safe(resolved_bot, departing_user.telegram_id, text)
     finally:
         if owned:
             await resolved_bot.session.close()

@@ -38,11 +38,15 @@ _UZ_DAY_BEFORE_RE = re.compile(
     _B0 + r"(?:o" + _APOS + r"tgan|avval|avvalgi|ўтган|аввал)\s+(?:kuni|куни)" + _B1,
     re.IGNORECASE,
 )
-_UZ_YESTERDAY_RE = re.compile(_B0 + r"(?:kecha|кеча)" + _B1, re.IGNORECASE)
-_UZ_TODAY_RE = re.compile(_B0 + r"(?:bugun|бугун)" + _B1, re.IGNORECASE)
+_UZ_YESTERDAY_RE = re.compile(_B0 + r"(?:kecha|кеча)(?:gi|ги)?" + _B1, re.IGNORECASE)
+_UZ_TODAY_RE = re.compile(_B0 + r"(?:bugun|бугун)(?:gi|ги)?" + _B1, re.IGNORECASE)
+_RU_DAY_BEFORE_RE = re.compile(r"позавчера(?:шн\w*)?", re.IGNORECASE)
+_RU_YESTERDAY_RE = re.compile(r"(?<!поза)вчера(?:шн\w*)?", re.IGNORECASE)
+_RU_TODAY_RE = re.compile(r"(?<!\w)сегодня(?:шн\w*)?", re.IGNORECASE)
 _DATE_MARKER_RES = [
-    re.compile(r"позавчера", re.IGNORECASE),
-    re.compile(r"вчера", re.IGNORECASE),
+    _RU_DAY_BEFORE_RE,
+    _RU_YESTERDAY_RE,
+    _RU_TODAY_RE,
     _UZ_DAY_BEFORE_RE,
     _UZ_YESTERDAY_RE,
     _UZ_TODAY_RE,
@@ -100,10 +104,10 @@ def apply_date_hint(date_hint: str | None, today: date | None = None) -> date:
 def resolve_operation_date(text: str, now: datetime | None = None) -> date:
     today = _reference_today(now)
 
-    if re.search(r"позавчера", text, re.IGNORECASE):
+    if _RU_DAY_BEFORE_RE.search(text):
         return _finalize_date(today - timedelta(days=2), today)
 
-    if re.search(r"вчера", text, re.IGNORECASE):
+    if _RU_YESTERDAY_RE.search(text):
         return _finalize_date(today - timedelta(days=1), today)
 
     if _UZ_DAY_BEFORE_RE.search(text):

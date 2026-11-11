@@ -1,4 +1,6 @@
+import logging
 import uuid
+from typing import Any
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -68,3 +70,16 @@ async def resolve_bot(bot: Bot | None) -> tuple[Bot, bool]:
     if bot is not None:
         return bot, False
     return Bot(token=BOT_TOKEN), True
+
+
+async def send_notice_safe(bot: Bot, chat_id: int, text: str, **kwargs: Any) -> bool:
+    """Best-effort Telegram notice: a delivery failure never breaks the caller's
+    already-decided state change. The error is logged (type only, no text)."""
+    try:
+        await bot.send_message(chat_id, text, **kwargs)
+    except Exception as exc:  # noqa: BLE001 - blocked bot, network, bad token...
+        logging.getLogger(__name__).warning(
+            "telegram notice to %s not delivered: %s", chat_id, type(exc).__name__
+        )
+        return False
+    return True

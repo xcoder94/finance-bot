@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -135,3 +135,27 @@ def test_uz_date_words_stripped_from_comment():
 
 def test_uz_kechasi_not_a_date_word():
     assert resolve_operation_date("kechasi taksi 20 ming", now=NOW) == TODAY
+
+
+@pytest.mark.parametrize(
+    "text, days_back",
+    [
+        ("вчерашний такси 25 тысяч", 1),
+        ("вчерашняя оплата 25 тысяч", 1),
+        ("позавчерашний обед 50 тысяч", 2),
+        ("kechagi taksi 20 ming", 1),
+        ("кечаги такси 20 минг", 1),
+        ("bugungi taksi 20 ming", 0),
+        ("бугунги такси 20 минг", 0),
+        ("сегодняшний обед 50 тысяч", 0),
+    ],
+)
+def test_date_word_forms_resolve(text, days_back):
+    assert resolve_operation_date(text, now=NOW) == TODAY - timedelta(days=days_back)
+
+
+@pytest.mark.parametrize(
+    "word", ["вчерашний", "вчерашняя", "позавчерашний", "сегодняшний", "kechagi", "кечаги", "bugungi", "бугунги"]
+)
+def test_date_word_forms_stripped_whole(word):
+    assert strip_date_words(f"{word} такси", f"{word} такси 20 тысяч") == "такси"

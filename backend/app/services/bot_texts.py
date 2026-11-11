@@ -62,12 +62,12 @@ CATALOGUE: dict[str, dict[str, str]] = {
     "command.help": {"ru": "Подсказка", "uz": "Yordam"},
     # --- quick entry ---
     "quick.amount_too_large": {
-        "ru": "Слишком большая сумма — больше {max} сум записать нельзя. Проверьте число.",
-        "uz": "Summa juda katta — {max} so'mdan ko'p yozib bo'lmaydi. Raqamni tekshiring.",
+        "ru": "Слишком большая сумма — больше {max} {cur} записать нельзя. Проверьте число.",
+        "uz": "Summa juda katta — {max} {cur} dan ortiq yozib bo'lmaydi. Raqamni tekshiring.",
     },
     "quick.amount_too_large_partial": {
-        "ru": "Не записал «{what}» — сумма {amount} сум больше допустимых {max}. Проверьте число.",
-        "uz": "«{what}» yozilmadi — {amount} so'm summa ruxsat etilgan {max} so'mdan katta. Raqamni tekshiring.",
+        "ru": "Не записал «{what}» — сумма {amount} {cur} больше допустимых {max} {cur}. Проверьте число.",
+        "uz": "«{what}» yozilmadi — {amount} {cur} summa ruxsat etilgan {max} {cur} chegarasidan katta. Raqamni tekshiring.",
     },
     # --- quick entry: errors and limits (ux-p5-backend-b) ---
     "quick.too_long": {

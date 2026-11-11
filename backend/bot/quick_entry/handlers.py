@@ -390,6 +390,12 @@ async def _try_add_shopping_items(
     return True
 
 
+def _currency_word(currency: str | None, language: str | None) -> str:
+    if currency == "USD":
+        return "USD"
+    return "сум" if language == "ru" else "so'm"
+
+
 async def _process_parsed_response(
     message: Message,
     bot: Bot,
@@ -433,13 +439,23 @@ async def _process_parsed_response(
         return
 
     if not clear_ops and not ambiguous_ops and not transfer_ops:
-        if any(
-            op.amount is not None and op.amount > MAX_AMOUNT
-            for op in response.operations
-        ):
+        big_first = next(
+            (
+                op
+                for op in response.operations
+                if op.amount is not None and op.amount > MAX_AMOUNT
+            ),
+            None,
+        )
+        if big_first is not None:
             await message.answer(
                 catalogue_t(
-                    user, "quick.amount_too_large", max=format_number(MAX_AMOUNT)
+                    user,
+                    "quick.amount_too_large",
+                    max=format_number(MAX_AMOUNT),
+                    cur=_currency_word(
+                        big_first.currency or default_wallet.currency, user.language
+                    ),
                 )
             )
             return
@@ -463,6 +479,9 @@ async def _process_parsed_response(
                     what=what[:60],
                     amount=format_number(big.amount),
                     max=format_number(MAX_AMOUNT),
+                    cur=_currency_word(
+                        big.currency or default_wallet.currency, user.language
+                    ),
                 )
             )
     op_date = _resolve_op_date(source_text, response, today)

@@ -210,14 +210,15 @@ async def test_existing_colours_not_rewritten(api_client) -> None:
 
 
 class _FixedParser:
-    def __init__(self, amount: int) -> None:
+    def __init__(self, amount: int, currency: str = "UZS") -> None:
         self.amount = amount
+        self.currency = currency
 
     async def parse(self, request: Any) -> ParseResponse:
         return ParseResponse(
             operations=[
                 ParsedOperation(
-                    type="expense", amount=self.amount, currency="UZS", category="Такси"
+                    type="expense", amount=self.amount, currency=self.currency, category="Такси"
                 )
             ]
         )
@@ -249,9 +250,24 @@ async def test_amount_over_max_has_own_message_and_keeps_counter(monkeypatch) ->
         assert budget.daily_unparsed == 0
 
 
+async def test_amount_over_max_usd_names_usd_not_som(monkeypatch) -> None:
+    async with rollback_session() as session:
+        user, budget = await create_user(session, telegram_id=9_610_021)
+        await seed_taxi_setup(session, user, budget)
+        monkeypatch.setattr(
+            "bot.quick_entry.handlers.async_session_factory", SessionFactory(session)
+        )
+        set_parser_override(_FixedParser(3_000_000_000, "USD"))
+        msg = _message(user.telegram_id, "такси 3000000000 долларов")
+        await handle_quick_entry_text(msg, SimpleNamespace())
+        (text,), _ = msg.answer.await_args
+        assert "USD" in text
+        assert " сум " not in text
+
+
 def test_too_large_text_uz_and_ru_catalogue() -> None:
-    assert t("ru", "quick.amount_too_large", max="2 000 000 000") == EXPECTED_TOO_LARGE_RU
-    assert "2 000 000 000" in t("uz", "quick.amount_too_large", max="2 000 000 000")
+    assert t("ru", "quick.amount_too_large", max="2 000 000 000", cur="сум") == EXPECTED_TOO_LARGE_RU
+    assert "2 000 000 000" in t("uz", "quick.amount_too_large", max="2 000 000 000", cur="so'm")
 
 
 # ------------------------------------------------------- B16 help / menu / B20

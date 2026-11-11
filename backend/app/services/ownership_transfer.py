@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.family_budget import FamilyBudget
 from app.models.ownership_transfer import OwnershipTransfer
 from app.models.user import User
-from app.services.goal_notify import resolve_bot
+from app.services.goal_notify import resolve_bot, send_notice_safe
 from app.services.bot_texts import t
 from app.services.member_texts import (
     transfer_accepted_to_former,
@@ -169,7 +169,8 @@ async def request_ownership_transfer(
 
     resolved_bot, owned = await resolve_bot(bot)
     try:
-        await resolved_bot.send_message(
+        await send_notice_safe(
+            resolved_bot,
             recipient.telegram_id,
             transfer_offer(budget.name, recipient),
             reply_markup=transfer_offer_keyboard(transfer.id, recipient.language),
@@ -227,12 +228,14 @@ async def accept_ownership_transfer(
 
     resolved_bot, owned = await resolve_bot(bot)
     try:
-        await resolved_bot.send_message(
+        await send_notice_safe(
+            resolved_bot,
             former_owner.telegram_id,
             transfer_accepted_to_former(new_owner_name, budget_name, former_owner),
         )
         for member in remaining:
-            await resolved_bot.send_message(
+            await send_notice_safe(
+                resolved_bot,
                 member.telegram_id,
                 transfer_accepted_to_others(new_owner_name, budget_name, member),
             )
@@ -271,7 +274,8 @@ async def refuse_ownership_transfer(
 
     resolved_bot, owned = await resolve_bot(bot)
     try:
-        await resolved_bot.send_message(
+        await send_notice_safe(
+            resolved_bot,
             former_owner.telegram_id,
             transfer_refused_to_former(recipient_name, former_owner),
         )
