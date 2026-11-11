@@ -1756,6 +1756,31 @@ button.home-ops-row:focus-visible {
   padding-top: 10px;
 }
 
+/* Designer decision (review-final 4a): below 360 px the header is exactly two rows, by design:
+   row 1 = tabs, row 2 = full-width month bar (44 px arrows at the edges, name centred). */
+@media (max-width: 359px) {
+  .analytics-page__head-row {
+    gap: 8px;
+  }
+
+  .analytics-page__head-row .analytics-page__head-lead,
+  .analytics-page__head-row .analytics-page__month-bar {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .analytics-page__head-row .month-arrow {
+    width: 44px;
+  }
+
+  .analytics-page__head-row .analytics-page__month-label-wrap {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
 .analytics-page__month-label-wrap {
   flex: 1 0 auto;
   text-align: center;

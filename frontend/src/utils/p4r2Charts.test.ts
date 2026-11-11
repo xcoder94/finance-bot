@@ -134,3 +134,27 @@ describe('trend title does not strand «12» / unit on two lines at 320 px (QA N
     expect(uz.analytics.trendTitle).toMatch(/12 oy$/)
   })
 })
+
+describe('Analytics header at 320 px is two tidy rows, by design (designer review 4a)', () => {
+  const start = css.indexOf('Designer decision (review-final 4a)')
+  const media = css.slice(start, css.indexOf('\n}\n', css.indexOf('.analytics-page__month-label-wrap', start)) + 3)
+  it('lives in a max-width: 359px block placed after the base header rules', () => {
+    expect(start).toBeGreaterThan(css.indexOf('\n.analytics-page__head-row .home-month-bar__label {'))
+    expect(media).toContain('@media (max-width: 359px)')
+  })
+  it('tabs and the month bar each take a full row, so they cannot sit side by side or overlap', () => {
+    const rule = media.slice(media.indexOf('.analytics-page__head-lead,'), media.indexOf('}', media.indexOf('.analytics-page__head-lead,')))
+    expect(rule).toContain('flex: 1 1 100%')
+    expect(rule).toContain('width: 100%')
+    expect(rule).toContain('min-width: 0')
+  })
+  it('44 px arrows at the edges, name centred between them, one equal gap between rows', () => {
+    expect(media).toMatch(/\.month-arrow \{\s*width: 44px;/)
+    expect(media).toMatch(/month-label-wrap \{[^}]*text-align: center/)
+    expect(media).toMatch(/\.analytics-page__head-row \{\s*gap: 8px;/)
+  })
+  it('the month name stays on one line and the bar is not left-aligned', () => {
+    expect(cssRule('.home-month-bar__label')).toContain('white-space: nowrap')
+    expect(cssRule('.home-month-bar')).toContain('justify-content: space-between')
+  })
+})
