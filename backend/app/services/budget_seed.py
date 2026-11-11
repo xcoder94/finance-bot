@@ -144,6 +144,52 @@ SEED_EXPENSE_CATEGORIES: dict[str, tuple[str, list[tuple[str, str]]]] = {
     ),
 }
 
+# Key successor tables used when operations move between budgets (join / leave / delete).
+# Only keys that exist in one set alone are listed; keys shared by both sets map to themselves.
+# LEGACY_TO_NEW_KEY: a legacy-only key -> the key that absorbed it in the new set.
+LEGACY_TO_NEW_KEY: dict[str, str] = {
+    "side_job": "business_side_job",
+    "gifts": "transfers_gifts",
+    "family_transfers": "transfers_gifts",
+    "cafes_restaurants": "cafes_delivery",
+    "delivery": "cafes_delivery",
+    "taxi": "taxi_transit",
+    "public_transport": "taxi_transit",
+    "fuel": "car",
+    "car_maintenance": "car",
+    "utilities": "utilities_telecom",
+    "telecom_internet": "utilities_telecom",
+    "repairs_furnishing": "home_repairs",
+    "kindergarten_school": "kids_learning",
+    "clubs_tutoring": "kids_learning",
+    "pharmacy": "drugstore",
+    "doctors_clinics": "doctors",
+    "dentistry": "doctors",
+    "events_celebrations": "toi_gifts",
+    "shopping_leisure": "personal_leisure",
+    "entertainment": "fun_subscriptions",
+    "subscriptions": "fun_subscriptions",
+}
+# NEW_TO_LEGACY_KEY: a new-only key -> the closest single legacy key (when several were merged,
+# the first of them / the main one).
+NEW_TO_LEGACY_KEY: dict[str, str] = {
+    "business_side_job": "side_job",
+    "transfers_gifts": "family_transfers",
+    "cafes_delivery": "cafes_restaurants",
+    "taxi_transit": "taxi",
+    "car": "fuel",
+    "utilities_telecom": "utilities",
+    "home_repairs": "repairs_furnishing",
+    "kids_learning": "kindergarten_school",
+    "drugstore": "pharmacy",
+    "doctors": "doctors_clinics",
+    "toi_gifts": "events_celebrations",
+    "personal_leisure": "shopping_leisure",
+    "fun_subscriptions": "entertainment",
+}
+# New-only keys with no legacy counterpart: the operation goes to the nearest parent.
+PARENT_FALLBACK = frozenset({"family_help"})
+
 PROTECTED_EXPENSE_PARENT_KEYS = frozenset({"food", "home", "health"})
 
 SEED_WALLETS: list[tuple[str, str, str]] = [
@@ -167,27 +213,51 @@ async def assign_default_card_uzs(session: AsyncSession, user: User) -> None:
 LEGACY_ONLY_KEYS = frozenset(
     {key for _n, key in LEGACY_SEED_INCOME_CATEGORIES}
     | {k for _p, (_pk, subs) in LEGACY_SEED_EXPENSE_CATEGORIES.items() for _sn, k in subs}
+    | {pk for _p, (pk, _s) in LEGACY_SEED_EXPENSE_CATEGORIES.items()}
 ) - frozenset(
     {key for _n, key in SEED_INCOME_CATEGORIES}
     | {k for _p, (_pk, subs) in SEED_EXPENSE_CATEGORIES.items() for _sn, k in subs}
+    | {pk for _p, (pk, _s) in SEED_EXPENSE_CATEGORIES.items()}
 )
 
 
-async def budget_uses_legacy_set(session: AsyncSession, family_budget_id: uuid.UUID) -> bool:
-    """True when the budget was seeded with the pre-U7 category set (any legacy-only key,
-    live or deleted, is present)."""
+_NEW_ONLY_KEYS = (
+    frozenset(
+        {key for _n, key in SEED_INCOME_CATEGORIES}
+        | {k for _p, (pk, subs) in SEED_EXPENSE_CATEGORIES.items() for _sn, k in subs}
+        | {pk for _p, (pk, _subs) in SEED_EXPENSE_CATEGORIES.items()}
+    )
+    - frozenset(
+        {key for _n, key in LEGACY_SEED_INCOME_CATEGORIES}
+        | {k for _p, (_pk, subs) in LEGACY_SEED_EXPENSE_CATEGORIES.items() for _sn, k in subs}
+        | {pk for _p, (pk, _subs) in LEGACY_SEED_EXPENSE_CATEGORIES.items()}
+    )
+)
+
+
+async def _has_key(
+    session: AsyncSession, family_budget_id: uuid.UUID, keys: frozenset[str], *, live_only: bool
+) -> bool:
     for model in (ExpenseCategory, IncomeCategory):
-        found = await session.scalar(
-            select(model.id)
-            .where(
-                model.family_budget_id == family_budget_id,
-                model.translation_key.in_(LEGACY_ONLY_KEYS),
-            )
-            .limit(1)
+        stmt = select(model.id).where(
+            model.family_budget_id == family_budget_id, model.translation_key.in_(keys)
         )
-        if found is not None:
+        if live_only:
+            stmt = stmt.where(model.is_deleted.is_(False))
+        if await session.scalar(stmt.limit(1)) is not None:
             return True
     return False
+
+
+async def budget_uses_legacy_set(session: AsyncSession, family_budget_id: uuid.UUID) -> bool:
+    """True when the budget actually uses the pre-U7 category set: live legacy-only seed keys
+    and no live new-only ones. A mixed budget (made by older join code) counts as the new set;
+    with no live seed keys at all, any legacy-only key (even deleted) decides."""
+    legacy_live = await _has_key(session, family_budget_id, LEGACY_ONLY_KEYS, live_only=True)
+    new_live = await _has_key(session, family_budget_id, _NEW_ONLY_KEYS, live_only=True)
+    if legacy_live or new_live:
+        return legacy_live and not new_live
+    return await _has_key(session, family_budget_id, LEGACY_ONLY_KEYS, live_only=False)
 
 
 async def copy_seed_categories_only(
