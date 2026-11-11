@@ -35,14 +35,14 @@ _APOS = "['\u02bb\u02bc\u2018\u2019`\u2032]?"
 _B0 = r"(?<![\w'])"
 _B1 = r"(?!\w)"
 _UZ_DAY_BEFORE_RE = re.compile(
-    _B0 + r"(?:o" + _APOS + r"tgan|avval|avvalgi|ўтган|аввал)\s+(?:kuni|куни)" + _B1,
+    _B0 + r"(?:o" + _APOS + r"tgan|avval|avvalgi|ўтган|аввал)\s+(?:kuni|kungi|куни|кунги)" + _B1,
     re.IGNORECASE,
 )
-_UZ_YESTERDAY_RE = re.compile(_B0 + r"(?:kecha|кеча)(?:gi|ги)?" + _B1, re.IGNORECASE)
-_UZ_TODAY_RE = re.compile(_B0 + r"(?:bugun|бугун)(?:gi|ги)?" + _B1, re.IGNORECASE)
-_RU_DAY_BEFORE_RE = re.compile(r"позавчера(?:шн\w*)?", re.IGNORECASE)
-_RU_YESTERDAY_RE = re.compile(r"(?<!поза)вчера(?:шн\w*)?", re.IGNORECASE)
-_RU_TODAY_RE = re.compile(r"(?<!\w)сегодня(?:шн\w*)?", re.IGNORECASE)
+_UZ_YESTERDAY_RE = re.compile(_B0 + r"(?:kecha|кеча)(?:gi|ги)?(?:\s+(?:kun|кун)(?![\w]))?" + _B1, re.IGNORECASE)
+_UZ_TODAY_RE = re.compile(_B0 + r"(?:bugun|бугун)(?:gi|ги)?(?:\s+(?:kun|кун)(?![\w]))?" + _B1, re.IGNORECASE)
+_RU_DAY_BEFORE_RE = re.compile(r"(?:(?:за\s+)?позавчерашн\w*\s+день|позавчера(?:шн\w*)?)", re.IGNORECASE)
+_RU_YESTERDAY_RE = re.compile(r"(?:(?:за\s+)?(?<!поза)вчерашн\w*\s+день|(?<!поза)вчера(?:шн\w*)?)", re.IGNORECASE)
+_RU_TODAY_RE = re.compile(r"(?:(?:за\s+)?(?<!\w)сегодняшн\w*\s+день|(?<!\w)сегодня(?:шн\w*)?)", re.IGNORECASE)
 _DATE_MARKER_RES = [
     _RU_DAY_BEFORE_RE,
     _RU_YESTERDAY_RE,

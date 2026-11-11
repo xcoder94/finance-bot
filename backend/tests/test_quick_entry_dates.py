@@ -1,3 +1,6 @@
+import re
+
+import pytest
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -159,3 +162,30 @@ def test_date_word_forms_resolve(text, days_back):
 )
 def test_date_word_forms_stripped_whole(word):
     assert strip_date_words(f"{word} такси", f"{word} такси 20 тысяч") == "такси"
+
+
+from datetime import datetime as _dt  # noqa: E402
+from datetime import timezone as _tz  # noqa: E402
+
+_NOW = _dt(2026, 11, 11, 12, 0, tzinfo=_tz.utc)
+
+
+@pytest.mark.parametrize(
+    ("text", "kept", "days_back"),
+    [
+        ("o'tgan kungi taksi 25 ming", "taksi", 2),
+        ("bugungi kun taksi 25 ming", "taksi", 0),
+        ("кечаги кун taksi 25 ming", "taksi", 1),
+        ("taksi 25 ming kechagi kun", "taksi", 1),
+        ("такси 25 тысяч за вчерашний день", "такси", 1),
+        ("такси 25 тысяч за позавчерашний день", "такси", 2),
+        ("такси за сегодняшний день", "такси", 0),
+        ("заплатил за вчерашний ужин 50000", "заплатил за ужин", 1),
+    ],
+)
+def test_p4_date_word_residue(text, kept, days_back):
+    from datetime import timedelta
+
+    assert resolve_operation_date(text, _NOW) == _NOW.date() - timedelta(days=days_back)
+    comment = re.sub(r"\d[\d\s]*\s*(ming|тысяч)?", "", text).strip()
+    assert strip_date_words(comment, text) == kept
