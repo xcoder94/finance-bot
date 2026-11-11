@@ -80,7 +80,7 @@
   --app-category-color-7: #6250b5;
   --app-category-color-8: #c43d44;
   --app-category-color-neutral: #727d89;
-  --app-category-color-other: #9aa0a6;
+  --app-category-color-other: #858b92;
 }
 
 .app-theme {
@@ -4590,9 +4590,20 @@ a.tabbar-link:active {
 
 .recent-category-chips {
   margin-top: -4px;
+  /* one row that scrolls sideways inside the block: long names never push the Category field down */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.recent-category-chips::-webkit-scrollbar {
+  display: none;
 }
 
 .recent-category-chips .date-chip {
+  flex: 0 0 auto;
   max-width: 60%;
   overflow: hidden;
   text-overflow: ellipsis;

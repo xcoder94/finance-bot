@@ -56,3 +56,13 @@ describe('U4 structure', () => {
     expect(css.match(/\.analytics-charts-donut-card__shares \{[^}]*\}/)?.[0]).toContain('display: block')
   })
 })
+
+describe('polish2: every range-bound block re-fetches on return to the app', () => {
+  it('summary (header "Расход за") is keyed by fetchKey (with homeEpoch), not by the bare range', () => {
+    const src = read('./AnalyticsChartsTab.tsx')
+    const summaryBlock = src.slice(src.indexOf('const summaryFetch = useFetchBlock('))
+    const head = summaryBlock.slice(0, summaryBlock.indexOf('const trendEndMonth'))
+    expect(head).toContain('fetchKey,')
+    expect(head).not.toMatch(/\n\s+rangeKey,\n\s+rangeFetchEnabled/)
+  })
+})

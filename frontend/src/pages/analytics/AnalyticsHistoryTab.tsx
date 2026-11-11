@@ -1,5 +1,5 @@
 import { useDataCacheStore } from '../../store/dataCacheStore'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -14,6 +14,8 @@ import {
   historyListStatus,
   historyCurrencyParam,
   isAnalyticsHistoryUncategorized,
+  isQuietHistoryRefresh,
+  planSilentHistoryRefresh,
 } from '../../utils/analyticsHistoryTab'
 import { applyClearHistoryFilter } from '../../utils/analyticsTabState'
 import { HistorySummaryLine } from './HistorySummaryLine'
@@ -51,6 +53,9 @@ export function AnalyticsHistoryTab() {
   const [historyRetryCount, setHistoryRetryCount] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState(false)
+  const lastIdentity = useRef<string | null>(null)
+  const loadedCount = useRef(0)
+  loadedCount.current = historyItems.length
 
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
 
@@ -74,7 +79,7 @@ export function AnalyticsHistoryTab() {
     return () => {
       cancelled = true
     }
-  }, [range, rangeFetchEnabled])
+  }, [range, rangeFetchEnabled, homeEpoch])
 
   const historyFetchKey = useMemo(
     () => buildAnalyticsHistoryFetchKey(rangeKey, historyCategoryFilter),
@@ -120,10 +125,58 @@ export function AnalyticsHistoryTab() {
       setHistoryItems([])
       setHistoryTotal(0)
       setHistoryStatus('idle')
+      lastIdentity.current = null
       return
     }
 
     let cancelled = false
+    const identity = [
+      range.dateFrom,
+      range.dateTo,
+      historyFetchKey,
+      expenseCategoryId ?? '',
+      String(uncategorized),
+      currencyParam ?? '',
+      historyRetryCount,
+    ].join('|')
+    const quiet = isQuietHistoryRefresh(
+      lastIdentity.current,
+      identity,
+      loadedCount.current > 0,
+    )
+    lastIdentity.current = identity
+
+    if (quiet) {
+      // Return to the app: re-read every row already shown and swap them in at once; the list
+      // never empties, so the scroll position and the loaded pages stay.
+      const plan = planSilentHistoryRefresh(loadedCount.current, HISTORY_PAGE_SIZE)
+      void Promise.all(
+        plan.map((step) =>
+          fetchHistoryPage(
+            range.dateFrom,
+            range.dateTo,
+            step.limit,
+            step.offset,
+            expenseCategoryId,
+            undefined,
+            uncategorized,
+            currencyParam,
+          ),
+        ),
+      )
+        .then((pages) => {
+          if (cancelled) return
+          setHistoryItems(pages.flatMap((page) => page.items))
+          setHistoryTotal(pages[pages.length - 1]?.total_count ?? 0)
+        })
+        .catch(() => {
+          // keep the rows on screen; the next return tries again
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
     setHistoryStatus('loading')
     setHistoryItems([])
     setHistoryTotal(0)

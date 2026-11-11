@@ -55,3 +55,29 @@ export function historyListStatus<S extends string>(
 ): S | 'loading' {
   return filterActive && !walletsReady && status === 'success' ? 'loading' : status
 }
+
+/**
+ * Quiet refresh on return: re-read everything already shown (offset 0 .. loaded) in as few
+ * requests as the API allows, so the list keeps its length and the scroll position.
+ */
+export function planSilentHistoryRefresh(
+  loaded: number,
+  pageSize = 50,
+  maxLimit = 500,
+): Array<{ offset: number; limit: number }> {
+  const want = Math.max(pageSize, loaded)
+  const plan: Array<{ offset: number; limit: number }> = []
+  for (let offset = 0; offset < want; offset += maxLimit) {
+    plan.push({ offset, limit: Math.min(maxLimit, want - offset) })
+  }
+  return plan
+}
+
+/** The list is "the same list" while only the data epoch moved: then it refreshes without clearing. */
+export function isQuietHistoryRefresh(
+  previousIdentity: string | null,
+  identity: string,
+  hasItems: boolean,
+): boolean {
+  return hasItems && previousIdentity === identity
+}

@@ -10,6 +10,8 @@ import {
   historyCurrencyParam,
   getAnalyticsHistoryExpenseCategoryId,
   isAnalyticsHistoryUncategorized,
+  isQuietHistoryRefresh,
+  planSilentHistoryRefresh,
 } from './analyticsHistoryTab'
 
 describe('buildAnalyticsHistoryFetchKey', () => {
@@ -94,5 +96,25 @@ describe('historyListStatus (B17 race)', () => {
     expect(historyListStatus('success', true, true)).toBe('success')
     expect(historyListStatus('success', false, false)).toBe('success')
     expect(historyListStatus('error', true, false)).toBe('error')
+  })
+})
+
+describe('polish2: quiet history refresh keeps loaded rows', () => {
+  it('plans one request covering every loaded row (at least one page)', () => {
+    expect(planSilentHistoryRefresh(0)).toEqual([{ offset: 0, limit: 50 }])
+    expect(planSilentHistoryRefresh(150)).toEqual([{ offset: 0, limit: 150 }])
+    expect(planSilentHistoryRefresh(500)).toEqual([{ offset: 0, limit: 500 }])
+    expect(planSilentHistoryRefresh(1100)).toEqual([
+      { offset: 0, limit: 500 },
+      { offset: 500, limit: 500 },
+      { offset: 1000, limit: 100 },
+    ])
+  })
+
+  it('is quiet only for the same list with rows; a new filter or period resets', () => {
+    expect(isQuietHistoryRefresh('a', 'a', true)).toBe(true)
+    expect(isQuietHistoryRefresh('a', 'b', true)).toBe(false)
+    expect(isQuietHistoryRefresh(null, 'a', true)).toBe(false)
+    expect(isQuietHistoryRefresh('a', 'a', false)).toBe(false)
   })
 })

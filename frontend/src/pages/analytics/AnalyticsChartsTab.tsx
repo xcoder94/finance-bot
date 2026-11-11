@@ -194,6 +194,7 @@ export function AnalyticsChartsTab() {
     fetchKey,
     rangeFetchEnabled,
     false,
+    `${rangeKey}|${currency}`,
   )
 
   const comparisonFetch = useFetchBlock(
@@ -206,6 +207,7 @@ export function AnalyticsChartsTab() {
     fetchKey,
     rangeFetchEnabled,
     false,
+    `${rangeKey}|${currency}`,
   )
 
   const incomeFetch = useFetchBlock(
@@ -218,6 +220,7 @@ export function AnalyticsChartsTab() {
     fetchKey,
     rangeFetchEnabled,
     false,
+    `${rangeKey}|${currency}`,
   )
 
   const subcategoryFetchKey = drillParent ? `${fetchKey}|drill:${drillParent.id}` : 'no-drill'
@@ -237,6 +240,7 @@ export function AnalyticsChartsTab() {
     subcategoryFetchKey,
     rangeFetchEnabled && drillParent !== null,
     false,
+    `${rangeKey}|${currency}|${drillParent?.id ?? ''}`,
   )
 
   const summaryFetch = useFetchBlock(
@@ -246,9 +250,10 @@ export function AnalyticsChartsTab() {
       }
       return fetchSummaryForRange(range.dateFrom, range.dateTo)
     }, [range]),
-    rangeKey,
+    fetchKey,
     rangeFetchEnabled,
     false,
+    rangeKey,
   )
 
   const trendEndMonth = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`
@@ -258,6 +263,7 @@ export function AnalyticsChartsTab() {
     fetchKey,
     rangeFetchEnabled,
     false,
+    `${rangeKey}|${currency}`,
   )
 
   const categoryMaps =

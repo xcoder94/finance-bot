@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Spinner, Text } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
@@ -16,7 +16,11 @@ export function useFetchBlock<T>(
   trigger: unknown,
   enabled: boolean,
   keepStaleData = true,
+  resetKey?: string,
 ) {
+  // resetKey names what the data is about (period, currency). While it stays the same, a new fetch
+  // (return to the app, data change) is quiet: the old data stays on screen until the new arrives.
+  const lastResetKey = useRef<string | undefined>(undefined)
   const [state, setState] = useState<FetchState<T>>({ status: 'loading' })
   const [retryCount, setRetryCount] = useState(0)
 
@@ -26,8 +30,12 @@ export function useFetchBlock<T>(
     }
 
     let cancelled = false
+    const sameSubject = resetKey !== undefined && lastResetKey.current === resetKey
+    lastResetKey.current = resetKey
     setState((current) =>
-      keepStaleData && current.status === 'success' ? current : { status: 'loading' },
+      (keepStaleData || sameSubject) && current.status === 'success'
+        ? current
+        : { status: 'loading' },
     )
 
     void fetcher()
@@ -45,7 +53,7 @@ export function useFetchBlock<T>(
     return () => {
       cancelled = true
     }
-  }, [fetcher, trigger, retryCount, enabled, keepStaleData])
+  }, [fetcher, trigger, retryCount, enabled, keepStaleData, resetKey])
 
   const retry = useCallback(() => {
     setRetryCount((count) => count + 1)

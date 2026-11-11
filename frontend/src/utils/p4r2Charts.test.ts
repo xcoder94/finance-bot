@@ -53,13 +53,13 @@ describe('«Другое» has its own colour (QA #6)', () => {
     expect(other?.color).toBe(OTHER_CATEGORY_COLOR)
     expect(css.match(/--app-category-color-other:/g)?.length).toBe(2)
   })
-  it('«Другое» is a neutral grey (designer review): #6b7280 dark, #9aa0a6 light, not the blue-grey of «Без категории»', () => {
+  it('«Другое» is a neutral grey (designer review): #6b7280 dark, #858b92 light, not the blue-grey of «Без категории»', () => {
     const vars = [...css.matchAll(/--app-category-color-(other|neutral): (#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]])
     expect(vars).toEqual([
       ['neutral', '#8e9aa7'],
       ['other', '#6b7280'],
       ['neutral', '#727d89'],
-      ['other', '#9aa0a6'],
+      ['other', '#858b92'],
     ])
     const hue = (hex: string) => {
       const [r, , b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
@@ -67,7 +67,7 @@ describe('«Другое» has its own colour (QA #6)', () => {
     }
     // grey: almost no blue tint
     expect(hue('#6b7280')).toBeLessThan(25)
-    expect(hue('#9aa0a6')).toBeLessThan(25)
+    expect(hue('#858b92')).toBeLessThan(25)
   })
 })
 
@@ -156,5 +156,32 @@ describe('Analytics header at 320 px is two tidy rows, by design (designer revie
   it('the month name stays on one line and the bar is not left-aligned', () => {
     expect(cssRule('.home-month-bar__label')).toContain('white-space: nowrap')
     expect(cssRule('.home-month-bar')).toContain('justify-content: space-between')
+  })
+})
+
+describe('polish2: «Другое» in the light theme reads against the page (>= 3:1)', () => {
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const ratio = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+  const other = [...css.matchAll(/--app-category-color-other: (#[0-9a-f]{6});/g)][1]?.[1] ?? ''
+  it('contrast with the white page and the grey card is at least 3:1', () => {
+    expect(ratio(other, '#ffffff')).toBeGreaterThanOrEqual(3)
+    expect(ratio(other, '#f1f3f5')).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('polish2: recent category chips are one scrollable row (320 px)', () => {
+  const rule = css.match(/\.recent-category-chips \{[^}]*\}/)?.[0] ?? ''
+  it('do not wrap into several rows and scroll inside the block', () => {
+    expect(rule).toContain('flex-wrap: nowrap')
+    expect(rule).toContain('overflow-x: auto')
   })
 })
