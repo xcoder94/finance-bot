@@ -2453,9 +2453,15 @@ button.home-ops-row:focus-visible {
   width: 100%;
   max-height: 94%;
   overflow: hidden auto;
-  padding: 16px 16px 24px;
+  /* no bottom padding: the sticky action row must sit on the real bottom edge, otherwise
+     content scrolls visibly UNDER the gap below it (N3); the row carries the 24px itself */
+  padding: 16px 16px 0;
   border-radius: 16px 16px 0 0;
   background: var(--bg);
+}
+
+.form-sheet-panel:not(:has(.form-sheet-actions)) {
+  padding-bottom: 24px;
 }
 
 .form-sheet-header {
@@ -2539,7 +2545,7 @@ button.home-ops-row:focus-visible {
   z-index: 1;
   display: flex;
   gap: 8px;
-  margin: 2px -16px -24px;
+  margin: 2px -16px 0;
   padding: 8px 16px 24px;
   background: var(--bg);
 }

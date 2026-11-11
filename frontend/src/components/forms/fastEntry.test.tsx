@@ -81,6 +81,20 @@ describe('FormSheet primary button', () => {
   })
 })
 
+describe('sheet content scrolls above the sticky Save bar (N3)', () => {
+  const css = readFileSync(join(__dirname, '../../index.css'), 'utf8')
+  it('the panel has no bottom padding, so sticky bottom:0 is the real edge', () => {
+    const panel = /\n\.form-sheet-panel \{[^}]*padding: 16px 16px 0;[^}]*\}/.exec(css)
+    expect(panel).not.toBeNull()
+    const actions = /\.form-sheet-actions\s*\{[^}]*\}/.exec(css)?.[0] ?? ''
+    expect(actions).toContain('margin: 2px -16px 0;')
+    expect(actions).toContain('padding: 8px 16px 24px;')
+  })
+  it('a sheet without an action row keeps its bottom padding', () => {
+    expect(css).toContain('.form-sheet-panel:not(:has(.form-sheet-actions))')
+  })
+})
+
 describe('FormSheet delete button (B22)', () => {
   it('renders the visible Удалить block above the sticky save bar', () => {
     const html = renderToStaticMarkup(
