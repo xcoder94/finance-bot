@@ -152,8 +152,28 @@ describe('recent category ids from the server history (bot entries count too)', 
     expect(recentIdsFromHistory(items, many, 'expense')).toHaveLength(MAX_RECENT_CATEGORIES)
   })
 
-  it('server ids win; local ids are the instant fallback when the server has nothing', () => {
-    expect(mergeRecentIds(['a', 'b'], ['x'])).toEqual(['a', 'b'])
+  it('a parent-only operation arrives with the parent in the subcategory field (U2.3)', () => {
+    const items = [
+      item({ expense_category_name: null, expense_subcategory_name: 'Дом' }),
+      item({ expense_category_name: null, expense_subcategory_name: 'Еда', expense_subcategory_translation_key: 'food' }),
+    ]
+    expect(recentIdsFromHistory(items, categories, 'expense')).toEqual(['home', 'food'])
+  })
+
+  it('a name in the subcategory field that is not a top-level category is skipped', () => {
+    const items = [item({ expense_category_name: null, expense_subcategory_name: 'Кафе' })]
+    expect(recentIdsFromHistory(items, categories, 'expense')).toEqual([])
+  })
+
+  it('local and server lists are united: local (just saved) first, no duplicates, max 5', () => {
+    expect(mergeRecentIds(['a', 'b'], ['x', 'a'])).toEqual(['x', 'a', 'b'])
     expect(mergeRecentIds([], ['x'])).toEqual(['x'])
+    expect(mergeRecentIds(['x'], [])).toEqual(['x'])
+    expect(mergeRecentIds(['s1', 's2', 's3'], ['l1', 'l2', 'l3'])).toEqual(['l1', 'l2', 'l3', 's1', 's2'])
+  })
+
+  it('6 saves in the app that the server list only partly knows still give 5 chips', () => {
+    const local = ['f', 'e', 'd', 'c', 'b']
+    expect(mergeRecentIds(['taxi'], local)).toHaveLength(MAX_RECENT_CATEGORIES)
   })
 })

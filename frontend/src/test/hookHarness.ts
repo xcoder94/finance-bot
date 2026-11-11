@@ -14,7 +14,10 @@ class Instance {
   pending: Array<() => void> = []
   renders = 0
   output: unknown
-  constructor(readonly fn: () => unknown) {}
+  fn: () => unknown
+  constructor(fn: () => unknown) {
+    this.fn = fn
+  }
 
   render() {
     current = this

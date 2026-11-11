@@ -139,6 +139,13 @@ export function recentIdsFromHistory<C extends RecentSourceCategory>(
             c.parent_id === parent.id &&
             sameCategory(c, item.expense_subcategory_name, item.expense_subcategory_translation_key),
         )
+      } else if (!item.expense_category_name && item.expense_subcategory_name) {
+        // History API puts a parent-only operation's category into the subcategory field.
+        match = categories.find(
+          (c) =>
+            !c.parent_id &&
+            sameCategory(c, item.expense_subcategory_name, item.expense_subcategory_translation_key),
+        )
       } else {
         match = parent
       }
@@ -153,7 +160,10 @@ export function recentIdsFromHistory<C extends RecentSourceCategory>(
   return ids
 }
 
-/** Server answer wins; the local list only stands in until it arrives (or when the server has none). */
+/**
+ * Union of the device list (saved in this app, so the newest) and the server list (bot, other
+ * devices): local first, then server entries not already there, at most 5.
+ */
 export function mergeRecentIds(serverIds: string[], localIds: string[]): string[] {
-  return serverIds.length > 0 ? serverIds : localIds
+  return [...new Set([...localIds, ...serverIds])].slice(0, MAX_RECENT_CATEGORIES)
 }
