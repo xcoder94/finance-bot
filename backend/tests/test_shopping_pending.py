@@ -357,3 +357,33 @@ class TestFlagInMe:
         monkeypatch.setattr("app.config.RECEIPT_PHOTO_ENABLED", None)
         me = await _build_me_response(session, fam["user"])
         assert me.receipt_photo_enabled is False
+
+
+class TestHintFailure:
+    async def test_telegram_failure_does_not_fail_the_request(
+        self, api_client, monkeypatch
+    ) -> None:
+        client, session = api_client
+
+        class Broken:
+            class session:  # noqa: N801
+                @staticmethod
+                async def close() -> None:
+                    return None
+
+            async def send_message(self, *a, **kw):
+                raise RuntimeError("telegram down")
+
+        async def fake_resolve(bot):
+            return Broken(), True
+
+        monkeypatch.setattr("app.services.shopping_pending_notify.resolve_bot", fake_resolve)
+        fam, tid, ids = await two_items(client, session)
+        r = await create_pending(client, tid, ids, "receipt")
+        assert r.status_code == 201, r.text
+        n = await session.scalar(
+            select(func.count()).select_from(ShoppingPurchase).where(
+                ShoppingPurchase.family_budget_id == fam["user"].family_budget_id
+            )
+        )
+        assert n == 1

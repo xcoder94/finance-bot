@@ -10,7 +10,7 @@ from app.models.goal import Goal
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.goals import GoalCreate, GoalResponse, GoalUpdate
-from app.services.goal_notify import fan_out_achievement, resolve_bot
+from app.services.goal_notify import prepare_achievement, resolve_bot, send_outbox
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_dates import tashkent_today
 from app.services.wallets_categories import get_active_wallet
@@ -113,10 +113,19 @@ async def check_goal_achievement(
     now_crossed = balance >= goal.target_amount
 
     if now_crossed and not goal.crossed:
-        resolved_bot, _owned = await resolve_bot(bot)
-        await fan_out_achievement(session, goal, balance, resolved_bot)
+        # State first, Telegram after commit: a failed notice never fails the saved change.
+        outbox = await prepare_achievement(session, goal, balance)
         goal.crossed = True
         await session.commit()
+        resolved_bot, owned = await resolve_bot(bot)
+        try:
+            await send_outbox(resolved_bot, outbox)
+        finally:
+            if owned:
+                try:
+                    await resolved_bot.session.close()
+                except Exception:  # noqa: BLE001
+                    pass
     elif not now_crossed and goal.crossed:
         goal.crossed = False
         await session.commit()
