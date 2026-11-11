@@ -13,6 +13,27 @@ const slices = [
   { key: 'other', name: 'Другое', value: 50_000, color: '#444' },
 ]
 
+describe('CategoryDonutChart delta noise (polish4)', () => {
+  const render = (list: typeof slices) =>
+    renderToStaticMarkup(<CategoryDonutChart slices={list} onSliceActivate={() => undefined} centerLabel="Расход" />)
+
+  it('no «новая» anywhere when the previous period was empty as a whole', () => {
+    const html = render([
+      { key: 'a', name: 'Еда', value: 700_000, color: '#111', prev: 0 },
+      { key: 'b', name: 'Такси', value: 200_000, color: '#222', prev: 0 },
+    ])
+    expect(html).not.toContain('новая')
+  })
+  it('equal amounts show «=» instead of «0%» next to the share', () => {
+    const html = render([
+      { key: 'a', name: 'Еда', value: 100, color: '#111', prev: 100 },
+      { key: 'b', name: 'Такси', value: 100, color: '#222', prev: 50 },
+    ])
+    expect(html).toMatch(/legend-delta[^>]*>=</)
+    expect(html).not.toMatch(/legend-delta[^>]*>0%</)
+  })
+})
+
 describe('CategoryDonutChart list', () => {
   const html = renderToStaticMarkup(
     <CategoryDonutChart slices={slices} onSliceActivate={() => undefined} centerLabel="Расход" />,

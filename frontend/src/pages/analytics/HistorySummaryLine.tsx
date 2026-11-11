@@ -7,13 +7,8 @@ import { summaryCurrenciesPresent } from '../../utils/historySummaryLine'
 /** One line per currency that has operations in the period: «Доход … · Расход …». */
 export function HistorySummaryLine({ summary }: { summary: SummaryResponse | null }) {
   const { t } = useTranslation()
-  if (!summary) {
-    return null
-  }
-  const rows = summaryCurrenciesPresent(summary.by_currency)
-  if (rows.length === 0) {
-    return null
-  }
+  // The container is always rendered: it reserves the height so the list below does not jump.
+  const rows = summary ? summaryCurrenciesPresent(summary.by_currency) : []
   return (
     <div className="history-summary-line" data-testid="history-summary-line">
       {rows.map((row) => (

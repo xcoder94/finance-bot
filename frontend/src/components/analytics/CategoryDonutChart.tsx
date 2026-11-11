@@ -40,6 +40,7 @@ export function CategoryDonutChart({
     )
   }
 
+  const previousPeriodHasData = slices.some((slice) => (slice.prev ?? 0) > 0)
   const total = slices.reduce((sum, slice) => sum + slice.value, 0)
   const percents = formatSharePercents(slices.map((slice) => slice.value))
   const totalText = formatAnalyticsAmountDigits(total)
@@ -98,8 +99,10 @@ export function CategoryDonutChart({
       <div className="analytics-donut__legend">
         {slices.map((slice, index) => {
           const isInteractive = Boolean(onSliceActivate) && !shouldIgnoreDonutTap(slice.key)
-          const delta =
+          const rawDelta =
             showDelta && slice.prev !== undefined ? deltaLabel(slice.value, slice.prev) : null
+          // «новая» on every row is noise when the whole previous period was empty
+          const delta = rawDelta?.kind === 'new' && !previousPeriodHasData ? null : rawDelta
           const className = isInteractive
             ? 'analytics-donut__legend-item analytics-donut__legend-item--interactive'
             : 'analytics-donut__legend-item'

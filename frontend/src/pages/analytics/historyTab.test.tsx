@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import i18n from 'i18next'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
@@ -39,6 +40,24 @@ describe('summary line', () => {
   it('shows both currencies when both present', () => {
     const html = wrap(<HistorySummaryLine summary={summary([['UZS', 1000, 400], ['USD', 5, 2]])} />)
     expect(html).toContain('$')
+  })
+})
+
+describe('summary line reserved space (polish4)', () => {
+  it('renders the reserved container even while there is no summary yet, so the list does not jump', () => {
+    const html = wrap(<HistorySummaryLine summary={null} />)
+    expect(html).toContain('history-summary-line')
+  })
+  it('keeps one row per currency and hides a zero currency', () => {
+    const html = wrap(<HistorySummaryLine summary={summary([['UZS', 1000, 400], ['USD', 0, 0]])} />)
+    expect(html.match(/history-summary-line__row/g)?.length).toBe(1)
+  })
+  it('weak (CSS text): reserves 2 rows below 360px and 1 row above', () => {
+    const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
+    const base = css.match(/\.history-summary-line \{[^}]*\}/)?.[0] ?? ''
+    expect(base).toContain('min-height')
+    const small = css.slice(css.indexOf('@media (max-width: 359px) {\n  .history-summary-line'))
+    expect(small).toMatch(/\.history-summary-line \{[^}]*min-height/)
   })
 })
 

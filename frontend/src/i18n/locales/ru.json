@@ -340,6 +340,7 @@
     "refDays_many": "за прошлые {{count}} дней",
     "refDays_other": "за прошлые {{count}} дня",
     "deltaNew": "новая",
+    "deltaSame": "=",
     "allExpenses": "Все расходы",
     "allOpsOf": "Все операции «{{name}}» ›",
     "hintRoot": "Нажмите на категорию, чтобы увидеть подробности",

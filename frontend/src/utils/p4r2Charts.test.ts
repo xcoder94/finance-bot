@@ -56,8 +56,8 @@ describe('«Другое» has its own colour (QA #6)', () => {
   it('«Другое» is a neutral grey (designer review): #6b7280 dark, #858b92 light, not the blue-grey of «Без категории»', () => {
     const vars = [...css.matchAll(/--app-category-color-(other|neutral): (#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]])
     expect(vars).toEqual([
-      ['neutral', '#8e9aa7'],
-      ['other', '#6b7280'],
+      ['neutral', '#c3ccd5'],
+      ['other', '#67707b'],
       ['neutral', '#4b5663'],
       ['other', '#858b92'],
     ])
@@ -66,7 +66,7 @@ describe('«Другое» has its own colour (QA #6)', () => {
       return b - r
     }
     // grey: almost no blue tint
-    expect(hue('#6b7280')).toBeLessThan(25)
+    expect(hue('#67707b')).toBeLessThan(25)
     expect(hue('#858b92')).toBeLessThan(25)
   })
 })

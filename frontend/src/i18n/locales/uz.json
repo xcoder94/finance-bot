@@ -329,6 +329,7 @@
     "refDays_one": "oldingi {{count}} kun",
     "refDays_other": "oldingi {{count}} kun",
     "deltaNew": "yangi",
+    "deltaSame": "=",
     "allExpenses": "Barcha xarajatlar",
     "allOpsOf": "«{{name}}» bo'yicha barcha operatsiyalar ›",
     "hintRoot": "Batafsil ko'rish uchun toifani bosing",

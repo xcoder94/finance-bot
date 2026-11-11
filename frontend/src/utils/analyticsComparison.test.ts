@@ -102,7 +102,7 @@ describe('deltaLabel', () => {
   it('signed percent with a real minus', () => {
     expect(deltaLabel(112, 100)).toEqual({ kind: 'up', text: '+12%' })
     expect(deltaLabel(95, 100)).toEqual({ kind: 'down', text: '−5%' })
-    expect(deltaLabel(100, 100)).toEqual({ kind: 'same', text: '0%' })
+    expect(deltaLabel(100, 100)).toEqual({ kind: 'same', text: '=' })
   })
 })
 

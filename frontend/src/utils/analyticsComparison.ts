@@ -73,7 +73,7 @@ export function deltaLabel(amount: number, prevAmount: number): DeltaLabel {
   if (pct < 0) {
     return { kind: 'down', text: `−${Math.abs(pct)}%` }
   }
-  return { kind: 'same', text: '0%' }
+  return { kind: 'same', text: t('analytics.deltaSame') }
 }
 
 export function formatSharePercent(value: number): string {
