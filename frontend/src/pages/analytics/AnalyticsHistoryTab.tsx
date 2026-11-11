@@ -10,6 +10,7 @@ import {
   buildAnalyticsHistoryFetchKey,
   getAnalyticsHistoryExpenseCategoryId,
   excludePersonalWalletRows,
+  historyListStatus,
   historyCurrencyParam,
   isAnalyticsHistoryUncategorized,
 } from '../../utils/analyticsHistoryTab'
@@ -87,9 +88,11 @@ export function AnalyticsHistoryTab() {
   const currencyParam = historyCurrencyParam(historyCategoryFilter, currency)
 
   const [personalWalletIds, setPersonalWalletIds] = useState<ReadonlySet<string>>(new Set())
+  const [walletsReady, setWalletsReady] = useState(false)
   const filterActive = historyCategoryFilter !== null
   useEffect(() => {
     if (!filterActive) {
+      setWalletsReady(false)
       return
     }
     let cancelled = false
@@ -97,9 +100,14 @@ export function AnalyticsHistoryTab() {
       .then((wallets) => {
         if (!cancelled) {
           setPersonalWalletIds(new Set(wallets.filter((w) => w.is_personal).map((w) => w.id)))
+          setWalletsReady(true)
         }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!cancelled) {
+          setWalletsReady(true)
+        }
+      })
     return () => {
       cancelled = true
     }
@@ -238,7 +246,7 @@ export function AnalyticsHistoryTab() {
       ) : null}
 
       <HistoryTransactionList
-        status={historyStatus}
+        status={historyListStatus(historyStatus, filterActive, walletsReady)}
         items={shownItems}
         groupByDay
         totalCount={shownItems.length + Math.max(0, historyTotal - historyItems.length)}

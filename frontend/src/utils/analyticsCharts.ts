@@ -7,6 +7,7 @@ import {
   resolveSubcategoryAmountDisplayName,
 } from './getDisplayName'
 import {
+  CHART_CATEGORY_COLORS,
   getCategoryColor,
   OTHER_CATEGORY_COLOR,
   UNCATEGORIZED_COLOR,
@@ -47,6 +48,44 @@ export type SubcategoryDrillDownState = {
   colorMap: Map<string, number>
 }
 
+const MAX_VISIBLE_SLICES = 8
+
+/** Ids of the biggest entries (at most 8); ties keep creation order. Everything else belongs to «Другое». */
+function pickLargestIds<T>(
+  entries: T[],
+  idOf: (entry: T) => string,
+  amountOf: (entry: T) => number,
+  orderedIds: string[],
+): Set<string> {
+  const rank = (entry: T) => {
+    const index = orderedIds.indexOf(idOf(entry))
+    return index >= 0 ? index : Number.MAX_SAFE_INTEGER
+  }
+  return new Set(
+    [...entries]
+      .sort((left, right) => amountOf(right) - amountOf(left) || rank(left) - rank(right))
+      .slice(0, MAX_VISIBLE_SLICES)
+      .map(idOf),
+  )
+}
+
+/** Keeps the stored colour; a slice that repeats an earlier colour gets the first free palette colour. */
+function distinctColors(slices: DonutSlice[]): DonutSlice[] {
+  const used = new Set<string>()
+  return slices.map((slice) => {
+    if (!used.has(slice.color)) {
+      used.add(slice.color)
+      return slice
+    }
+    const free = CHART_CATEGORY_COLORS.find((color) => !used.has(color))
+    if (!free) {
+      return slice
+    }
+    used.add(free)
+    return { ...slice, color: free }
+  })
+}
+
 export function buildParentCategoryCards(
   entries: CategoryAmount[],
   orderedParentIds: string[],
@@ -61,10 +100,10 @@ export function buildParentCategoryCards(
   const cards: ParentCategoryCard[] = []
   let otherAmount = 0
   const otherParentIds: string[] = []
+  const visibleIds = pickLargestIds(withAmount, (e) => e.category_id, (e) => e.amount, orderedParentIds)
 
   for (const entry of withAmount) {
-    const orderIndex = orderedParentIds.indexOf(entry.category_id)
-    if (orderIndex >= 0 && orderIndex < 8) {
+    if (visibleIds.has(entry.category_id)) {
       cards.push({
         key: entry.category_id,
         name: resolveCategoryAmountDisplayName(entry, displayNameById, t),
@@ -125,10 +164,15 @@ export function prepareSubcategoryDonutSlices(
 
   const slices = new Map<string, DonutSlice>()
   let otherAmount = 0
+  const visibleIds = pickLargestIds(
+    withAmount,
+    (e) => e.subcategory_id,
+    (e) => e.amount,
+    orderedSubcategoryIds,
+  )
 
   for (const entry of withAmount) {
-    const orderIndex = orderedSubcategoryIds.indexOf(entry.subcategory_id)
-    if (orderIndex >= 0 && orderIndex < 8) {
+    if (visibleIds.has(entry.subcategory_id)) {
       slices.set(entry.subcategory_id, {
         key: entry.subcategory_id,
         name: entry.display_name,
@@ -142,7 +186,7 @@ export function prepareSubcategoryDonutSlices(
     otherAmount += entry.amount
   }
 
-  const result = Array.from(slices.values())
+  const result = distinctColors(Array.from(slices.values()))
   if (otherAmount > 0) {
     result.push({
       key: OTHER_CATEGORY_KEY,
@@ -227,11 +271,16 @@ export function prepareDonutSlices(
 
   const slices = new Map<string, DonutSlice>()
   let otherAmount = 0
+  const visibleIds = pickLargestIds(
+    withAmount,
+    (e) => e.category_id,
+    (e) => e.amount,
+    orderedCategoryIds,
+  )
 
   for (const entry of withAmount) {
     const categoryId = entry.category_id
-    const orderIndex = orderedCategoryIds.indexOf(categoryId)
-    if (orderIndex >= 0 && orderIndex < 8) {
+    if (visibleIds.has(categoryId)) {
       slices.set(categoryId, {
         key: categoryId,
         name: resolveCategoryAmountDisplayName(entry, displayNameById, t),
@@ -245,7 +294,7 @@ export function prepareDonutSlices(
     otherAmount += entry.amount
   }
 
-  const result = Array.from(slices.values())
+  const result = distinctColors(Array.from(slices.values()))
   if (uncategorizedAmount > 0) {
     result.push({
       key: UNCATEGORIZED_KEY,

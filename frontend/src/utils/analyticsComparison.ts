@@ -1,5 +1,6 @@
 import { t } from '../i18n/t'
 import { formatChartsEmptyMonth } from './analyticsChartsTab'
+import { groupThousands } from './groupThousands'
 import { shiftMonth, type PeriodTab, type SelectedMonth } from './periodFilter'
 
 const DAY_MS = 86_400_000
@@ -41,7 +42,7 @@ export function buildComparisonLine(input: ComparisonInput): string | null {
   if (pct === 0) {
     return t('analytics.compareSame', { ref })
   }
-  return t(pct > 0 ? 'analytics.compareMore' : 'analytics.compareLess', { pct: Math.abs(pct), ref })
+  return t(pct > 0 ? 'analytics.compareMore' : 'analytics.compareLess', { pct: groupThousands(Math.abs(pct)), ref })
 }
 
 export function buildHeadline(input: {

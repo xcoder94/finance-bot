@@ -55,7 +55,7 @@ describe('WalletsView', () => {
     expect(html).toContain('Общие')
     expect(html).toContain('Личные')
     expect(html).toContain('1 000 сум')
-    expect(html).toContain('-300 сум')
+    expect(html).toContain('−300 сум')
     expect(html).toContain('500 сум')
     expect(html).toContain('Это деньги на кошельках сейчас')
     expect(html.indexOf('Общие')).toBeLessThan(html.indexOf('Личные'))
@@ -70,7 +70,7 @@ describe('WalletsView', () => {
       onRetry: () => {},
     })
     expect(html).toContain('1 000 сум')
-    expect(html).toContain('-$25')
+    expect(html).toContain('−$25')
   })
 
   it('no personal wallets: group hidden', () => {

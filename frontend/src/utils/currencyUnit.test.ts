@@ -12,7 +12,7 @@ describe('owner decision 12: сум / so\'m instead of UZS', () => {
     await i18n.changeLanguage('ru')
     expect(sumUnit()).toBe('сум')
     expect(formatCurrency(3_450_000, 'UZS')).toBe('3 450 000 сум')
-    expect(formatCurrency(-5, 'UZS')).toBe('-5 сум')
+    expect(formatCurrency(-5, 'UZS')).toBe('−5 сум')
     expect(walletCurrencySuffix('UZS')).toBe('сум')
     expect(formatGoalMoney(200_000, 'UZS')).toBe('200 000 сум')
   })

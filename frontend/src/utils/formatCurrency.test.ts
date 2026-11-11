@@ -18,7 +18,7 @@ describe('formatCurrency wrapping', () => {
   })
   it('RU and negative numbers behave the same', async () => {
     await i18n.changeLanguage('ru')
-    expect(formatCurrency(-3_450_000, 'UZS')).toBe('-3 450 000 сум')
+    expect(formatCurrency(-3_450_000, 'UZS')).toBe('−3 450 000 сум')
     expect(formatCurrency(1_500, 'USD')).toBe('$1 500')
   })
   it('groupThousands leaves short numbers alone', () => {

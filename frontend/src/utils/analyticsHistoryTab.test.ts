@@ -6,6 +6,7 @@ import { CHART_CATEGORY_COLORS } from './chartColors'
 import {
   buildAnalyticsHistoryFetchKey,
   excludePersonalWalletRows,
+  historyListStatus,
   historyCurrencyParam,
   getAnalyticsHistoryExpenseCategoryId,
   isAnalyticsHistoryUncategorized,
@@ -82,5 +83,16 @@ describe('excludePersonalWalletRows (B17 remainder)', () => {
   })
   it('keeps everything when no personal wallets', () => {
     expect(excludePersonalWalletRows(rows, new Set())).toHaveLength(3)
+  })
+})
+
+describe('historyListStatus (B17 race)', () => {
+  it('shows the skeleton while the wallet list is not ready and a filter is on', () => {
+    expect(historyListStatus('success', true, false)).toBe('loading')
+  })
+  it('passes the status through otherwise', () => {
+    expect(historyListStatus('success', true, true)).toBe('success')
+    expect(historyListStatus('success', false, false)).toBe('success')
+    expect(historyListStatus('error', true, false)).toBe('error')
   })
 })

@@ -528,12 +528,15 @@ body {
 
 .home-personal-card__stats {
   display: flex;
+  flex-wrap: wrap;
   margin-top: 10px;
   gap: 10px;
 }
 
+/* 320px: three amounts do not fit one row; a stat that does not fit moves down, its figure is never cut */
 .home-personal-card__stat {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: max-content;
 }
 
 .home-personal-card__stat-label {
@@ -549,6 +552,7 @@ body {
   font-weight: 500;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: var(--tx);
 }
 
@@ -2949,6 +2953,7 @@ button.home-ops-row:focus-visible {
 
 .goals-card__amounts {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 10px;
   margin-top: 9px;
@@ -3231,6 +3236,9 @@ button.home-ops-row:focus-visible {
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: var(--tx);
+}
+
+.home-left__num {
   white-space: nowrap;
 }
 
@@ -4546,7 +4554,7 @@ a.tabbar-link:active {
 }
 
 .history-day__total {
-  white-space: nowrap;
+  text-align: right;
 }
 
 .history-summary-line {

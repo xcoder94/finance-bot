@@ -5,7 +5,7 @@ import { groupThousands } from './groupThousands'
 export type Currency = 'UZS' | 'USD'
 
 export function formatCurrency(amount: number, currency: Currency): string {
-  const sign = amount < 0 ? '-' : ''
+  const sign = amount < 0 ? '−' : ''
   const absolute = Math.abs(amount)
   const formatted = groupThousands(absolute)
 

@@ -46,3 +46,12 @@ export function excludePersonalWalletRows<
       !(item.to_wallet_id !== null && personalWalletIds.has(item.to_wallet_id)),
   )
 }
+
+/** With a filter the list is not drawn until the wallet list is known (no personal rows flash in). */
+export function historyListStatus<S extends string>(
+  status: S,
+  filterActive: boolean,
+  walletsReady: boolean,
+): S | 'loading' {
+  return filterActive && !walletsReady && status === 'success' ? 'loading' : status
+}

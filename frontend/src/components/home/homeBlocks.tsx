@@ -5,7 +5,7 @@ import { CountUp } from '../CountUp'
 import { groupThousands } from '../../utils/groupThousands'
 
 function formatSumNumber(value: number): string {
-  const sign = value < 0 ? '-' : ''
+  const sign = value < 0 ? '−' : ''
   return `${sign}${groupThousands(Math.abs(value))}`
 }
 
@@ -39,7 +39,7 @@ function SumAmount({ id, value, negative }: { id: string; value: number; negativ
     <div
       className={`home-left__value${negative ? ' home-left__value--negative' : ''}${sumSizeClass(text)}`}
     >
-      <CountUp id={id} value={value} format={formatSumNumber} /> <span className="home-left__unit">{t('home.unitSum')}</span>
+      <span className="home-left__num"><CountUp id={id} value={value} format={formatSumNumber} /></span> <span className="home-left__unit">{t('home.unitSum')}</span>
     </div>
   )
 }

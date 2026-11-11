@@ -19,11 +19,11 @@ export function HistorySummaryLine({ summary }: { summary: SummaryResponse | nul
       {rows.map((row) => (
         <div key={row.currency} className="history-summary-line__row">
           <span className="history-summary-line__income">
-            {t('home.income')} {formatCurrency(row.income, row.currency as Currency)}
+            {t('home.income')}{'\u00a0'}{formatCurrency(row.income, row.currency as Currency)}
           </span>
           {' · '}
           <span className="history-summary-line__expense">
-            {t('home.expense')} {formatCurrency(row.expense, row.currency as Currency)}
+            {t('home.expense')}{'\u00a0'}{formatCurrency(row.expense, row.currency as Currency)}
           </span>
         </div>
       ))}
