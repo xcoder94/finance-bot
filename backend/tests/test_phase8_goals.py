@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from tests.db_helpers import db_address
 import pytest
+from app.services.goal_notify import drain_background
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -551,7 +552,6 @@ def _mock_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     async def fake_resolve_bot(b: AsyncMock | None) -> tuple[AsyncMock, bool]:
         return (bot if b is None else b), False
 
-    monkeypatch.setattr("app.services.goals.resolve_bot", fake_resolve_bot)
     monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
     return bot
 
@@ -588,6 +588,7 @@ async def test_crossing_sends_to_every_member_owner_button(
     assert resp.status_code == 201, resp.text
     goal_id = uuid.UUID(resp.json()["id"])
 
+    await drain_background()
     assert bot.send_message.await_count == 2
     calls_by_tid: dict[int, tuple] = {
         c.args[0]: (c.args[1], c.kwargs) for c in bot.send_message.await_args_list
@@ -630,10 +631,13 @@ async def test_staying_above_does_not_resend(
         json={"wallet_id": str(wallet.id), "target_amount": 8_000_000},
     )
     assert create_resp.status_code == 201
+    await drain_background()
     assert bot.send_message.await_count == 2
 
+    await drain_background()
     bot.send_message.reset_mock()
     await check_goal_achievement(session, wallet.id, bot=bot)
+    await drain_background()
     bot.send_message.assert_not_awaited()
 
 
@@ -658,6 +662,7 @@ async def test_drop_below_then_cross_sends_again(
     )
     assert create_resp.status_code == 201
     goal_id = uuid.UUID(create_resp.json()["id"])
+    await drain_background()
     bot.send_message.reset_mock()
 
     patch_resp = await client.patch(
@@ -666,6 +671,7 @@ async def test_drop_below_then_cross_sends_again(
         json={"target_amount": 9_000_000},
     )
     assert patch_resp.status_code == 200
+    await drain_background()
     bot.send_message.assert_not_awaited()
 
     goal = await session.get(Goal, goal_id)
@@ -678,6 +684,7 @@ async def test_drop_below_then_cross_sends_again(
         json={"target_amount": 8_000_000},
     )
     assert patch_back.status_code == 200
+    await drain_background()
     assert bot.send_message.await_count == 2
 
 
@@ -813,6 +820,7 @@ async def test_transfer_into_wallet_triggers_achievement(
         json={"wallet_id": str(wallet_to.id), "target_amount": 1_000},
     )
     assert goal_resp.status_code == 201, goal_resp.text
+    await drain_background()
     bot.send_message.reset_mock()
 
     transfer_resp = await client.post(
@@ -826,6 +834,7 @@ async def test_transfer_into_wallet_triggers_achievement(
         },
     )
     assert transfer_resp.status_code == 201, transfer_resp.text
+    await drain_background()
     assert bot.send_message.await_count == 2
     calls_by_tid = {c.args[0] for c in bot.send_message.await_args_list}
     assert owner_tid in calls_by_tid

@@ -10,7 +10,7 @@ from app.models.goal import Goal
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.goals import GoalCreate, GoalResponse, GoalUpdate
-from app.services.goal_notify import prepare_achievement, resolve_bot, send_outbox
+from app.services.goal_notify import prepare_achievement, queue_notice
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_dates import tashkent_today
 from app.services.wallets_categories import get_active_wallet
@@ -91,11 +91,17 @@ async def get_goal_in_family(
 async def get_active_goal_for_wallet(
     session: AsyncSession,
     wallet_id: uuid.UUID,
+    *,
+    lock: bool = False,
 ) -> Goal | None:
     stmt = select(Goal).where(
         Goal.wallet_id == wallet_id,
         Goal.status == "active",
     )
+    if lock:
+        # Two concurrent operations that both reach the target must notify once: the second
+        # waits here, then re-reads the committed `crossed` flag.
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
     return await session.scalar(stmt)
 
 
@@ -105,7 +111,7 @@ async def check_goal_achievement(
     *,
     bot: Bot | None = None,
 ) -> None:
-    goal = await get_active_goal_for_wallet(session, wallet_id)
+    goal = await get_active_goal_for_wallet(session, wallet_id, lock=True)
     if goal is None:
         return
 
@@ -116,16 +122,9 @@ async def check_goal_achievement(
         # State first, Telegram after commit: a failed notice never fails the saved change.
         outbox = await prepare_achievement(session, goal, balance)
         goal.crossed = True
+        for chat_id, text, reply_markup in outbox:
+            queue_notice(session, bot, chat_id, text, reply_markup=reply_markup)
         await session.commit()
-        resolved_bot, owned = await resolve_bot(bot)
-        try:
-            await send_outbox(resolved_bot, outbox)
-        finally:
-            if owned:
-                try:
-                    await resolved_bot.session.close()
-                except Exception:  # noqa: BLE001
-                    pass
     elif not now_crossed and goal.crossed:
         goal.crossed = False
         await session.commit()

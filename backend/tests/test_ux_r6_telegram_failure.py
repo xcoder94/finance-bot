@@ -32,7 +32,7 @@ def _failing_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     async def fake_resolve_bot(b):  # noqa: ANN001
         return (bot if b is None else b), False
 
-    monkeypatch.setattr("app.services.goals.resolve_bot", fake_resolve_bot)
+    monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
     return bot
 
 
@@ -51,6 +51,7 @@ async def test_goal_create_already_achieved_survives_telegram_failure(
         json={"wallet_id": str(wallet.id), "target_amount": 8_000_000},
     )
     assert resp.status_code == 201, resp.text
+    await goal_notify.drain_background()
     assert bot.send_message.await_count == 2  # every member was tried
     count = await session.scalar(
         select(func.count()).select_from(Goal).where(Goal.wallet_id == wallet.id)

@@ -55,6 +55,7 @@ from app.services.ownership_transfer import (
     request_ownership_transfer,
 )
 from tests.auth_helpers import TEST_APP_PASS_SECRET, bearer_header_for_telegram_id
+from tests.notice_helpers import settle
 from tests.test_members import auth_headers, create_user_with_budget
 
 TEST_BOT_USERNAME = "finance_test_bot"
@@ -129,13 +130,7 @@ def _mock_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     async def fake_resolve_bot(b: AsyncMock | None) -> tuple[AsyncMock, bool]:
         return (bot if b is None else b), False
 
-    monkeypatch.setattr(
-        "app.services.membership_lifecycle.resolve_bot", fake_resolve_bot
-    )
     monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
-    monkeypatch.setattr(
-        "app.services.ownership_transfer.resolve_bot", fake_resolve_bot
-    )
     return bot
 
 
@@ -1429,6 +1424,7 @@ async def test_transfer_accept_swaps_roles_and_notifies_former_and_remaining(
             bot=None,
         )
         assert transfer.status == "pending"
+        await settle(session)
         assert bot.send_message.await_count == 1
         assert transfer_offer("Семья Каримовых") in bot.send_message.await_args.args[1]
 
@@ -1451,6 +1447,7 @@ async def test_transfer_accept_swaps_roles_and_notifies_former_and_remaining(
         assert recipient.role == "owner"
         assert transfer.status == "accepted"
 
+        await settle(session)
         messages = {
             call.args[0]: call.args[1]
             for call in bot.send_message.await_args_list
@@ -1496,6 +1493,7 @@ async def test_transfer_refuse_keeps_owner_and_notifies_former(
             budget=budget,
             bot=None,
         )
+        await settle(session)
         bot.send_message.reset_mock()
 
         await refuse_ownership_transfer(
@@ -1514,6 +1512,7 @@ async def test_transfer_refuse_keeps_owner_and_notifies_former(
         assert recipient.role == "member"
         assert transfer.status == "refused"
 
+        await settle(session)
         bot.send_message.assert_awaited_once_with(
             owner.telegram_id,
             transfer_refused_to_former("Рустам"),

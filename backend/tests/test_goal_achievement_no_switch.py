@@ -15,6 +15,7 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services import goal_notify
 from app.services.goal_notify import format_achievement_message
 from tests.test_wallets_categories import api_client, auth_headers, create_user_with_budget
 
@@ -102,7 +103,6 @@ def _mock_bot(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     async def fake_resolve_bot(b: AsyncMock | None) -> tuple[AsyncMock, bool]:
         return (bot if b is None else b), False
 
-    monkeypatch.setattr("app.services.goals.resolve_bot", fake_resolve_bot)
     monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve_bot)
     return bot
 
@@ -138,6 +138,7 @@ async def test_achievement_sends_despite_both_notification_switches_off(
 
     expected_text = format_achievement_message("Накопления", 8_200_000, 8_000_000, "UZS")
 
+    await goal_notify.drain_background()
     assert bot.send_message.await_count == 2
     calls_by_tid: dict[int, tuple] = {
         c.args[0]: (c.args[1], c.kwargs) for c in bot.send_message.await_args_list

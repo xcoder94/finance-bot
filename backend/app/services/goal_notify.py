@@ -1,11 +1,13 @@
+import asyncio
 import logging
 import uuid
 from typing import Any
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.config import BOT_TOKEN
 from app.models.goal import Goal
@@ -105,12 +107,87 @@ async def resolve_bot(bot: Bot | None) -> tuple[Bot, bool]:
 
 async def send_notice_safe(bot: Bot, chat_id: int, text: str, **kwargs: Any) -> bool:
     """Best-effort Telegram notice: a delivery failure never breaks the caller's
-    already-decided state change. The error is logged (type only, no text)."""
+    already-decided state change. The error is logged (type only, no text).
+    A hanging Telegram is cut off after NOTICE_TIMEOUT_SECONDS."""
     try:
-        await bot.send_message(chat_id, text, **kwargs)
+        await asyncio.wait_for(
+            bot.send_message(chat_id, text, **kwargs), timeout=NOTICE_TIMEOUT_SECONDS
+        )
     except Exception as exc:  # noqa: BLE001 - blocked bot, network, bad token...
         logging.getLogger(__name__).warning(
             "telegram notice to %s not delivered: %s", chat_id, type(exc).__name__
         )
         return False
     return True
+
+
+# --- Deferred delivery (ux-r7) -------------------------------------------------
+# API requests never wait for Telegram: notices are queued on the session and sent by a
+# background task only after the outermost commit (rolled back -> dropped).
+
+NOTICE_TIMEOUT_SECONDS = 5.0
+_QUEUE_KEY = "notice_queue"
+_background_tasks: set[asyncio.Task[None]] = set()
+
+Notice = tuple[int, str, dict[str, Any]]
+
+
+def queue_notice(
+    session: AsyncSession,
+    bot: Bot | None,
+    chat_id: int,
+    text: str,
+    **kwargs: Any,
+) -> None:
+    """Queue a notice; it is sent after the session commits. bot=None -> own Bot at send time."""
+    queue = session.sync_session.info.setdefault(_QUEUE_KEY, [])
+    queue.append((bot, (chat_id, text, kwargs)))
+
+
+async def deliver(bot: Bot | None, notices: list[Notice]) -> None:
+    resolved, owned = await resolve_bot(bot)
+    try:
+        await asyncio.gather(
+            *(send_notice_safe(resolved, cid, text, **kw) for cid, text, kw in notices)
+        )
+    except Exception:  # noqa: BLE001 - background task must never raise
+        logging.getLogger(__name__).warning("notice delivery failed")
+    finally:
+        if owned:
+            try:
+                await resolved.session.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def spawn_background(coro: Any) -> None:
+    task = asyncio.get_running_loop().create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+async def drain_background() -> None:
+    """Wait for in-flight notice tasks (tests / graceful shutdown)."""
+    while _background_tasks:
+        await asyncio.gather(*list(_background_tasks), return_exceptions=True)
+
+
+@event.listens_for(Session, "after_commit")
+def _flush_queue_after_commit(session: Session) -> None:
+    queue = session.info.pop(_QUEUE_KEY, None)
+    if not queue:
+        return
+    groups: dict[int, tuple[Bot | None, list[Notice]]] = {}
+    for bot, notice in queue:
+        groups.setdefault(id(bot), (bot, []))[1].append(notice)
+    try:
+        for bot, notices in groups.values():
+            spawn_background(deliver(bot, notices))
+    except RuntimeError:  # no running loop: nothing to send with
+        pass
+
+
+@event.listens_for(Session, "after_soft_rollback")
+def _drop_queue_on_rollback(session: Session, previous_transaction: Any) -> None:
+    if not previous_transaction.nested:  # a savepoint rollback keeps the outer queue
+        session.info.pop(_QUEUE_KEY, None)

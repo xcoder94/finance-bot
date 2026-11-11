@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from tests.db_helpers import db_address
 import pytest
+from app.services.goal_notify import drain_background
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -281,12 +282,13 @@ class TestDeleteMember:
         headers = auth_headers(owner_tid)
 
         with patch(
-            "app.services.membership_lifecycle.resolve_bot",
+            "app.services.goal_notify.resolve_bot",
             new=AsyncMock(return_value=(AsyncMock(), False)),
         ):
             delete_resp = await client.delete(
                 f"/api/v1/members/{member.id}", headers=headers
             )
+            await drain_background()
         assert delete_resp.status_code == 200
         assert delete_resp.json() == {
             "id": str(member.id),
@@ -340,12 +342,13 @@ class TestDeleteMember:
         headers = auth_headers(owner_tid)
 
         with patch(
-            "app.services.membership_lifecycle.resolve_bot",
+            "app.services.goal_notify.resolve_bot",
             new=AsyncMock(return_value=(AsyncMock(), False)),
         ):
             first_delete = await client.delete(
                 f"/api/v1/members/{member.id}", headers=headers
             )
+            await drain_background()
         assert first_delete.status_code == 200
 
         second_delete = await client.delete(f"/api/v1/members/{member.id}", headers=headers)

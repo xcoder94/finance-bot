@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.family_budget import FamilyBudget
 from app.models.ownership_transfer import OwnershipTransfer
 from app.models.user import User
-from app.services.goal_notify import resolve_bot, send_notice_safe
+from app.services.goal_notify import queue_notice
 from app.services.bot_texts import t
 from app.services.member_texts import (
     transfer_accepted_to_former,
@@ -167,17 +167,13 @@ async def request_ownership_transfer(
     session.add(transfer)
     await session.flush()
 
-    resolved_bot, owned = await resolve_bot(bot)
-    try:
-        await send_notice_safe(
-            resolved_bot,
-            recipient.telegram_id,
-            transfer_offer(budget.name, recipient),
-            reply_markup=transfer_offer_keyboard(transfer.id, recipient.language),
-        )
-    finally:
-        if owned:
-            await resolved_bot.session.close()
+    queue_notice(
+        session,
+        bot,
+        recipient.telegram_id,
+        transfer_offer(budget.name, recipient),
+        reply_markup=transfer_offer_keyboard(transfer.id, recipient.language),
+    )
 
     return transfer
 
@@ -226,22 +222,19 @@ async def accept_ownership_transfer(
         )
     ).all()
 
-    resolved_bot, owned = await resolve_bot(bot)
-    try:
-        await send_notice_safe(
-            resolved_bot,
-            former_owner.telegram_id,
-            transfer_accepted_to_former(new_owner_name, budget_name, former_owner),
+    queue_notice(
+        session,
+        bot,
+        former_owner.telegram_id,
+        transfer_accepted_to_former(new_owner_name, budget_name, former_owner),
+    )
+    for member in remaining:
+        queue_notice(
+            session,
+            bot,
+            member.telegram_id,
+            transfer_accepted_to_others(new_owner_name, budget_name, member),
         )
-        for member in remaining:
-            await send_notice_safe(
-                resolved_bot,
-                member.telegram_id,
-                transfer_accepted_to_others(new_owner_name, budget_name, member),
-            )
-    finally:
-        if owned:
-            await resolved_bot.session.close()
 
 
 async def refuse_ownership_transfer(
@@ -272,13 +265,9 @@ async def refuse_ownership_transfer(
     transfer.status = "refused"
     recipient_name = display_name(recipient)
 
-    resolved_bot, owned = await resolve_bot(bot)
-    try:
-        await send_notice_safe(
-            resolved_bot,
-            former_owner.telegram_id,
-            transfer_refused_to_former(recipient_name, former_owner),
-        )
-    finally:
-        if owned:
-            await resolved_bot.session.close()
+    queue_notice(
+        session,
+        bot,
+        former_owner.telegram_id,
+        transfer_refused_to_former(recipient_name, former_owner),
+    )

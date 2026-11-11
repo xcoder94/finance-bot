@@ -38,7 +38,7 @@ def _flag_on_and_hint_recorder(monkeypatch):
     async def fake_resolve(bot):
         return Recorder(), True
 
-    monkeypatch.setattr("app.services.shopping_pending_notify.resolve_bot", fake_resolve)
+    monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve)
     return sent
 
 
@@ -377,7 +377,7 @@ class TestHintFailure:
         async def fake_resolve(bot):
             return Broken(), True
 
-        monkeypatch.setattr("app.services.shopping_pending_notify.resolve_bot", fake_resolve)
+        monkeypatch.setattr("app.services.goal_notify.resolve_bot", fake_resolve)
         fam, tid, ids = await two_items(client, session)
         r = await create_pending(client, tid, ids, "receipt")
         assert r.status_code == 201, r.text
