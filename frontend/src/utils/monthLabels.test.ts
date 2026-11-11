@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import i18n from '../i18n'
+import { stubIntlWithoutUzbekMonths } from '../test/noUzbekIntl'
 
 import { formatChartsEmptyMonth } from './analyticsChartsTab'
 import { formatMonthTitle } from './homeMonth'
 import { formatMonthLabel, formatShortMonthKey } from './periodFilter'
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
   await i18n.changeLanguage('ru')
 })
 
@@ -40,11 +42,20 @@ describe('month labels case (P3-6)', () => {
       expect(formatMonthLabel({ year: 2026, month: 11 })).not.toMatch(/г\./)
     }
   })
-  it('UZ short month keys come from app strings: Noy / Dek, never M12 (B6)', async () => {
+  it('UZ short month keys come from app strings: Noy / Dek, even where Intl has no Uzbek (B6)', async () => {
+    stubIntlWithoutUzbekMonths()
     await i18n.changeLanguage('uz')
     expect(formatShortMonthKey('2026-11')).toBe('Noy')
     expect(formatShortMonthKey('2026-12')).toBe('Dek')
-    expect(formatShortMonthKey('2026-01')).not.toMatch(/^M\d+$/)
+    for (let month = 1; month <= 12; month += 1) {
+      expect(formatShortMonthKey(`2026-${String(month).padStart(2, '0')}`)).not.toMatch(/\d/)
+    }
+  })
+  it('UZ month title and empty-month name never print a raw «M12» where Intl has no Uzbek', async () => {
+    stubIntlWithoutUzbekMonths()
+    await i18n.changeLanguage('uz')
+    expect(formatMonthLabel({ year: 2026, month: 12 })).toBe('2026-yil dekabr')
+    expect(formatChartsEmptyMonth({ year: 2026, month: 12 })).toBe('Dekabr')
   })
   it('RU short month key', async () => {
     await i18n.changeLanguage('ru')

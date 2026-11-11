@@ -15,6 +15,8 @@ class Instance {
   renders = 0
   output: unknown
   fn: () => unknown
+  /** Called with the rendered output before effects run: attach fake DOM nodes to refs here. */
+  onRendered?: (output: unknown) => void
   constructor(fn: () => unknown) {
     this.fn = fn
   }
@@ -26,6 +28,7 @@ class Instance {
     this.dirty = false
     this.output = this.fn()
     current = null
+    this.onRendered?.(this.output)
     const run = this.pending
     this.pending = []
     run.forEach((effect) => effect())
@@ -88,6 +91,13 @@ export function useRef<T>(init: T) {
   return s.value as { current: T }
 }
 
+let idCounter = 0
+export function useId() {
+  const { s } = slot()
+  if (!('value' in s)) s.value = `:h${(idCounter += 1)}:`
+  return s.value as string
+}
+
 export function reactHarnessModule() {
   return {
     useState,
@@ -96,13 +106,19 @@ export function reactHarnessModule() {
     useMemo,
     useCallback,
     useRef,
-    default: { useState, useEffect, useLayoutEffect: useEffect, useMemo, useCallback, useRef },
+    useId,
+    default: { useState, useEffect, useLayoutEffect: useEffect, useMemo, useCallback, useRef, useId },
   }
 }
 
 /** Renders `fn` and keeps re-rendering while state changes; each tick lets promises settle. */
-export async function mountHook<T>(fn: () => T, ticks = 40) {
+export async function mountHook<T>(
+  fn: () => T,
+  ticks = 40,
+  onRendered?: (output: unknown) => void,
+) {
   const inst = new Instance(fn)
+  inst.onRendered = onRendered
   inst.render()
   const settle = async (n = ticks) => {
     for (let i = 0; i < n; i += 1) {

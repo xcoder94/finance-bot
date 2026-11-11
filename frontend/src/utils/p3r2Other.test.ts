@@ -34,6 +34,15 @@ describe('«Другое» holds the smallest categories, not the newest (QA P3 
     expect(new Set(colours).size).toBe(colours.length)
   })
 
+  it('categories that were all stored with the same colour still get different colours on the chart', () => {
+    const sameColour = new Map(ids.map((id) => [id, 0] as const))
+    const slices = prepareDonutSlices(entries, ids, sameColour, 'Другое', t)
+    const colours = slices.filter((s) => s.key !== 'other').map((s) => s.color)
+    expect(colours).toHaveLength(8)
+    expect(new Set(colours).size).toBe(8)
+    expect(colours).not.toContain(slices.find((s) => s.key === 'other')!.color)
+  })
+
   it('subcategories: same rule', () => {
     const subs = ids.map((id, i) => ({
       subcategory_id: id,

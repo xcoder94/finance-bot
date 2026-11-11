@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+import { stubIntlWithoutUzbekMonths } from '../test/noUzbekIntl'
 
 import {
   addDays,
@@ -130,8 +132,14 @@ describe('formatChipDate in Uzbek (own month names, never Intl) (P1-1)', () => {
     expect(formatChipDate('2025-11-08', '2026-11-10', 'uz-UZ')).toBe('2025-yil 8-noyabr')
     expect(formatChipDate('2026-01-01', '2026-11-10', 'uz-UZ')).toBe('1-yanvar')
   })
-  it('never prints the Intl fallback «M11»', () => {
-    expect(formatChipDate('2026-11-07', '2026-11-10', 'uz-UZ')).not.toMatch(/M\d/)
+  it('never prints the Intl fallback «M11» on a device whose Intl has no Uzbek months', () => {
+    stubIntlWithoutUzbekMonths()
+    try {
+      expect(formatChipDate('2026-11-07', '2026-11-10', 'uz-UZ')).toBe('7-noyabr')
+      expect(formatChipDate('2025-12-08', '2026-11-10', 'uz-UZ')).toBe('2025-yil 8-dekabr')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 
