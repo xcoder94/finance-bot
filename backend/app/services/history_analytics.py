@@ -55,11 +55,14 @@ def resolve_analytics_date_range(
     return date_from, date_to
 
 
-def resolve_previous_period(date_from: datetime, date_to: datetime) -> tuple[datetime, datetime]:
+def _resolve_previous_period_unchecked(
+    date_from: datetime, date_to: datetime
+) -> tuple[datetime, datetime] | None:
     """Period right before [date_from, date_to].
 
     A full Tashkent calendar month -> the previous calendar month. Anything else -> a range of the
     same length (rounded up to whole seconds) ending 1 microsecond before date_from.
+    None when the previous period cannot be represented (dates at the edge of the calendar).
     """
     if date_from.tzinfo is None:
         date_from = date_from.replace(tzinfo=UTC)
@@ -82,6 +85,15 @@ def resolve_previous_period(date_from: datetime, date_to: datetime) -> tuple[dat
     prev_to = date_from - timedelta(microseconds=1)
     prev_from = date_from - timedelta(seconds=span_seconds)
     return prev_from, prev_to
+
+
+def resolve_previous_period(
+    date_from: datetime, date_to: datetime
+) -> tuple[datetime, datetime] | None:
+    try:
+        return _resolve_previous_period_unchecked(date_from, date_to)
+    except OverflowError:
+        return None
 
 
 async def count_family_users(session: AsyncSession, family_budget_id: uuid.UUID) -> int:
@@ -406,10 +418,14 @@ async def get_history(
 
 def _period_sums(date_from: datetime, date_to: datetime):
     """Current-period and previous-period sums over one scan of [prev_from, date_to]."""
-    prev_from, prev_to = resolve_previous_period(date_from, date_to)
+    previous = resolve_previous_period(date_from, date_to)
     in_current = (Transaction.transaction_date >= date_from) & (Transaction.transaction_date <= date_to)
-    in_prev = (Transaction.transaction_date >= prev_from) & (Transaction.transaction_date <= prev_to)
     cur = func.coalesce(func.sum(Transaction.amount).filter(in_current), 0)
+    if previous is None:
+        # no representable previous period: scan only the current one, prev sums are 0
+        return date_from, cur, literal(0)
+    prev_from, prev_to = previous
+    in_prev = (Transaction.transaction_date >= prev_from) & (Transaction.transaction_date <= prev_to)
     prev = func.coalesce(func.sum(Transaction.amount).filter(in_prev), 0)
     return prev_from, cur, prev
 
@@ -516,7 +532,7 @@ async def get_expense_comparison(
 ) -> ExpenseComparison:
     wallet = aliased(Wallet)
     prev_from, cur_sum, prev_sum = _period_sums(date_from, date_to)
-    _, prev_to = resolve_previous_period(date_from, date_to)
+    previous = resolve_previous_period(date_from, date_to)
     stmt = (
         select(cur_sum, prev_sum)
         .join(wallet, Transaction.wallet_id == wallet.id)
@@ -535,8 +551,8 @@ async def get_expense_comparison(
         currency=currency,
         total=int(total or 0),
         prev_total=int(prev_total or 0),
-        prev_date_from=prev_from,
-        prev_date_to=prev_to,
+        prev_date_from=previous[0] if previous else None,
+        prev_date_to=previous[1] if previous else None,
     )
 
 

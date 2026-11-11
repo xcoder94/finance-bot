@@ -59,8 +59,8 @@ class ExpenseComparison(BaseModel):
     currency: str
     total: int = Field(ge=0)
     prev_total: int = Field(ge=0)
-    prev_date_from: datetime
-    prev_date_to: datetime
+    prev_date_from: datetime | None = None
+    prev_date_to: datetime | None = None
 
 
 class SubcategoryAmount(BaseModel):

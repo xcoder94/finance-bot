@@ -277,3 +277,38 @@ def test_resolve_previous_period_october_gives_september_dates():
     assert pf == datetime(2026, 9, 1, tzinfo=TZ)
     assert pt.astimezone(TZ).date().isoformat() == "2026-09-30"
     assert (pt.astimezone(TZ).date() - pf.astimezone(TZ).date()).days + 1 == 30
+
+
+def test_resolve_previous_period_none_at_calendar_edge():
+    lo = datetime(1, 1, 1, tzinfo=UTC)
+    hi = datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC)
+    assert resolve_previous_period(lo, lo + timedelta(days=1)) is None
+
+
+async def test_far_dates_do_not_500(api_client):
+    client, session = api_client
+    tg = _tg()
+    _, _, food, _, _, _, _ = await _seed(session, tg)
+    far = {"date_from": "0001-01-01T00:00:00+00:00", "date_to": "9999-12-31T23:59:59+00:00"}
+    ranges = [far, {**far, "date_to": NOV["date_to"]}, {**far, "date_from": NOV["date_from"]}]
+    for rng in ranges:
+        for path, extra in [
+            ("expenses-by-category", {}),
+            ("income-by-category", {}),
+            ("expenses-by-subcategory", {"parent_category_id": str(food.id)}),
+            ("expense-comparison", {}),
+        ]:
+            resp = await client.get(
+                f"/api/v1/analytics/{path}",
+                headers=auth_headers(tg),
+                params={"currency": "UZS", **extra, **rng},
+            )
+            assert resp.status_code == 200, (path, rng, resp.text)
+    resp = await client.get(
+        "/api/v1/analytics/expense-comparison",
+        headers=auth_headers(tg),
+        params={"currency": "UZS", **far},
+    )
+    body = resp.json()
+    assert body["prev_total"] == 0 and body["prev_date_from"] is None
+    assert body["total"] > 0
