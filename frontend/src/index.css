@@ -35,7 +35,7 @@
   --app-category-color-7: #a99bf2;
   --app-category-color-8: #ff7b82;
   --app-category-color-neutral: #8e9aa7;
-  --app-category-color-other: #c9b27a;
+  --app-category-color-other: #6b7280;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -80,7 +80,7 @@
   --app-category-color-7: #6250b5;
   --app-category-color-8: #c43d44;
   --app-category-color-neutral: #727d89;
-  --app-category-color-other: #8a7340;
+  --app-category-color-other: #9aa0a6;
 }
 
 .app-theme {

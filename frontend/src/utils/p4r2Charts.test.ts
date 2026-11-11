@@ -53,6 +53,22 @@ describe('«Другое» has its own colour (QA #6)', () => {
     expect(other?.color).toBe(OTHER_CATEGORY_COLOR)
     expect(css.match(/--app-category-color-other:/g)?.length).toBe(2)
   })
+  it('«Другое» is a neutral grey (designer review): #6b7280 dark, #9aa0a6 light, not the blue-grey of «Без категории»', () => {
+    const vars = [...css.matchAll(/--app-category-color-(other|neutral): (#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]])
+    expect(vars).toEqual([
+      ['neutral', '#8e9aa7'],
+      ['other', '#6b7280'],
+      ['neutral', '#727d89'],
+      ['other', '#9aa0a6'],
+    ])
+    const hue = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+      return b - r
+    }
+    // grey: almost no blue tint
+    expect(hue('#6b7280')).toBeLessThan(25)
+    expect(hue('#9aa0a6')).toBeLessThan(25)
+  })
 })
 
 describe('legend names wrap instead of being cut to 5 letters (QA #9)', () => {
