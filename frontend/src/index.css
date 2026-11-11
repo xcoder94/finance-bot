@@ -4567,6 +4567,33 @@ a.tabbar-link:active {
   margin-top: -4px;
 }
 
+.recent-category-chips .date-chip {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* P1 polish: 320 px truncation */
+@media (max-width: 360px) {
+  .home-ops-row {
+    gap: 8px;
+  }
+
+  .home-ops-row__title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .home-ops-row__amount {
+    font-size: 13px;
+  }
+}
+/* end P1 polish */
+
 .empty-state-icon {
   display: flex;
   align-items: center;
