@@ -111,10 +111,20 @@ async def check_goal_achievement(
     *,
     bot: Bot | None = None,
 ) -> None:
+    # Cheap unlocked look first: when nothing changes (goal far from the threshold or already
+    # flagged) no row lock is taken, so nothing is held across the next wallet.
+    goal = await get_active_goal_for_wallet(session, wallet_id)
+    if goal is None:
+        return
+    balance = await wallet_balance(session, wallet_id)
+    if (balance >= goal.target_amount) == goal.crossed:
+        return
+
+    # The flag must flip: lock, re-read the committed flag (a concurrent request may have
+    # flipped it already) and decide again.
     goal = await get_active_goal_for_wallet(session, wallet_id, lock=True)
     if goal is None:
         return
-
     balance = await wallet_balance(session, wallet_id)
     now_crossed = balance >= goal.target_amount
 

@@ -42,7 +42,9 @@ async def _check_affected_wallets(
     *,
     bot: Bot | None = None,
 ) -> None:
-    for wallet_id in wallet_ids:
+    # Fixed order (sorted ids): concurrent requests touching the same wallets never lock
+    # goal rows crosswise.
+    for wallet_id in sorted(wallet_ids, key=str):
         await check_goal_achievement(session, wallet_id, bot=bot)
 
 

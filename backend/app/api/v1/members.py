@@ -20,11 +20,13 @@ from app.schemas.members import (
     TransferResponse,
 )
 from app.services.membership_lifecycle import (
+    MemberAlreadyDetachedError,
     OwnerCannotDetachError,
     detach_member_to_own_budget,
 )
 from app.services.ownership_transfer import (
     InvalidTransferTargetError,
+    TransferConflictError,
     request_ownership_transfer,
 )
 from app.services.invite import (
@@ -163,13 +165,17 @@ async def delete_member(
     member_role = member.role
     member_first_name = member.first_name
 
-    await detach_member_to_own_budget(
-        session,
-        departing_user=member,
-        old_budget=old_budget,
-        reason="removed",
-        bot=None,
-    )
+    try:
+        await detach_member_to_own_budget(
+            session,
+            departing_user=member,
+            old_budget=old_budget,
+            reason="removed",
+            bot=None,
+        )
+    except MemberAlreadyDetachedError:
+        await session.rollback()
+        raise HTTPException(status_code=404) from None
     await session.commit()
 
     return MemberDeleteResponse(
@@ -204,6 +210,9 @@ async def leave_family(
         )
     except OwnerCannotDetachError:
         raise HTTPException(status_code=400, detail="owner_cannot_leave") from None
+    except MemberAlreadyDetachedError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="already_left") from None
 
     await session.commit()
 
@@ -241,6 +250,8 @@ async def transfer_ownership(
         )
     except InvalidTransferTargetError as exc:
         raise HTTPException(status_code=400, detail="invalid_transfer_target") from exc
+    except TransferConflictError as exc:
+        raise HTTPException(status_code=409, detail="transfer_in_progress") from exc
 
     await session.commit()
     await session.refresh(transfer)

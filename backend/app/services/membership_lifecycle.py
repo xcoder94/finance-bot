@@ -31,6 +31,10 @@ class OwnerCannotDetachError(Exception):
     pass
 
 
+class MemberAlreadyDetachedError(Exception):
+    """A parallel request already moved this person out of the budget."""
+
+
 def personal_wallet_transaction_clause(personal_wallet_ids: list[uuid.UUID]):
     """Match any transaction touching one of the given personal wallet ids on
     either side (wallet_id or to_wallet_id).
@@ -162,6 +166,11 @@ async def detach_member_to_own_budget(
     reason: Literal["removed", "left"],
     bot: Bot | None = None,
 ) -> FamilyBudget:
+    # Serialise duplicates (double leave, leave + remove): the second one waits here, then sees
+    # the person already moved and stops before any notice or new budget is created.
+    await session.refresh(departing_user, with_for_update=True)
+    if departing_user.family_budget_id != old_budget.id or departing_user.is_deleted:
+        raise MemberAlreadyDetachedError()
     if departing_user.role == "owner":
         raise OwnerCannotDetachError()
 

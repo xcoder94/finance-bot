@@ -3,6 +3,7 @@ import uuid
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.family_budget import FamilyBudget
@@ -20,6 +21,10 @@ from app.services.member_texts import (
 
 class InvalidTransferTargetError(Exception):
     pass
+
+
+class TransferConflictError(Exception):
+    """A concurrent request already created the pending offer for this family."""
 
 
 class TransferNotFoundError(Exception):
@@ -165,7 +170,11 @@ async def request_ownership_transfer(
         status="pending",
     )
     session.add(transfer)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError as exc:  # parallel duplicate: the one-pending-per-family index
+        await session.rollback()  # also drops the queued notices of this request
+        raise TransferConflictError() from exc
 
     queue_notice(
         session,
