@@ -39,7 +39,7 @@ import {
   peekPersonalSummary,
   peekPersonalWalletBalances,
 } from '../store/dataCacheStore'
-import { resolveFetchState, type FetchState, type KeyedFetchState } from '../utils/homeFetchState'
+import { useFetchBlock } from '../hooks/useFetchBlock'
 import { daysLeftInMonth, monthHasIncome, perDayAllowance, remainingFromSummary } from '../utils/homeLeft'
 import {
   loadDismissedAt,
@@ -126,50 +126,6 @@ function formatTransactionDateShort(isoDate: string): string {
     day: '2-digit',
     month: '2-digit',
   }).format(new Date(isoDate))
-}
-
-function useFetchBlock<T>(
-  fetcher: () => Promise<T>,
-  trigger: unknown,
-  initialData: T | null = null,
-  dataKey = 'static',
-) {
-  const [stored, setStored] = useState<KeyedFetchState<T>>(() => ({
-    key: dataKey,
-    state: initialData ? { status: 'success', data: initialData } : { status: 'loading' },
-  }))
-  const [retryCount, setRetryCount] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    setStored({
-      key: dataKey,
-      state: initialData ? { status: 'success', data: initialData } : { status: 'loading' },
-    })
-
-    void fetcher()
-      .then((data) => {
-        if (!cancelled) {
-          setStored({ key: dataKey, state: { status: 'success', data } })
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setStored({ key: dataKey, state: { status: 'error' } })
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [fetcher, trigger, retryCount, initialData, dataKey])
-
-  const retry = useCallback(() => {
-    setRetryCount((count) => count + 1)
-  }, [])
-
-  const state: FetchState<T> = resolveFetchState(stored, dataKey, initialData)
-  return { state, retry }
 }
 
 function HomeSkeleton() {
