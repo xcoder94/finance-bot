@@ -1,3 +1,4 @@
+import { saveErrorKey } from '../../api/familyChanged'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -73,7 +74,7 @@ export function WalletFormSheet({
   const [nameTouched, setNameTouched] = useState(false)
   const nameOverflow = useNameOverflow()
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // New wallets are always UZS; an existing wallet keeps its own currency.
   const currency: 'UZS' | 'USD' =
@@ -97,7 +98,7 @@ export function WalletFormSheet({
     setNameTouched(false)
     nameOverflow.reset()
     setSaving(false)
-    setSaveError(false)
+    setSaveError(null)
   }, [open, wallet])
 
   useNativeBackButtonOverlay(
@@ -153,7 +154,7 @@ export function WalletFormSheet({
     }
 
     setSaving(true)
-    setSaveError(false)
+    setSaveError(null)
     try {
       await onSave({
         name: name.trim(),
@@ -161,8 +162,8 @@ export function WalletFormSheet({
         is_personal: walletCreateIsPersonal(createWalletType),
       })
       onClose()
-    } catch {
-      setSaveError(true)
+    } catch (error) {
+      setSaveError(saveErrorKey(error, 'settings.submitError'))
     } finally {
       setSaving(false)
     }
@@ -255,7 +256,7 @@ export function WalletFormSheet({
             const next = clampEntityName(event.target.value)
             nameOverflow.onValueChange(next)
             setName(next)
-            setSaveError(false)
+            setSaveError(null)
           }}
         />
       </FormSheetField>
@@ -285,7 +286,7 @@ export function WalletFormSheet({
 
       {saveError ? (
         <div className="form-sheet-load-error" role="alert">
-          <p>{t('settings.submitError')}</p>
+          <p>{t(saveError)}</p>
           <button type="button" onClick={() => void handleSave()} disabled={saving}>
             {t('auth.retry')}
           </button>

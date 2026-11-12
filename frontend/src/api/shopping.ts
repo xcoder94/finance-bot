@@ -1,4 +1,5 @@
 import { getAuthHeader } from './authHeader'
+import { raiseIfFamilyChanged } from './familyChanged'
 
 export type ShoppingItem = {
   id: string
@@ -84,6 +85,7 @@ async function send(url: string, method: string, body?: unknown): Promise<Respon
     throw new ShoppingApiError('network')
   }
   if (!response.ok) {
+    if (method !== 'GET') await raiseIfFamilyChanged(response.clone ? response.clone() : response)
     throw await toError(response)
   }
   return response

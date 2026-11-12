@@ -15,6 +15,7 @@ import {
   WalletPickerSheet,
 } from '../components/forms/transactionAddFields'
 import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
+import { saveErrorKey } from '../api/familyChanged'
 import { TransactionSubmitError } from '../components/transaction-form/TransactionFormShared'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -66,7 +67,7 @@ export function AddTransferPage() {
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
   const [destPickerOpen, setDestPickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const closeSheet = useCallback(() => {
     if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
@@ -103,6 +104,19 @@ export function AddTransferPage() {
       setDestWalletId(pickAlternateWalletId(wallets, nextSourceId))
     }
   }, [referenceState, sourceWalletId, defaultWalletId])
+
+  // The family can change under an open form (409 family_changed): drop wallets the new budget lacks.
+  useEffect(() => {
+    if (referenceState.status !== 'success') {
+      return
+    }
+    if (sourceWalletId && !referenceState.wallets.some((wallet) => wallet.id === sourceWalletId)) {
+      setSourceWalletId('')
+    }
+    if (destWalletId && !referenceState.wallets.some((wallet) => wallet.id === destWalletId)) {
+      setDestWalletId(pickAlternateWalletId(referenceState.wallets, sourceWalletId))
+    }
+  }, [referenceState, sourceWalletId, destWalletId])
 
   useEffect(() => {
     if (sourceWalletId && sourceWalletId === destWalletId && referenceState.status === 'success') {
@@ -210,7 +224,7 @@ export function AddTransferPage() {
     }
 
     setSubmitting(true)
-    setSubmitError(false)
+    setSubmitError(null)
 
     try {
       await createTransferTransaction({
@@ -224,9 +238,9 @@ export function AddTransferPage() {
       invalidateHomeData(familyId)
       celebrateSave()
       closeSheet()
-    } catch {
+    } catch (error) {
       haptic.error()
-      setSubmitError(true)
+      setSubmitError(saveErrorKey(error, 'addTransaction.submitError'))
     } finally {
       setSubmitting(false)
     }
@@ -332,7 +346,7 @@ export function AddTransferPage() {
 
         <FormSheetCommentField value={comment} onChange={setComment} />
 
-        {submitError ? <TransactionSubmitError onRetry={() => void handleSubmit()} /> : null}
+        {submitError ? <TransactionSubmitError messageKey={submitError} onRetry={() => void handleSubmit()} /> : null}
       </FormSheet>
 
       <WalletPickerSheet

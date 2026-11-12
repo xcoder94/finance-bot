@@ -32,6 +32,14 @@ const amountProps = {
   initialMethod: undefined as 'manual' | 'receipt' | 'voice' | undefined,
 }
 
+describe('ShoppingAmountView: family changed', () => {
+  it('says the family changed instead of the usual record failure', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} failed={false} familyChanged />)
+    expect(html).toContain('Состав семьи изменился')
+    expect(html).not.toContain(ru.shopping.recordFailed)
+  })
+})
+
 describe('ShoppingAmountView: finish sheet with methods (mockup, dev-fix2)', () => {
   it('is a sheet (dialog) with title, close, caption and the three tabs when the photo flag is on', () => {
     const html = wrap(<ShoppingAmountView {...amountProps} />)

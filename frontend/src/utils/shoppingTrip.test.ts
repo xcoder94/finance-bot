@@ -82,6 +82,17 @@ d2('createTripSubmitter (B1: token survives a lost answer)', () => {
   })
 })
 
+d2('trip submitter: family changed', () => {
+  i2('nothing was saved: a family_changed outcome is passed on and the next try uses a fresh token', async () => {
+    const send = v2.fn().mockResolvedValue({ kind: 'family_changed' })
+    const sub = createTripSubmitter(send)
+    e2((await sub.submit(['1'], 1)).kind).toBe('family_changed')
+    await sub.submit(['1'], 1)
+    const t = send.mock.calls.map((c) => c[0].client_token)
+    e2(t[1]).not.toBe(t[0])
+  })
+})
+
 d2('finishTrip (Готово)', () => {
   i2('re-reads the list for the family, then goes back to /shopping', () => {
     const calls: string[] = []

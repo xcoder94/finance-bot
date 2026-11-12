@@ -1,3 +1,4 @@
+import { saveErrorKey } from '../../api/familyChanged'
 import {
   type KeyboardEvent,
   type ClipboardEvent,
@@ -215,7 +216,7 @@ export function GoalFormSheet({
   const [deadlineTouched, setDeadlineTouched] = useState(false)
   const [walletPickerOpen, setWalletPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const selectableWallets = useMemo(
     () =>
@@ -224,6 +225,13 @@ export function GoalFormSheet({
         : wallets,
     [mode, wallets],
   )
+
+  // The family can change under an open form (409 family_changed): forget a wallet the new budget lacks.
+  useEffect(() => {
+    if (walletId && !wallets.some((wallet) => wallet.id === walletId)) {
+      setWalletId('')
+    }
+  }, [wallets, walletId])
 
   const selectedWallet =
     selectableWallets.find((wallet) => wallet.id === walletId) ??
@@ -257,7 +265,7 @@ export function GoalFormSheet({
 
     setAmountOverLimit(false)
     setSaving(false)
-    setSaveError(false)
+    setSaveError(null)
     setWalletPickerOpen(false)
   }, [open, mode, goal, selectableWallets])
 
@@ -297,7 +305,7 @@ export function GoalFormSheet({
     const trimmedName = name.trim()
 
     setSaving(true)
-    setSaveError(false)
+    setSaveError(null)
     try {
       if (mode === 'create') {
         await onCreate({
@@ -314,8 +322,8 @@ export function GoalFormSheet({
         })
       }
       onClose()
-    } catch {
-      setSaveError(true)
+    } catch (error) {
+      setSaveError(saveErrorKey(error, 'settings.submitError'))
     } finally {
       setSaving(false)
     }
@@ -381,7 +389,7 @@ export function GoalFormSheet({
             const next = clampEntityName(event.target.value)
             nameOverflow.onValueChange(next)
             setName(next)
-            setSaveError(false)
+            setSaveError(null)
           }}
         />
       </FormSheetField>
@@ -427,7 +435,7 @@ export function GoalFormSheet({
 
       {saveError ? (
         <div className="form-sheet-load-error" role="alert">
-          <p>{t('settings.submitError')}</p>
+          <p>{t(saveError)}</p>
           <button type="button" onClick={() => void handleSave()} disabled={saving}>
             {t('auth.retry')}
           </button>

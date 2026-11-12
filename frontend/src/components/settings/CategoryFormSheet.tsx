@@ -1,3 +1,4 @@
+import { saveErrorKey } from '../../api/familyChanged'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -71,7 +72,7 @@ export function CategoryFormSheet({
   const [nameTouched, setNameTouched] = useState(false)
   const nameOverflow = useNameOverflow()
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -81,7 +82,7 @@ export function CategoryFormSheet({
     nameOverflow.reset()
     setNameTouched(false)
     setSaving(false)
-    setSaveError(false)
+    setSaveError(null)
   }, [open, category])
 
   useNativeBackButtonOverlay(open, onClose)
@@ -130,12 +131,12 @@ export function CategoryFormSheet({
     }
 
     setSaving(true)
-    setSaveError(false)
+    setSaveError(null)
     try {
       await onSave({ name: name.trim() })
       onClose()
-    } catch {
-      setSaveError(true)
+    } catch (error) {
+      setSaveError(saveErrorKey(error, 'settings.submitError'))
     } finally {
       setSaving(false)
     }
@@ -185,14 +186,14 @@ export function CategoryFormSheet({
             const next = clampEntityName(event.target.value)
             nameOverflow.onValueChange(next)
             setName(next)
-            setSaveError(false)
+            setSaveError(null)
           }}
         />
       </FormSheetField>
 
       {saveError ? (
         <div className="form-sheet-load-error" role="alert">
-          <p>{t('settings.submitError')}</p>
+          <p>{t(saveError)}</p>
           <button type="button" onClick={() => void handleSave()} disabled={saving}>
             {t('auth.retry')}
           </button>

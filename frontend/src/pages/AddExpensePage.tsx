@@ -23,6 +23,7 @@ import {
   WalletPickerSheet,
 } from '../components/forms/transactionAddFields'
 import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
+import { saveErrorKey } from '../api/familyChanged'
 import { TransactionSubmitError } from '../components/transaction-form/TransactionFormShared'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -86,7 +87,7 @@ export function AddExpensePage() {
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
   const [walletPickerOpen, setWalletPickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const closeSheet = useCallback(() => {
     if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
@@ -121,6 +122,20 @@ export function AddExpensePage() {
     }
     return getTopLevelCategories(referenceState.categories)
   }, [referenceState])
+
+  // The family can change under an open form (409 family_changed): drop what the new budget lacks.
+  useEffect(() => {
+    if (referenceState.status !== 'success') {
+      return
+    }
+    if (categoryId && !referenceState.categories.some((category) => category.id === categoryId)) {
+      setCategoryId('')
+      setCategoryLabel('')
+    }
+    if (walletId && !referenceState.wallets.some((wallet) => wallet.id === walletId)) {
+      setWalletId('')
+    }
+  }, [referenceState, categoryId, walletId])
 
   useEffect(() => {
     if (referenceState.status !== 'success') {
@@ -189,7 +204,7 @@ export function AddExpensePage() {
     }
 
     setSubmitting(true)
-    setSubmitError(false)
+    setSubmitError(null)
 
     try {
       await createExpenseTransaction({
@@ -203,9 +218,9 @@ export function AddExpensePage() {
       invalidateHomeData(familyId)
       celebrateSave()
       closeSheet()
-    } catch {
+    } catch (error) {
       haptic.error()
-      setSubmitError(true)
+      setSubmitError(saveErrorKey(error, 'addTransaction.submitError'))
     } finally {
       setSubmitting(false)
     }
@@ -308,7 +323,7 @@ export function AddExpensePage() {
 
         <FormSheetCommentField value={comment} onChange={setComment} />
 
-        {submitError ? <TransactionSubmitError onRetry={() => void handleSubmit()} /> : null}
+        {submitError ? <TransactionSubmitError messageKey={submitError} onRetry={() => void handleSubmit()} /> : null}
       </FormSheet>
 
       <CategoryPickerSheet

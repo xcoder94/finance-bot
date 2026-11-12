@@ -14,6 +14,7 @@ vi.mock('../api/shopping', async () => {
 
 import * as api from '../api/shopping'
 import { ShoppingApiError } from '../api/shopping'
+import { FamilyChangedError } from '../api/familyChanged'
 import { useShoppingStore } from './shoppingStore'
 
 const m = vi.mocked(api)
@@ -141,6 +142,13 @@ describe('shoppingStore.purchase', () => {
     id: 'p', transaction_id: 't', items_recorded: 1, amount: 5000, currency: 'UZS',
     category_label: 'Еда', wallet_name: 'W', remaining: 10, items_left: 1,
   }
+
+  it('409 family_changed: its own outcome, the list on screen is untouched', async () => {
+    useShoppingStore.setState({ items: [mk('1', 'a')], status: 'ready', scope: 'fam' })
+    m.createShoppingPurchase.mockRejectedValue(new FamilyChangedError())
+    expect(await s().purchase(body)).toEqual({ kind: 'family_changed' })
+    expect(s().items).toHaveLength(1)
+  })
 
   it('ok: returns the purchase and removes bought ids from the shown list', async () => {
     useShoppingStore.setState({ items: [mk('1', 'a'), mk('2', 'b')], status: 'ready', scope: 'fam' })

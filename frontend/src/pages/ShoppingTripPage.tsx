@@ -90,6 +90,7 @@ export function ShoppingTripPage() {
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [noWallet, setNoWallet] = useState(false)
+  const [familyChanged, setFamilyChanged] = useState(false)
   const [result, setResult] = useState<{ purchase: ShoppingPurchase; requested: number } | null>(
     null,
   )
@@ -225,6 +226,7 @@ export function ShoppingTripPage() {
     setBusy(true)
     setFailed(false)
     setNoWallet(false)
+    setFamilyChanged(false)
     const outcome = await submitter.current!.submit(ids, parsed)
     submitting.current = false
     setBusy(false)
@@ -235,6 +237,9 @@ export function ShoppingTripPage() {
       setStage('result')
     } else if (outcome.kind === 'no_wallet') {
       setNoWallet(true)
+    } else if (outcome.kind === 'family_changed') {
+      haptic.error()
+      setFamilyChanged(true)
     } else {
       haptic.error()
       setFailed(true)
@@ -311,6 +316,7 @@ export function ShoppingTripPage() {
         busy={busy}
         failed={failed}
         noWallet={noWallet}
+        familyChanged={familyChanged}
         photoEnabled={photoEnabled}
         botMethod={botMethod}
         onBotMethod={(method) => void startBot(method, ids)}
@@ -318,6 +324,7 @@ export function ShoppingTripPage() {
           setAmount(v)
           setFailed(false)
           setNoWallet(false)
+          setFamilyChanged(false)
         }}
         onOverLimit={setOverLimit}
         onSubmit={() => void onSubmit()}

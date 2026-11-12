@@ -109,12 +109,18 @@ export function TransactionFormLoading() {
   )
 }
 
-export function TransactionSubmitError({ onRetry }: { onRetry: () => void }) {
+export function TransactionSubmitError({
+  onRetry,
+  messageKey = 'addTransaction.submitError',
+}: {
+  onRetry: () => void
+  messageKey?: string
+}) {
   const { t } = useTranslation()
 
   return (
     <div className="transaction-form__submit-error" role="alert">
-      <Text>{t('addTransaction.submitError')}</Text>
+      <Text>{t(messageKey)}</Text>
       <Button mode="plain" size="s" onClick={onRetry}>
         {t('auth.retry')}
       </Button>

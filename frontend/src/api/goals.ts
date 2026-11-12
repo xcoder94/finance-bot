@@ -1,4 +1,5 @@
 import { getAuthHeader } from './authHeader'
+import { raiseIfFamilyChanged } from './familyChanged'
 import { HomeApiError } from './home'
 
 export type GoalResponse = {
@@ -70,6 +71,7 @@ async function apiPatch<T>(url: string, body: unknown): Promise<T> {
   }
 
   if (!response.ok) {
+    await raiseIfFamilyChanged(response)
     throw new HomeApiError()
   }
 
@@ -93,6 +95,7 @@ async function apiPost<T>(url: string, body?: unknown): Promise<T> {
   }
 
   if (!response.ok) {
+    await raiseIfFamilyChanged(response)
     throw new HomeApiError()
   }
 

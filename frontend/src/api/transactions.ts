@@ -1,4 +1,5 @@
 import { getAuthHeader } from './authHeader'
+import { raiseIfFamilyChanged } from './familyChanged'
 import type { ExpenseCategoryResponse } from './categories'
 import type { WalletResponse } from './wallets'
 
@@ -110,6 +111,7 @@ async function apiPost<T>(url: string, body: unknown): Promise<T> {
   }
 
   if (!response.ok) {
+    await raiseIfFamilyChanged(response)
     throw new TransactionsApiError()
   }
 
@@ -133,6 +135,7 @@ async function apiPatch<T>(url: string, body: unknown): Promise<T> {
   }
 
   if (!response.ok) {
+    await raiseIfFamilyChanged(response)
     throw new TransactionsApiError()
   }
 
@@ -154,6 +157,7 @@ async function apiDelete<T>(url: string): Promise<T> {
   }
 
   if (!response.ok) {
+    await raiseIfFamilyChanged(response)
     throw new TransactionsApiError()
   }
 

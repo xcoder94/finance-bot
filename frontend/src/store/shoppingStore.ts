@@ -1,3 +1,4 @@
+import { FamilyChangedError } from '../api/familyChanged'
 import { create } from 'zustand'
 
 import {
@@ -20,6 +21,8 @@ export type RemoveResult = 'ok' | 'failed'
 export type PurchaseOutcome =
   | { kind: 'ok'; purchase: ShoppingPurchase; replay: boolean }
   | { kind: 'no_wallet' }
+  /** the person's family changed while saving: nothing was recorded */
+  | { kind: 'family_changed' }
   /** definite = the server answered with a 4xx (nothing was recorded); otherwise the outcome is unknown. */
   | { kind: 'failed'; definite: boolean }
 
@@ -148,6 +151,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
       }
       return { kind: 'ok', purchase, replay }
     } catch (error) {
+      if (error instanceof FamilyChangedError) return { kind: 'family_changed' }
       if (codeOf(error) === 'no_wallet') return { kind: 'no_wallet' }
       const status = error instanceof ShoppingApiError ? error.status : 0
       return { kind: 'failed', definite: status >= 400 && status < 500 }

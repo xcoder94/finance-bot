@@ -26,6 +26,7 @@ import {
   WalletPickerSheet,
 } from '../components/forms/transactionAddFields'
 import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
+import { saveErrorKey } from '../api/familyChanged'
 import { TransactionSubmitError } from '../components/transaction-form/TransactionFormShared'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -103,7 +104,7 @@ export function EditExpensePage() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
-  const [submitError, setSubmitError] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const closeSheet = useCallback(() => {
     if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
@@ -199,7 +200,7 @@ export function EditExpensePage() {
     }
 
     setSubmitting(true)
-    setSubmitError(false)
+    setSubmitError(null)
 
     try {
       const updated = await updateExpenseTransaction(id, {
@@ -213,9 +214,9 @@ export function EditExpensePage() {
       invalidateTransactionData(familyId, id)
       celebrateSave()
       closeSheet()
-    } catch {
+    } catch (error) {
       haptic.error()
-      setSubmitError(true)
+      setSubmitError(saveErrorKey(error, 'addTransaction.submitError'))
     } finally {
       setSubmitting(false)
     }
@@ -346,7 +347,7 @@ export function EditExpensePage() {
 
         <FormSheetCommentField value={comment} onChange={setComment} />
 
-        {submitError ? <TransactionSubmitError onRetry={() => void handleSubmit()} /> : null}
+        {submitError ? <TransactionSubmitError messageKey={submitError} onRetry={() => void handleSubmit()} /> : null}
       </FormSheet>
 
       <CategoryPickerSheet
