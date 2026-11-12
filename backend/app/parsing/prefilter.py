@@ -332,35 +332,69 @@ def _verb_type(
     return None
 
 
-def _wallet_span(text: str, name: str) -> tuple[int, int] | None:
-    pattern = r"\s+".join(re.escape(p) for p in name.split())
-    found = re.search(r"(?<!\w)" + pattern + r"(?!\w)", text, re.IGNORECASE)
-    return found.span() if found else None
+def _overlaps(span: tuple[int, int], others: list[tuple[int, int]]) -> bool:
+    return any(span[0] < o[1] and o[0] < span[1] for o in others)
 
 
 def _match_wallet_spans(
-    text: str, wallet_names: list[str]
+    text: str,
+    wallet_names: list[str],
+    exclude: list[tuple[int, int]] | None = None,
 ) -> list[tuple[str, tuple[int, int]]]:
-    """Wallets named in full; a name inside a longer matched name ("Карта" in "Карта сум") is dropped."""
-    hits = [
-        (name, span)
-        for name in wallet_names
-        if (span := _wallet_span(text, name)) is not None
-    ]
-    return [
-        (name, span)
-        for name, span in hits
-        if not any(
-            other_span[0] <= span[0]
-            and span[1] <= other_span[1]
-            and (other_span[1] - other_span[0]) > (span[1] - span[0])
-            for _, other_span in hits
-        )
-    ]
+    """Mentions of a wallet: runs of neighbouring words that read as words of wallet names
+    (case and ending tolerant: "картой", "humodan", "naqdga"). Returns (the phrase as typed, span);
+    which wallet it is, is decided later by the one matcher the AI path uses too.
+    Words inside `exclude` (the amount, the category) never belong to a mention.
+    """
+    from app.services.quick_entry_wallets import (  # local: services import the models
+        _CURRENCY_TOKENS,
+        _same_word,
+        _tokens,
+    )
 
+    name_toks = [_tokens(name) for name in wallet_names]
+    named = {t for toks in name_toks for t in toks if t not in _CURRENCY_TOKENS}
+    if not named:
+        return []
+    cut = exclude or []
+    words = []
+    for m in re.finditer(r"[\w']+", text.translate(_APOSTROPHES)):
+        keys = _tokens(m.group())
+        words.append((keys[0] if keys else None, m.span()))
 
-def _match_wallets(text: str, wallet_names: list[str]) -> list[str]:
-    return [name for name, _ in _match_wallet_spans(text, wallet_names)]
+    def owners(key: str | None, span: tuple[int, int]) -> tuple[bool, set[int]] | None:
+        """(is a name word, indexes of the names that have this word), None -> not a wallet word."""
+        if key is None or _overlaps(span, cut):
+            return None
+        if key in _CURRENCY_TOKENS:
+            found = {i for i, toks in enumerate(name_toks) if key in toks}
+            return (False, found) if found else None
+        found = {i for i, toks in enumerate(name_toks) if any(_same_word(key, t) for t in toks)}
+        return (True, found) if found else None
+
+    # A run: neighbouring wallet words that can all belong to ONE wallet name; a word of another
+    # wallet starts a new run ("карта сум наличный сум" is two mentions).
+    runs: list[tuple[int, int]] = []
+    start: int | None = None
+    hit = False
+    common: set[int] = set()
+    for idx, (key, span) in enumerate(words):
+        got = owners(key, span)
+        adjacent = idx > 0 and not text[words[idx - 1][1][1] : span[0]].strip()
+        if got is not None and start is not None and adjacent and common & got[1]:
+            common &= got[1]
+            hit = hit or got[0]
+            continue
+        if start is not None and hit:
+            runs.append((start, idx - 1))
+        start, hit, common = (idx, got[0], set(got[1])) if got is not None else (None, False, set())
+    if start is not None and hit:
+        runs.append((start, len(words) - 1))
+    result = []
+    for a, b in runs:
+        span = (words[a][1][0], words[b][1][1])
+        result.append((text[span[0] : span[1]], span))
+    return result
 
 
 def _build_comment(
@@ -419,7 +453,7 @@ def try_prefilter(
 
     if not resolved and verb_type in ("expense", "income") and _has_debt_context(text):
         # Debt phrase ("qarzga oldim", "qarzni qaytardim"): verb decides, no category.
-        debt_hits = _match_wallet_spans(text, wallet_names)
+        debt_hits = _match_wallet_spans(text, wallet_names, [amount.span])
         debt_wallets = [n for n, _ in debt_hits]
         if len(debt_wallets) > 1:
             return PrefilterResult(operation=None, reason="wallet_ambiguous")
@@ -442,7 +476,7 @@ def try_prefilter(
         return PrefilterResult(operation=None, reason=reason)
 
     match = resolved[0]
-    wallet_hit_spans = _match_wallet_spans(text, wallet_names)
+    wallet_hit_spans = _match_wallet_spans(text, wallet_names, [amount.span, match.span])
     wallet_hits = [n for n, _ in wallet_hit_spans]
     wallet_spans = [sp for _, sp in wallet_hit_spans]
     if len(wallet_hits) > 1:

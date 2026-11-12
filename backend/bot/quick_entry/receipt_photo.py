@@ -24,6 +24,7 @@ from app.models.family_budget import FamilyBudget
 from app.models.income_category import IncomeCategory
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.family_guard import guard_family_unchanged
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
 from app.services import ai_usage
@@ -226,6 +227,8 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 
+        # person's row first (as join/leave do), then the budget's counters: one lock order
+        await guard_family_unchanged(session, user)
         today = tashkent_today_for_counters()
         await ensure_counters_day(session, budget, today)
 

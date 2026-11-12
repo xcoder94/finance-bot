@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from aiogram import F, Router
@@ -39,6 +40,15 @@ from bot.onboarding import (
 )
 
 router = Router()
+logger = logging.getLogger(__name__)
+
+
+async def _answer_join_failed(callback: CallbackQuery, language: str) -> None:
+    try:
+        await callback.message.answer(t(language, "membership.join_failed"))
+        await callback.answer()
+    except Exception:
+        logger.warning("join_failed reply not delivered", exc_info=True)
 
 
 async def _refusal_for_join_block(
@@ -63,54 +73,60 @@ async def join_accept(callback: CallbackQuery) -> None:
     budget_name = ""
     user_language = "ru"
 
-    async with async_session_factory() as session:
-        async with session.begin():
-            user = await get_active_user_by_telegram_id(
-                session, callback.from_user.id
-            )
-            if user is None:
-                await callback.answer()
-                return
-
-            user_language = user.language
-            budget = await get_family_budget_by_invite_token(session, token)
-            if budget is None:
-                await callback.message.edit_text(invite_link_invalid(user))
-                await callback.answer()
-                return
-
-            budget_name = budget.name
-
-            if user.family_budget_id == budget.id:
-                await callback.message.edit_text(invite_already_member(budget.name, user))
-                await callback.answer()
-                return
-
-            if not await lock_for_join(session, user=user, target=budget):
-                await callback.message.edit_text(invite_link_invalid(user))
-                await callback.answer()
-                return
-            if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
-                await callback.message.edit_text(invite_family_full_chat(user))
-                await callback.answer()
-                return
-
-            block = await evaluate_join_from_own_budget(session, user, budget)
-            if block is not None:
-                await callback.message.edit_text(
-                    await _refusal_for_join_block(session, user, block)
+    try:
+        async with async_session_factory() as session:
+            async with session.begin():
+                user = await get_active_user_by_telegram_id(
+                    session, callback.from_user.id
                 )
-                await callback.answer()
-                return
+                if user is None:
+                    await callback.answer()
+                    return
 
-            try:
-                await convert_join_with_own_budget(
-                    session, user=user, target=budget
-                )
-            except FamilyFullError:
-                await callback.message.edit_text(invite_family_full_chat(user))
-                await callback.answer()
-                return
+                user_language = user.language
+                budget = await get_family_budget_by_invite_token(session, token)
+                if budget is None:
+                    await callback.message.edit_text(invite_link_invalid(user))
+                    await callback.answer()
+                    return
+
+                budget_name = budget.name
+
+                if user.family_budget_id == budget.id:
+                    await callback.message.edit_text(invite_already_member(budget.name, user))
+                    await callback.answer()
+                    return
+
+                if not await lock_for_join(session, user=user, target=budget):
+                    await callback.message.edit_text(invite_link_invalid(user))
+                    await callback.answer()
+                    return
+                if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
+                    await callback.message.edit_text(invite_family_full_chat(user))
+                    await callback.answer()
+                    return
+
+                block = await evaluate_join_from_own_budget(session, user, budget)
+                if block is not None:
+                    await callback.message.edit_text(
+                        await _refusal_for_join_block(session, user, block)
+                    )
+                    await callback.answer()
+                    return
+
+                try:
+                    await convert_join_with_own_budget(
+                        session, user=user, target=budget
+                    )
+                except FamilyFullError:
+                    await callback.message.edit_text(invite_family_full_chat(user))
+                    await callback.answer()
+                    return
+    except Exception:
+        # a deadlock or any other failure rolled the join back: say so, never stay silent
+        logger.exception("join_accept failed telegram_user_id=%s", callback.from_user.id)
+        await _answer_join_failed(callback, user_language)
+        return
 
     await callback.message.answer(
         welcome_invited(escape_markdown(budget_name), user_language),

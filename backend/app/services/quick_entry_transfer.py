@@ -64,6 +64,41 @@ def needs_exchange_refusal(
     return from_currency != to_currency and rate is None
 
 
+_SOURCE_PREPOSITIONS = {"с", "со", "из", "от", "from"}
+_TARGET_PREPOSITIONS = {"на", "в", "во", "к", "to"}
+_SOURCE_ENDINGS = ("dan", "den", "дан", "дэн")
+_TARGET_ENDINGS = ("ga", "ka", "qa", "ra", "ға", "га", "ка", "қа")
+
+
+def _hint_role(hint: str | None) -> str | None:
+    """'source' / 'target' by the Russian preposition or the Uzbek case ending, else None."""
+    words = (hint or "").casefold().replace("\u2019", "'").split()
+    if not words:
+        return None
+    if words[0] in _SOURCE_PREPOSITIONS and len(words) > 1:
+        return "source"
+    if words[0] in _TARGET_PREPOSITIONS and len(words) > 1:
+        return "target"
+    last = words[-1].strip(".,;")
+    for endings, role in ((_SOURCE_ENDINGS, "source"), (_TARGET_ENDINGS, "target")):
+        if any(last.endswith(e) and len(last) - len(e) >= 3 for e in endings):
+            return role
+    return None
+
+
+def order_transfer_hints(
+    from_hint: str | None, to_hint: str | None
+) -> tuple[str | None, str | None]:
+    """The model may hand the two hints over the wrong way round ("kartadan naqdga" -> from
+    naqdga): the words themselves say which end is which, so swap when they contradict."""
+    role_from, role_to = _hint_role(from_hint), _hint_role(to_hint)
+    if (role_from == "target" and role_to != "target") or (
+        role_to == "source" and role_from != "source"
+    ):
+        return to_hint, from_hint
+    return from_hint, to_hint
+
+
 def _pick_by_hint(
     wallets: list[Wallet],
     hint: str,
@@ -166,6 +201,7 @@ async def resolve_transfer_wallets(
     default_wallet: Wallet,
 ) -> ResolvedTransferWallets | CurrencyMissing:
     visible = await list_wallets_for_parse(session, family_budget_id, writer)
+    from_hint, to_hint = order_transfer_hints(from_hint, to_hint)
 
     from_result = _resolve_from_wallet(
         visible,

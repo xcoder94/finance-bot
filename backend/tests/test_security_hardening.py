@@ -25,6 +25,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_family_guard_on_fake_session(monkeypatch):
+    """These tests run on a FakeSession without a database; the family guard is a row lock."""
+    for target in ("bot.quick_entry.handlers", "bot.quick_entry.receipt_photo"):
+        monkeypatch.setattr(f"{target}.guard_family_unchanged", AsyncMock())
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.models.base import Base

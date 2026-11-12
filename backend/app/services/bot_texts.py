@@ -103,6 +103,10 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "uz": "Siz hozirgina boshqa byudjetga o'tdingiz — bu yozuv saqlanmadi. "
         "Uni qayta yuboring.",
     },
+    "membership.join_failed": {
+        "ru": "Присоединиться не получилось, ничего не изменилось. Нажмите кнопку ещё раз.",
+        "uz": "Qo'shilib bo'lmadi, hech narsa o'zgarmadi. Tugmani yana bosing.",
+    },
     "quick.exchange_rate_required": {
         "ru": "Перевод между кошельками в разных валютах — это обмен, для него нужен курс.\n"
         "Сделайте его в приложении.",

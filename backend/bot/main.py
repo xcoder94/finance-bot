@@ -5,8 +5,12 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ErrorEvent, Update
 
+from sqlalchemy import select
+
 from app.config import BOT_TOKEN, receipt_photo_enabled, SUPPORT_CHAT_ID
+from app.db import async_session_factory
 from app.logging_setup import setup_logging
+from app.models.user import User
 from app.services.bot_texts import t as bot_t
 from app.services.family_guard import FamilyChangedError
 from app.services.invite import cache_bot_username
@@ -36,6 +40,25 @@ def _telegram_user_id_from_update(update: Update) -> int | None:
     return None
 
 
+async def _person_language(sender: object) -> str:
+    """The language in the person's own settings; the Telegram client's only if he is unknown."""
+    telegram_id = getattr(sender, "id", None)
+    if isinstance(telegram_id, int):
+        try:
+            async with async_session_factory() as session:
+                language = await session.scalar(
+                    select(User.language).where(
+                        User.telegram_id == telegram_id, User.is_deleted.is_(False)
+                    )
+                )
+            if language in ("ru", "uz"):
+                return language
+        except Exception:
+            logger.warning("person language lookup failed", exc_info=True)
+    code = (getattr(sender, "language_code", None) or "ru")[:2]
+    return "uz" if code == "uz" else "ru"
+
+
 async def reply_family_changed(update: Update, exc: BaseException) -> bool:
     """A write was refused because its author joined/left a family mid-flight (ux-r14):
     nothing was saved, tell him to send it again. False -> not this error."""
@@ -46,9 +69,9 @@ async def reply_family_changed(update: Update, exc: BaseException) -> bool:
         update.callback_query.from_user if update.callback_query else None
     )
     if message is not None:
-        code = (getattr(sender, "language_code", None) or "ru")[:2]
+        language = await _person_language(sender)
         try:
-            await message.answer(bot_t("uz" if code == "uz" else "ru", "common.family_changed"))
+            await message.answer(bot_t(language, "common.family_changed"))
         except Exception:
             logger.warning("family_changed reply failed", exc_info=True)
     return True

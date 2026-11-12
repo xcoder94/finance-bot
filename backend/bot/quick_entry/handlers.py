@@ -30,6 +30,7 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.family_guard import guard_family_unchanged
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
 from app.services import ai_usage
@@ -740,6 +741,8 @@ async def process_quick_entry_text(
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 
+        # person's row first (as join/leave do), then the budget's counters: one lock order
+        await guard_family_unchanged(session, user)
         today = tashkent_today_for_counters()
         await ensure_counters_day(session, budget, today)
 
@@ -921,6 +924,8 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 
+        # person's row first (as join/leave do), then the budget's counters: one lock order
+        await guard_family_unchanged(session, user)
         today = tashkent_today_for_counters()
         await ensure_counters_day(session, budget, today)
 
@@ -1230,6 +1235,8 @@ async def handle_quick_entry_type(callback: CallbackQuery, bot: Bot) -> None:
             await _answer_gone(callback, user)
             return
 
+        # person's row first (as join/leave do), then the budget's counters: one lock order
+        await guard_family_unchanged(session, user)
         today = tashkent_today_for_counters()
         await ensure_counters_day(session, budget, today)
 

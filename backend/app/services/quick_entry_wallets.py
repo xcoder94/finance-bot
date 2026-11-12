@@ -30,11 +30,19 @@ _CURRENCY_TOKENS = {"usd", "uzs"}
 _CONNECTORS = {"с", "со", "из", "на", "в", "по", "от", "за"}
 
 
+# Uzbek (Latin) words for the usual wallet kinds, folded to the Russian word: a wallet named in
+# Russian is reachable by "kartadan"/"naqdga" and the other way round. A case ending may follow.
+_KIND_ALIASES = {"karta": "карта", "naqd": "наличные", "naqt": "наличные", "naxt": "наличные"}
+
+
 def _canon(token: str) -> str:
     if token.startswith(_USD_PREFIXES) or token == "$":
         return "usd"
     if token in _UZS_WORDS:
         return "uzs"
+    for stem, canon in _KIND_ALIASES.items():
+        if token.startswith(stem) and len(token) - len(stem) <= 4:
+            return canon
     return token
 
 
@@ -62,6 +70,15 @@ def _has_word(tokens: list[str], word: str) -> bool:
     return any(_same_word(t, word) for t in tokens)
 
 
+def _narrow(candidates: list[Wallet], currency: str | None) -> list[Wallet]:
+    """Several wallets fit equally (two cards named alike): the amount's currency decides."""
+    if len(candidates) > 1 and currency is not None:
+        in_currency = [w for w in candidates if w.currency == currency]
+        if in_currency:
+            return in_currency
+    return candidates
+
+
 def pick_wallet_by_hint(
     wallets: list[Wallet],
     hint: str | None,
@@ -83,7 +100,7 @@ def pick_wallet_by_hint(
     named = [(w, _tokens(w.name)) for w in wallets]
     allowed = [(w, toks) for w, toks in named if exclude is None or w.id != exclude.id]
 
-    exact = [w for w, toks in allowed if toks and toks == hint_tokens]
+    exact = _narrow([w for w, toks in allowed if toks and toks == hint_tokens], currency)
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
@@ -98,7 +115,7 @@ def pick_wallet_by_hint(
     ]
     if whole:
         longest = max(len(toks) for _, toks in whole)
-        top = [w for w, toks in whole if len(toks) == longest]
+        top = _narrow([w for w, toks in whole if len(toks) == longest], currency)
         return top[0] if len(top) == 1 else None
 
     found: list[Wallet] = []
@@ -114,6 +131,7 @@ def pick_wallet_by_hint(
             found.append(w)
         if any(t not in _CURRENCY_TOKENS and _has_word(hint_tokens, t) for t in toks):
             shared.append(w)
+    found = _narrow(found, currency)
     if len(found) == 1:
         return found[0]
     if not found and currency is not None:
@@ -131,17 +149,41 @@ def wallet_matches_hint(hint: str, wallet_name: str) -> bool:
     return bool(name_tokens) and all(_has_word(hint_tokens, t) for t in name_tokens)
 
 
+def _word_key(word: str) -> str | None:
+    found = _tokens(word)
+    return found[0] if found else None
+
+
+def _cut_phrase(words: list[str], phrase: str) -> list[str]:
+    """Remove every run of whole words that reads as `phrase` (case/ending tolerant)."""
+    wanted = [k for k in (_word_key(p) for p in phrase.split()) if k]
+    if not wanted:
+        return words
+    keys = [_word_key(w) for w in words]
+    out: list[str] = []
+    i = 0
+    while i < len(words):
+        window = keys[i : i + len(wanted)]
+        if len(window) == len(wanted) and all(
+            k is not None and _same_word(k, w) for k, w in zip(window, wanted)
+        ):
+            i += len(wanted)
+            continue
+        out.append(words[i])
+        i += 1
+    return out
+
+
 def strip_wallet_mention(
     comment: str | None, wallet_name: str, hint: str | None
 ) -> str | None:
-    """Drop the wallet's name / the phrase that named it from a comment."""
+    """Drop the wallet's name / the phrase that named it from a comment (whole words only)."""
     if not comment:
         return comment
-    result = comment
-    for phrase in filter(None, (wallet_name, hint)):
-        pattern = r"\s*".join(re.escape(p) for p in phrase.split())
-        result = re.sub(pattern, " ", result, flags=re.IGNORECASE)
-    words = result.split()
+    words = comment.split()
+    phrases = sorted(filter(None, (wallet_name, hint)), key=lambda p: -len(p.split()))
+    for phrase in phrases:
+        words = _cut_phrase(words, phrase)
     while words and words[0].casefold() in _CONNECTORS:
         words.pop(0)
     while words and words[-1].casefold() in _CONNECTORS:
