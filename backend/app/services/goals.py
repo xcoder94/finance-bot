@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from aiogram import Bot
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.goal import Goal
@@ -195,7 +196,7 @@ async def create_goal(
         )
     )
     if existing is not None:
-        raise HTTPException(status_code=409)
+        raise HTTPException(status_code=409, detail="goal_already_exists")
 
     _reject_backdated_deadline(body.deadline)
 
@@ -213,7 +214,12 @@ async def create_goal(
         crossed=False,
     )
     session.add(goal)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # a parallel request created the active goal of this wallet between our check and insert
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="goal_already_exists") from None
     await session.refresh(goal)
     await check_goal_achievement(session, wallet.id)
     await session.refresh(goal)
