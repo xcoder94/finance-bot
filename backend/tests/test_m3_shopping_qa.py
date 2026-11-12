@@ -131,13 +131,16 @@ class TestQaRaces:
             buy(real_client, fam["tid"], [a["id"]], amount=5000),
             real_client.delete(f"/api/v1/shopping/items/{a['id']}", headers=headers(fam["other_tid"])),
         )
-        assert rp.status_code == 201, rp.text
+        # delete first: the item is not the family's any more -> 404 and nothing recorded
+        # (ux-next3b); buy first: 201 and one expense. Never an expense without a purchase.
+        assert rp.status_code in (201, 404), rp.text
         assert rd.status_code in (204, 404), rd.text
+        want = 1 if rp.status_code == 201 else 0
         async with async_session_factory() as s:
             assert await s.scalar(select(func.count()).select_from(Transaction).where(
-                Transaction.family_budget_id == fam["budget_id"])) == 1
+                Transaction.family_budget_id == fam["budget_id"])) == want
             assert await s.scalar(select(func.count()).select_from(ShoppingPurchase).where(
-                ShoppingPurchase.family_budget_id == fam["budget_id"])) == 1
+                ShoppingPurchase.family_budget_id == fam["budget_id"])) == want
 
     async def test_ten_parallel_replays_one_expense(self, committed_family, real_client) -> None:
         fam = committed_family

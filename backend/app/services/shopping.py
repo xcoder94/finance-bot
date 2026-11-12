@@ -280,6 +280,42 @@ async def get_purchase_result(
     return await build_purchase_result(session, purchase)
 
 
+async def _require_own_items(session: AsyncSession, user: User, ids: list[uuid.UUID]) -> None:
+    """Every id must be an item of the person's current budget (under the family lock), or an
+    item a family mate has just bought (owner decision 5: the money was spent, 0 items kept).
+
+    Foreign or unknown ids (a list left over from before a join) -> 404 and nothing is
+    recorded; a membership change in flight was already turned into 409 family_changed by
+    the guard.
+    """
+    present = set(
+        (
+            await session.scalars(
+                select(ShoppingItem.id).where(
+                    ShoppingItem.id.in_(ids),
+                    ShoppingItem.family_budget_id == user.family_budget_id,
+                )
+            )
+        ).all()
+    )
+    missing = [i for i in ids if i not in present]
+    if not missing:
+        return
+    bought: set[uuid.UUID] = set()
+    for row in (
+        await session.scalars(
+            select(ShoppingPurchase.item_ids).where(
+                ShoppingPurchase.family_budget_id == user.family_budget_id,
+                ShoppingPurchase.status == "completed",
+                ShoppingPurchase.item_ids.overlap(missing),
+            )
+        )
+    ).all():
+        bought.update(row)
+    if any(i not in bought for i in missing):
+        raise HTTPException(status_code=404)
+
+
 async def _write_off(
     session: AsyncSession, user: User, ids: list[uuid.UUID], amount: int, channel: str
 ) -> tuple[Transaction, Wallet, list[str]]:
@@ -336,18 +372,6 @@ async def complete_purchase_manual(
     await guard_family_unchanged(session, user)
     ids = list(dict.fromkeys(item_ids))
 
-    # Items that exist but belong to ANOTHER family -> 404 and nothing is done.
-    foreign = await session.scalar(
-        select(func.count())
-        .select_from(ShoppingItem)
-        .where(
-            ShoppingItem.id.in_(ids),
-            ShoppingItem.family_budget_id != user.family_budget_id,
-        )
-    )
-    if foreign:
-        raise HTTPException(status_code=404)
-
     await lock_family_budget(session, user.family_budget_id)
 
     existing = await session.scalar(
@@ -361,6 +385,7 @@ async def complete_purchase_manual(
             raise HTTPException(status_code=409, detail=CODE_NOT_COMPLETED)
         return await build_purchase_result(session, existing), False
 
+    await _require_own_items(session, user, ids)
     transaction, wallet, names = await _write_off(session, user, ids, amount, "app")
 
     now = datetime.now(UTC)
@@ -430,16 +455,6 @@ async def create_pending_purchase(
     """Open a purchase that waits for a sum from the bot. Returns (row, created)."""
     await guard_family_unchanged(session, user)
     ids = list(dict.fromkeys(item_ids))
-    foreign = await session.scalar(
-        select(func.count())
-        .select_from(ShoppingItem)
-        .where(
-            ShoppingItem.id.in_(ids),
-            ShoppingItem.family_budget_id != user.family_budget_id,
-        )
-    )
-    if foreign:
-        raise HTTPException(status_code=404)
 
     await lock_family_budget(session, user.family_budget_id)
 
@@ -459,6 +474,8 @@ async def create_pending_purchase(
             if not (same_items and same_method):
                 raise HTTPException(status_code=409, detail=CODE_TOKEN_CONFLICT)
             return existing, False
+
+    await _require_own_items(session, user, ids)
 
     previous = await session.scalar(
         select(ShoppingPurchase)
