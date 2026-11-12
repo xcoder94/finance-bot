@@ -97,6 +97,12 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "ru": "Не понял, это трата или доход?",
         "uz": "Tushunmadim, bu xarajatmi yoki daromadmi?",
     },
+    "common.family_changed": {
+        "ru": "Вы только что перешли в другой бюджет — эта запись не сохранена. "
+        "Отправьте её ещё раз, повтор займёт секунду.",
+        "uz": "Siz hozirgina boshqa byudjetga o'tdingiz — bu yozuv saqlanmadi. "
+        "Uni qayta yuboring.",
+    },
     "quick.exchange_rate_required": {
         "ru": "Перевод между кошельками в разных валютах — это обмен, для него нужен курс.\n"
         "Сделайте его в приложении.",

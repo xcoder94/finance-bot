@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.user_deps import CurrentUserDep, OwnerUserDep
+from app.auth.user_deps import CurrentUserDep, WriteOwnerDep
 from app.db import get_session
 from app.models.expense_category import ExpenseCategory
 from app.models.income_category import IncomeCategory
@@ -122,7 +122,7 @@ async def list_income_categories(
 @router.post("/categories/income", status_code=201)
 async def create_income_category(
     body: IncomeCategoryCreate,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> IncomeCategoryResponse:
     await lock_family_budget(session, user.family_budget_id)
@@ -160,7 +160,7 @@ async def create_income_category(
 async def update_income_category(
     category_id: uuid.UUID,
     body: IncomeCategoryUpdate,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> IncomeCategoryResponse:
     category = await get_active_income_category(session, category_id, user.family_budget_id)
@@ -187,7 +187,7 @@ async def update_income_category(
 @router.delete("/categories/income/{category_id}")
 async def delete_income_category(
     category_id: uuid.UUID,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> IncomeCategoryDeleteResponse:
     category = await get_active_income_category(session, category_id, user.family_budget_id)
@@ -264,7 +264,7 @@ async def list_expense_categories(
 @router.post("/categories/expense", status_code=201)
 async def create_expense_category(
     body: ExpenseCategoryCreate,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ExpenseCategoryResponse:
     await lock_family_budget(session, user.family_budget_id)
@@ -334,7 +334,7 @@ async def create_expense_category(
 async def update_expense_category(
     category_id: uuid.UUID,
     body: ExpenseCategoryUpdate,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ExpenseCategoryResponse:
     category = await get_active_expense_category(session, category_id, user.family_budget_id)
@@ -365,7 +365,7 @@ async def update_expense_category(
 @router.delete("/categories/expense/{category_id}")
 async def delete_expense_category(
     category_id: uuid.UUID,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ExpenseCategoryDeleteResponse:
     category = await get_active_expense_category(session, category_id, user.family_budget_id)

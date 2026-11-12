@@ -11,6 +11,7 @@ from app.models.expense_category import ExpenseCategory
 from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.services.family_guard import guard_family_unchanged
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.transactions import (
     validate_quick_entry_expense_refs,
@@ -34,6 +35,7 @@ async def create_quick_entry_expense(
     transaction_date: datetime,
     channel: str | None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     await validate_quick_entry_expense_refs(
         session,
         user.family_budget_id,
@@ -69,6 +71,7 @@ async def create_quick_entry_income(
     transaction_date: datetime,
     channel: str | None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     await validate_quick_entry_income_refs(
         session,
         user.family_budget_id,

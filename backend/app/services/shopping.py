@@ -19,6 +19,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.shopping import PurchaseResult, normalize_item_name
+from app.services.family_guard import guard_family_unchanged
 from app.services.entity_limits import lock_family_budget
 from app.services.goals import check_goal_achievement
 from app.services.history_analytics import get_summary
@@ -89,6 +90,7 @@ async def add_shopping_items(
     longer fit under the cap land in ``over_limit``; empty/too long ones in
     ``invalid``. All of it happens in one transaction under the family lock.
     """
+    await guard_family_unchanged(session, user)
     result = AddItemsResult()
     await lock_family_budget(session, user.family_budget_id)
     count = await _count_items(session, user.family_budget_id)
@@ -331,6 +333,7 @@ async def complete_purchase_manual(
     Algorithm (work/db/m3-schema.md §2): family lock -> replay check -> wallet ->
     DELETE items RETURNING -> one expense -> purchase row, in one transaction.
     """
+    await guard_family_unchanged(session, user)
     ids = list(dict.fromkeys(item_ids))
 
     # Items that exist but belong to ANOTHER family -> 404 and nothing is done.
@@ -425,6 +428,7 @@ async def create_pending_purchase(
     client_token: uuid.UUID | None,
 ) -> tuple[ShoppingPurchase, bool]:
     """Open a purchase that waits for a sum from the bot. Returns (row, created)."""
+    await guard_family_unchanged(session, user)
     ids = list(dict.fromkeys(item_ids))
     foreign = await session.scalar(
         select(func.count())
@@ -583,6 +587,7 @@ async def complete_pending_purchase(
     row completed, one commit). A completed row is an idempotent replay: stored
     result, nothing created. cancelled/expired -> 410 purchase_closed.
     """
+    await guard_family_unchanged(session, user)
     await lock_family_budget(session, user.family_budget_id)
     purchase = await session.scalar(
         select(ShoppingPurchase)

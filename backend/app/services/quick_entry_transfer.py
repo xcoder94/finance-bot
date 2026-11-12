@@ -13,6 +13,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.parsing.types import ParsedOperation
+from app.services.family_guard import guard_family_unchanged
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
     list_wallets_for_parse,
@@ -201,6 +202,7 @@ async def create_quick_entry_transfer(
     transaction_date: datetime,
     channel: str | None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
         user.family_budget_id,

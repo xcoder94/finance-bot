@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.user_deps import CurrentUserDep, OwnerUserDep
+from app.auth.user_deps import CurrentUserDep, WriteOwnerDep
 from app.db import get_session
 from app.schemas.goals import GoalCreate, GoalResponse, GoalUpdate
 from app.services.goals import close_goal, create_goal, list_goals, update_goal
@@ -24,7 +24,7 @@ async def get_goals(
 @router.post("/goals", status_code=201)
 async def post_goal(
     body: GoalCreate,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GoalResponse:
     return await create_goal(session, user, body)
@@ -34,7 +34,7 @@ async def post_goal(
 async def patch_goal(
     goal_id: uuid.UUID,
     body: GoalUpdate,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GoalResponse:
     return await update_goal(session, user, goal_id, body)
@@ -43,7 +43,7 @@ async def patch_goal(
 @router.post("/goals/{goal_id}/close")
 async def post_close_goal(
     goal_id: uuid.UUID,
-    user: OwnerUserDep,
+    user: WriteOwnerDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GoalResponse:
     return await close_goal(session, user, goal_id)

@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.user_deps import CurrentUserDep
+from app.auth.user_deps import CurrentUserDep, WriteUserDep
 from app.db import get_session
 from app.config import receipt_photo_enabled
 from app.models.shopping import ShoppingPurchase
@@ -47,7 +47,7 @@ async def get_items(user: CurrentUserDep, session: SessionDep) -> list[ShoppingI
 
 @router.post("/items", status_code=201)
 async def create_item(
-    body: ShoppingItemBody, user: CurrentUserDep, session: SessionDep, response: Response
+    body: ShoppingItemBody, user: WriteUserDep, session: SessionDep, response: Response
 ) -> ShoppingItemResponse:
     result = await add_shopping_items(session, user, [body.name])
     if result.over_limit:
@@ -60,21 +60,21 @@ async def create_item(
 
 @router.patch("/items/{item_id}")
 async def patch_item(
-    item_id: uuid.UUID, body: ShoppingItemBody, user: CurrentUserDep, session: SessionDep
+    item_id: uuid.UUID, body: ShoppingItemBody, user: WriteUserDep, session: SessionDep
 ) -> ShoppingItemResponse:
     item = await rename_item(session, user, item_id, body.name)
     return ShoppingItemResponse.model_validate(item)
 
 
 @router.delete("/items/{item_id}", status_code=204)
-async def remove_item(item_id: uuid.UUID, user: CurrentUserDep, session: SessionDep) -> Response:
+async def remove_item(item_id: uuid.UUID, user: WriteUserDep, session: SessionDep) -> Response:
     await delete_item(session, user, item_id)
     return Response(status_code=204)
 
 
 @router.post("/purchases", status_code=201)
 async def create_purchase(
-    body: PurchaseCreate, user: CurrentUserDep, session: SessionDep, response: Response
+    body: PurchaseCreate, user: WriteUserDep, session: SessionDep, response: Response
 ) -> PurchaseResult:
     result, created = await complete_purchase_manual(
         session,
@@ -102,7 +102,7 @@ def _pending_status(purchase: ShoppingPurchase) -> PendingStatus:
 
 @router.post("/purchases/pending", status_code=201)
 async def create_pending(
-    body: PendingCreate, user: CurrentUserDep, session: SessionDep, response: Response
+    body: PendingCreate, user: WriteUserDep, session: SessionDep, response: Response
 ) -> PendingStatus:
     if body.method == "receipt" and not receipt_photo_enabled():
         raise HTTPException(status_code=409, detail=CODE_RECEIPT_DISABLED)
@@ -129,7 +129,7 @@ async def get_pending(
 
 @router.post("/purchases/{purchase_id}/cancel")
 async def cancel_pending(
-    purchase_id: uuid.UUID, user: CurrentUserDep, session: SessionDep
+    purchase_id: uuid.UUID, user: WriteUserDep, session: SessionDep
 ) -> PendingStatus:
     return _pending_status(await cancel_purchase(session, user, purchase_id))
 
@@ -138,7 +138,7 @@ async def cancel_pending(
 async def post_pending_amount(
     purchase_id: uuid.UUID,
     body: PendingAmount,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: SessionDep,
     response: Response,
 ) -> PurchaseResult:

@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+from app.services.family_guard import FAMILY_CHANGED, FamilyChangedError
 from app.api.v1.admin import router as admin_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import router as auth_router
@@ -137,6 +138,12 @@ app.include_router(analytics_router)
 app.include_router(members_router)
 app.include_router(shopping_router)
 app.include_router(admin_router)
+
+
+@app.exception_handler(FamilyChangedError)
+async def family_changed_handler(request: Request, exc: FamilyChangedError) -> JSONResponse:
+    # joined / left a family while this write was in flight: nothing was saved, repeat it
+    return JSONResponse(status_code=409, content={"detail": FAMILY_CHANGED})
 
 
 @app.exception_handler(Exception)

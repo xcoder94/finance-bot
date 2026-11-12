@@ -7,6 +7,8 @@ from aiogram.types import ErrorEvent, Update
 
 from app.config import BOT_TOKEN, receipt_photo_enabled, SUPPORT_CHAT_ID
 from app.logging_setup import setup_logging
+from app.services.bot_texts import t as bot_t
+from app.services.family_guard import FamilyChangedError
 from app.services.invite import cache_bot_username
 from app.services import deferred_phone_prompt  # noqa: F401  (registers the session listeners)
 from app.services.notification_scheduler import notification_loop
@@ -34,9 +36,29 @@ def _telegram_user_id_from_update(update: Update) -> int | None:
     return None
 
 
+async def reply_family_changed(update: Update, exc: BaseException) -> bool:
+    """A write was refused because its author joined/left a family mid-flight (ux-r14):
+    nothing was saved, tell him to send it again. False -> not this error."""
+    if not isinstance(exc, FamilyChangedError):
+        return False
+    message = update.message or (update.callback_query.message if update.callback_query else None)
+    sender = update.message.from_user if update.message else (
+        update.callback_query.from_user if update.callback_query else None
+    )
+    if message is not None:
+        code = (getattr(sender, "language_code", None) or "ru")[:2]
+        try:
+            await message.answer(bot_t("uz" if code == "uz" else "ru", "common.family_changed"))
+        except Exception:
+            logger.warning("family_changed reply failed", exc_info=True)
+    return True
+
+
 def register_global_error_handler(dp: Dispatcher) -> None:
     @dp.errors()
     async def on_bot_error(event: ErrorEvent) -> bool:
+        if await reply_family_changed(event.update, event.exception):
+            return True
         user_id = _telegram_user_id_from_update(event.update)
         # ErrorEvent carries the exception after aiogram already caught it —
         # logger.exception() would see empty sys.exc_info(); pass exc_info=.

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.user_deps import CurrentUserDep
+from app.auth.user_deps import CurrentUserDep, WriteUserDep
 from app.db import get_session
 from app.schemas.transactions import (
     ExpenseCreate,
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/v1")
 @router.post("/transactions/income", status_code=201)
 async def create_income(
     body: IncomeCreate,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TransactionResponse:
     transaction = await create_income_transaction(session, user, body)
@@ -48,7 +48,7 @@ async def create_income(
 @router.post("/transactions/expense", status_code=201)
 async def create_expense(
     body: ExpenseCreate,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TransactionResponse:
     transaction = await create_expense_transaction(session, user, body)
@@ -58,7 +58,7 @@ async def create_expense(
 @router.post("/transactions/transfer", status_code=201)
 async def create_transfer(
     body: TransferCreate,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TransactionResponse:
     transaction = await create_transfer_transaction(session, user, body)
@@ -86,7 +86,7 @@ async def get_transaction(
 async def update_transaction(
     transaction_id: uuid.UUID,
     request: Request,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TransactionResponse:
     transaction = await get_active_transaction(session, transaction_id, user.family_budget_id)
@@ -125,7 +125,7 @@ async def update_transaction(
 @router.delete("/transactions/{transaction_id}")
 async def delete_transaction(
     transaction_id: uuid.UUID,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TransactionResponse:
     transaction = await get_active_transaction(session, transaction_id, user.family_budget_id)

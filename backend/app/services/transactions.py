@@ -22,6 +22,7 @@ from app.schemas.transactions import (
     TransferCreate,
     TransferUpdate,
 )
+from app.services.family_guard import guard_family_unchanged
 from app.services.change_log import (
     record_expense_changes,
     record_income_changes,
@@ -238,6 +239,7 @@ async def create_income_transaction(
     *,
     bot: Bot | None = None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     await validate_income_refs(
         session,
         user.family_budget_id,
@@ -270,6 +272,7 @@ async def create_expense_transaction(
     *,
     bot: Bot | None = None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     await validate_expense_refs(
         session,
         user.family_budget_id,
@@ -302,6 +305,7 @@ async def create_transfer_transaction(
     *,
     bot: Bot | None = None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
         user.family_budget_id,
@@ -343,6 +347,7 @@ async def update_income_transaction(
     *,
     bot: Bot | None = None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     await validate_income_refs(
         session,
         transaction.family_budget_id,
@@ -375,6 +380,7 @@ async def update_expense_transaction(
     *,
     bot: Bot | None = None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     await validate_expense_refs(
         session,
         transaction.family_budget_id,
@@ -407,6 +413,7 @@ async def update_transfer_transaction(
     *,
     bot: Bot | None = None,
 ) -> Transaction:
+    await guard_family_unchanged(session, user)
     _, _, to_amount, stored_rate = await validate_transfer_refs(
         session,
         transaction.family_budget_id,

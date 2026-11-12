@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import exists, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.user_deps import CurrentUserDep
+from app.auth.user_deps import CurrentUserDep, WriteUserDep
 from app.db import get_session
 from app.models.goal import Goal
 from app.models.transaction import Transaction
@@ -102,7 +102,7 @@ async def list_wallets(
 @router.post("/wallets", status_code=201)
 async def create_wallet(
     body: WalletCreate,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletResponse:
     if body.is_personal:
@@ -170,7 +170,7 @@ async def create_wallet(
 async def update_wallet(
     wallet_id: uuid.UUID,
     body: WalletUpdate,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletResponse:
     wallet = await get_active_wallet(session, wallet_id, user.family_budget_id)
@@ -201,7 +201,7 @@ async def update_wallet(
 @router.delete("/wallets/{wallet_id}")
 async def delete_wallet(
     wallet_id: uuid.UUID,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> WalletDeleteResponse:
     wallet = await get_active_wallet(session, wallet_id, user.family_budget_id)

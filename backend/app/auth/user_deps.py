@@ -9,6 +9,7 @@ from app.db import get_session
 from app.models.family_budget import FamilyBudget
 from app.models.user import User
 from app.services.activity import touch_activity
+from app.services.family_guard import guard_family_unchanged
 
 
 async def get_current_user(
@@ -47,5 +48,25 @@ async def require_owner(
     return user
 
 
+async def get_current_user_for_write(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> User:
+    """Same person, but the request waits out a running join/leave and is refused (409
+    family_changed) if it moved him to another budget (see app/services/family_guard.py)."""
+    await guard_family_unchanged(session, user)
+    return user
+
+
+async def require_owner_for_write(
+    user: Annotated[User, Depends(get_current_user_for_write)],
+) -> User:
+    if user.role != "owner":
+        raise HTTPException(status_code=403)
+    return user
+
+
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 OwnerUserDep = Annotated[User, Depends(require_owner)]
+WriteUserDep = Annotated[User, Depends(get_current_user_for_write)]
+WriteOwnerDep = Annotated[User, Depends(require_owner_for_write)]

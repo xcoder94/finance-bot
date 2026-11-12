@@ -10,6 +10,7 @@ from app.models.goal import Goal
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.goals import GoalCreate, GoalResponse, GoalUpdate
+from app.services.family_guard import guard_family_unchanged
 from app.services.goal_notify import prepare_achievement, queue_notice
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_dates import tashkent_today
@@ -181,6 +182,7 @@ async def create_goal(
     user: User,
     body: GoalCreate,
 ) -> GoalResponse:
+    await guard_family_unchanged(session, user)
     wallet = await get_active_wallet(session, body.wallet_id, user.family_budget_id)
     if wallet is None:
         raise HTTPException(status_code=404)
@@ -225,6 +227,7 @@ async def update_goal(
     goal_id: uuid.UUID,
     body: GoalUpdate,
 ) -> GoalResponse:
+    await guard_family_unchanged(session, user)
     goal = await get_goal_in_family(session, goal_id, user.family_budget_id)
     if goal is None:
         raise HTTPException(status_code=404)
@@ -257,6 +260,7 @@ async def close_goal(
     user: User,
     goal_id: uuid.UUID,
 ) -> GoalResponse:
+    await guard_family_unchanged(session, user)
     goal = await get_goal_in_family(session, goal_id, user.family_budget_id)
     if goal is None:
         raise HTTPException(status_code=404)
