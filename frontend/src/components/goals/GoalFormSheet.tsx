@@ -1,4 +1,5 @@
-import { saveErrorKey } from '../../api/familyChanged'
+import { ownerFormErrorKey } from '../../api/familyChanged'
+import { revealMessage } from '../../utils/revealMessage'
 import {
   type KeyboardEvent,
   type ClipboardEvent,
@@ -46,6 +47,8 @@ type GoalFormSheetProps = {
   mode: GoalFormMode
   goal: GoalResponse | null
   wallets: WalletResponse[]
+  /** false for a member: the sentence 'only the owner' is shown and Save is off */
+  editable?: boolean
   onClose: () => void
   onCreate: (payload: {
     wallet_id: string
@@ -202,6 +205,7 @@ export function GoalFormSheet({
   mode,
   goal,
   wallets,
+  editable = true,
   onClose,
   onCreate,
   onUpdate,
@@ -281,6 +285,7 @@ export function GoalFormSheet({
   const targetAmount = Number(targetAmountDigits)
   const hasValidAmount = targetAmountDigits.length > 0 && targetAmount > 0 && !amountOverLimit
   const canSave =
+    editable &&
     hasValidAmount &&
     deadlineValid &&
     (mode === 'edit' ? goal !== null : walletId.length > 0) &&
@@ -323,7 +328,7 @@ export function GoalFormSheet({
       }
       onClose()
     } catch (error) {
-      setSaveError(saveErrorKey(error, 'settings.submitError'))
+      setSaveError(ownerFormErrorKey(error, 'settings.submitError', 'familyChanged.goalsOwnerOnly'))
     } finally {
       setSaving(false)
     }
@@ -433,12 +438,14 @@ export function GoalFormSheet({
         </button>
       ) : null}
 
-      {saveError ? (
-        <div className="form-sheet-load-error" role="alert">
-          <p>{t(saveError)}</p>
-          <button type="button" onClick={() => void handleSave()} disabled={saving}>
-            {t('auth.retry')}
-          </button>
+      {!editable || saveError ? (
+        <div className="form-sheet-load-error" role="alert" ref={revealMessage}>
+          <p>{t(editable ? saveError! : 'familyChanged.goalsOwnerOnly')}</p>
+          {editable && saveError === 'settings.submitError' ? (
+            <button type="button" onClick={() => void handleSave()} disabled={saving}>
+              {t('auth.retry')}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </FormSheet>

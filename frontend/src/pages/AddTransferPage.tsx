@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -68,6 +68,14 @@ export function AddTransferPage() {
   const [destPickerOpen, setDestPickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // The person moved to another family while the form was open (the app rereads /me on return): say why.
+  const shownFamily = useRef(familyId)
+  useEffect(() => {
+    if (shownFamily.current === familyId) return
+    shownFamily.current = familyId
+    setSubmitError('familyChanged.message')
+  }, [familyId])
 
   const closeSheet = useCallback(() => {
     if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
@@ -240,7 +248,7 @@ export function AddTransferPage() {
       closeSheet()
     } catch (error) {
       haptic.error()
-      setSubmitError(saveErrorKey(error, 'addTransaction.submitError'))
+      setSubmitError(saveErrorKey(error, 'addTransaction.submitError', 'familyChanged.message'))
     } finally {
       setSubmitting(false)
     }

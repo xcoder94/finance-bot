@@ -90,7 +90,8 @@ describe('409 family_changed', () => {
 
   it('the explanation is the family message only for this error', async () => {
     const error = await createExpenseTransaction(expense).catch((e) => e)
-    expect(saveErrorKey(error, 'addTransaction.submitError')).toBe('familyChanged.message')
+    expect(saveErrorKey(error, 'addTransaction.submitError', 'familyChanged.message')).toBe('familyChanged.message')
+    expect(saveErrorKey(error, 'addTransaction.submitError')).toBe('familyChanged.generic')
     expect(saveErrorKey(new Error('x'), 'addTransaction.submitError')).toBe('addTransaction.submitError')
   })
 })

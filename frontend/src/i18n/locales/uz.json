@@ -1,6 +1,11 @@
 {
   "familyChanged": {
-    "message": "Oila tarkibi o'zgardi. Kategoriya va hamyonni tekshirib, yana saqlang"
+    "message": "Oila tarkibi o'zgardi. Kategoriya va hamyonni tekshirib, yana saqlang",
+    "generic": "Oila tarkibi o'zgardi. Ma'lumotlarni tekshirib, yana saqlang",
+    "categoriesOwnerOnly": "Kategoriyalarni faqat byudjet egasi o'zgartira oladi",
+    "goalsOwnerOnly": "Maqsadlarni faqat byudjet egasi yaratishi va o'zgartirishi mumkin",
+    "transactionGone": "Bu operatsiya avvalgi byudjetda qoldi va bu yerda mavjud emas",
+    "transactionGoneClose": "Yopish"
   },
   "nav": {
     "home": "Bosh sahifa",

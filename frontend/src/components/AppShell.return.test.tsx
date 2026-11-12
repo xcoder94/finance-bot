@@ -56,8 +56,21 @@ vi.mock('../hooks/usePageDirection', () => ({ usePageDirection: () => 'forward' 
 vi.mock('../hooks/useShoppingStartup', () => ({ useShoppingStartup: () => undefined }))
 vi.mock('../hooks/useTapHaptic', () => ({ useTapHaptic: () => undefined }))
 vi.mock('../hooks/useTxDeepLink', () => ({ useTxDeepLink: () => 'idle' }))
+const auth = vi.hoisted(() => ({
+  user: { familyBudgetId: 'fam', role: 'owner' } as { familyBudgetId: string; role: string },
+  setReady: vi.fn(),
+  meNow: { family_budget_id: 'fam', role: 'owner' },
+}))
 vi.mock('../store/authStore', () => ({
-  useAuthStore: (select: (s: unknown) => unknown) => select({ user: { familyBudgetId: 'fam' } }),
+  useAuthStore: Object.assign((select: (s: unknown) => unknown) => select({ user: auth.user }), {
+    getState: () => ({ user: auth.user, setReady: auth.setReady }),
+  }),
+}))
+vi.mock('../api/authHeader', () => ({ getAuthHeader: () => 'Bearer t' }))
+vi.stubGlobal('fetch', async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ id: 'u', telegram_id: 1, first_name: 'A', username: null, language: 'ru', budget_name: 'B', member_count: 1, default_wallet_id: null, ...auth.meNow }),
 }))
 vi.mock('../store/chromeStore', () => ({
   useChromeStore: (select: (s: unknown) => unknown) => select({ tabbarHidden: false }),
@@ -95,8 +108,26 @@ describe('return to the app', () => {
     clock += THROTTLE_PLUS
     documentStub.visibilityState = 'visible'
     listeners.visibilitychange?.forEach((cb) => cb())
+    await new Promise((r) => setTimeout(r, 0))
 
     expect(useDataCacheStore.getState().homeEpoch).toBe(before + 1)
+  })
+
+  it('takes the new family and role when the person moved while the app was in the background', async () => {
+    let clock = 9_000_000
+    vi.spyOn(Date, 'now').mockImplementation(() => clock)
+    await mountHook(() => AppShell())
+    auth.meNow = { family_budget_id: 'other', role: 'member' }
+    auth.setReady.mockClear()
+
+    clock += THROTTLE_PLUS
+    documentStub.visibilityState = 'visible'
+    listeners.visibilitychange?.forEach((cb) => cb())
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(auth.setReady).toHaveBeenCalledTimes(1)
+    expect(auth.setReady.mock.calls[0][0]).toMatchObject({ familyBudgetId: 'other', role: 'member' })
+    auth.meNow = { family_budget_id: 'fam', role: 'owner' }
   })
 
   it('does not re-read while the app is hidden, and not twice for one quick return', async () => {
@@ -114,6 +145,7 @@ describe('return to the app', () => {
     listeners.visibilitychange?.forEach((cb) => cb())
     clock += 1_000
     listeners.visibilitychange?.forEach((cb) => cb())
+    await new Promise((r) => setTimeout(r, 0))
     expect(useDataCacheStore.getState().homeEpoch).toBe(before + 1)
   })
 })

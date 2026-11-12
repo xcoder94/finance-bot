@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
@@ -17,6 +17,7 @@ import { DeleteConfirmSheet } from '../components/forms/DeleteConfirmSheet'
 import { CategoryPickerSheet } from '../components/forms/CategoryPickerSheet'
 import { ChangesBlock } from '../components/forms/ChangesBlock'
 import { FormSheet } from '../components/forms/FormSheet'
+import { TransactionGoneSheet } from '../components/forms/TransactionGoneSheet'
 import { FormSheetField } from '../components/forms/FormSheetField'
 import {
   FormSheetAmountField,
@@ -77,6 +78,8 @@ function resolveExpenseCategorySelectionWithT(
 type LoadState =
   | { status: 'loading' }
   | { status: 'error' }
+  /** the person moved to another family; this operation stayed in the old budget */
+  | { status: 'gone' }
   | { status: 'success'; wallets: Wallet[]; categories: ExpenseCategory[]; transaction: TransactionResponse }
 
 export function EditExpensePage() {
@@ -88,6 +91,8 @@ export function EditExpensePage() {
 
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [loadRetry, setLoadRetry] = useState(0)
+  // The fields are filled from the saved operation once; a reload (family changed) must not overwrite what was typed.
+  const filledFor = useRef<string | null>(null)
 
   const [transactionDate, setTransactionDate] = useState('')
   const [dateError, setDateError] = useState(false)
@@ -144,15 +149,18 @@ export function EditExpensePage() {
         t,
       )
 
-      setTransactionDate(tashkentDateOf(transaction.transaction_date))
-      setAmount(String(transaction.amount))
-      setWalletId(transaction.wallet_id)
-      setCategoryId(selection.categoryId)
-      setCategoryLabel(selection.label)
-      setComment(transaction.comment ?? '')
+      if (filledFor.current !== id) {
+        setTransactionDate(tashkentDateOf(transaction.transaction_date))
+        setAmount(String(transaction.amount))
+        setWalletId(transaction.wallet_id)
+        setCategoryId(selection.categoryId)
+        setCategoryLabel(selection.label)
+        setComment(transaction.comment ?? '')
+        filledFor.current = id
+      }
       setLoadState({ status: 'success', wallets, categories, transaction })
     } catch {
-      setLoadState({ status: 'error' })
+      setLoadState({ status: filledFor.current === id ? 'gone' : 'error' })
     }
   }, [familyId, id, loadRetry, t])
 
@@ -216,7 +224,7 @@ export function EditExpensePage() {
       closeSheet()
     } catch (error) {
       haptic.error()
-      setSubmitError(saveErrorKey(error, 'addTransaction.submitError'))
+      setSubmitError(saveErrorKey(error, 'addTransaction.submitError', 'familyChanged.message'))
     } finally {
       setSubmitting(false)
     }
@@ -269,6 +277,10 @@ export function EditExpensePage() {
         </div>
       </FormSheet>
     )
+  }
+
+  if (loadState.status === 'gone') {
+    return <TransactionGoneSheet title={t('editExpense.title')} onClose={closeSheet} />
   }
 
   if (loadState.status === 'error') {

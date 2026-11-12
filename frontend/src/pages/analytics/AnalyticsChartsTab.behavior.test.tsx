@@ -65,6 +65,7 @@ async function answerAll(
   h: { settle: (n?: number) => Promise<void> },
   comparison: Record<string, unknown>,
   expenses?: unknown[],
+  subcategories: unknown[] = [],
 ) {
   const answers: Record<string, unknown> = {
     comparison,
@@ -72,7 +73,7 @@ async function answerAll(
     income: [],
     summary: { by_currency: [{ currency: 'UZS', income: 0, expense: 120_000, transfer_net: 0, net_change: 0, average_daily_expense: 0, most_expensive_weekday: null, most_expensive_weekday_average: 0 }], day_of_week_expense: { UZS: [0, 0, 0, 0, 0, 0, 0] }, day_of_week_income: {} },
     trend: [],
-    subcategories: [],
+    subcategories,
   }
   const waiting = calls.splice(0)
   waiting.forEach((c) => c.resolve(answers[c.name]))
@@ -120,6 +121,24 @@ describe('Analytics charts: «новая» label (polish5)', () => {
   it('hidden when last month was empty as a whole', async () => {
     const h = await mountHook(() => AnalyticsChartsTab())
     await answerAll(h, { ...COMPARISON_SEPT, prev_total: 0 }, [food])
+    expect(await donutOnScreen(h.result())).not.toContain('новая')
+  })
+})
+
+describe('Analytics charts: «новая» label inside a category (drill-down)', () => {
+  const sub = { subcategory_id: 'fruit', subcategory_name: 'Фрукты', subcategory_translation_key: null, color_index: 1, amount: 50_000, prev_amount: 0 }
+  const parent = (prev: number) => ({ category_id: 'food', category_name: 'Еда', category_translation_key: null, color_index: 0, amount: 120_000, prev_amount: prev })
+  beforeEach(() => {
+    context.drillParent = { id: 'food', name: 'Еда' }
+  })
+  it('shown when last month had spending in another subcategory of the same category', async () => {
+    const h = await mountHook(() => AnalyticsChartsTab())
+    await answerAll(h, COMPARISON_SEPT, [parent(80_000)], [sub])
+    expect(await donutOnScreen(h.result())).toContain('новая')
+  })
+  it('hidden when the whole category had nothing last month', async () => {
+    const h = await mountHook(() => AnalyticsChartsTab())
+    await answerAll(h, COMPARISON_SEPT, [parent(0)], [sub])
     expect(await donutOnScreen(h.result())).not.toContain('новая')
   })
 })

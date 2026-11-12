@@ -387,6 +387,17 @@ export function AnalyticsChartsTab() {
     return 0
   }, [drillParent, subcategoriesFetch.state, expensesFetch.state])
 
+  // «новая» is judged by the whole previous period: the whole month at the top level, the whole
+  // category (all its subcategories) inside a category.
+  const drillPreviousTotal =
+    drillParent === null
+      ? comparisonFetch.state.status === 'success'
+        ? comparisonFetch.state.data.prev_total
+        : undefined
+      : expensesFetch.state.status === 'success'
+        ? (expensesFetch.state.data.find((entry) => entry.category_id === drillParent.id)?.prev_amount ?? 0)
+        : undefined
+
   const handleSliceActivate = useCallback(
     (key: string) => {
       if (isUncategorizedKey(key)) {
@@ -598,11 +609,7 @@ export function AnalyticsChartsTab() {
             slices={donutSlices}
             onSliceActivate={handleSliceActivate}
             centerLabel={t('home.expense')}
-            previousTotal={
-              drillParent === null && comparisonFetch.state.status === 'success'
-                ? comparisonFetch.state.data.prev_total
-                : undefined
-            }
+            previousTotal={drillPreviousTotal}
           />
         )}
 

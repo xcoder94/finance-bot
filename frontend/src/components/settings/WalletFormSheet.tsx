@@ -1,4 +1,5 @@
 import { saveErrorKey } from '../../api/familyChanged'
+import { revealMessage } from '../../utils/revealMessage'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -285,11 +286,13 @@ export function WalletFormSheet({
       ) : null}
 
       {saveError ? (
-        <div className="form-sheet-load-error" role="alert">
+        <div className="form-sheet-load-error" role="alert" ref={revealMessage}>
           <p>{t(saveError)}</p>
-          <button type="button" onClick={() => void handleSave()} disabled={saving}>
-            {t('auth.retry')}
-          </button>
+          {saveError === 'settings.submitError' ? (
+            <button type="button" onClick={() => void handleSave()} disabled={saving}>
+              {t('auth.retry')}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </FormSheet>

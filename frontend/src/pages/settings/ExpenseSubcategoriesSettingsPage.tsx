@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
+import { FamilyChangedError } from '../../api/familyChanged'
 import {
   createExpenseCategory,
   deleteExpenseCategory,
@@ -120,6 +121,10 @@ export function ExpenseSubcategoriesSettingsPage() {
     if (sheetState.kind !== 'form' || !parentId) {
       return
     }
+    // The category belongs to a budget the person has left: nothing to save into.
+    if (!parent) {
+      throw new FamilyChangedError()
+    }
 
     if (sheetState.mode === 'create') {
       await createExpenseCategory({ name: payload.name, parent_id: parentId })
@@ -193,8 +198,9 @@ export function ExpenseSubcategoriesSettingsPage() {
         {loadState.status === 'error' ? (
           <SettingsSectionLoadError onRetry={() => setReloadCount((count) => count + 1)} />
         ) : null}
-        {loadState.status === 'success' && !parent ? (
-          <SettingsSectionLoadError onRetry={() => setReloadCount((count) => count + 1)} />
+        {loadState.status === 'success' && !parent && sheetState.kind !== 'form' ? (
+          // The category is not in this family (the person moved): the list is the way back.
+          <Navigate to="/settings/expense-categories" replace />
         ) : null}
         {loadState.status === 'success' && parent ? (
           <SettingsEntityGroup
@@ -221,14 +227,14 @@ export function ExpenseSubcategoriesSettingsPage() {
         ) : null}
       </SettingsSubPageShell>
 
-      {sheetState.kind === 'form' && parent ? (
+      {sheetState.kind === 'form' && (parent || loadState.status === 'success') ? (
         <CategoryFormSheet
           open
           mode={sheetState.mode}
           kind="expense-subcategory"
           category={formCategory}
           displayName={formCategory ? getDisplayName(formCategory, t) : undefined}
-          parentName={parentDisplayName}
+          parentName={parent ? parentDisplayName : undefined}
           atLimit={sheetState.mode === 'create' && subcategoryCount >= SUBCATEGORY_LIMIT}
           limitMessage={
             sheetState.mode === 'create' && subcategoryCount >= SUBCATEGORY_LIMIT

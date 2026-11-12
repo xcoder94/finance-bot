@@ -72,8 +72,12 @@ export type HistoryResponse = {
 }
 
 export class HomeApiError extends Error {
-  constructor(message?: string) {
+  /** Machine code from the response ({"detail": "goal_already_exists"}), when the server gave one. */
+  readonly code: string | null
+
+  constructor(message?: string, code: string | null = null) {
     super(message ?? 'request failed')
+    this.code = code
   }
 }
 

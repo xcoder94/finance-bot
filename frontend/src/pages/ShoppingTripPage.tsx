@@ -53,6 +53,7 @@ import {
 import { parsePositiveInt } from '../utils/transactionForm'
 import { walletCurrencySuffix } from '../utils/transactionFormFields'
 import { FailBox } from '../components/FailBox'
+import { revealMessage } from '../utils/revealMessage'
 
 type Stage = 'launch' | 'trip' | 'amount' | 'manual' | 'result'
 
@@ -130,6 +131,20 @@ export function ShoppingTripPage() {
   useEffect(() => {
     void load(scope, { silent: true })
   }, [load, scope])
+
+  // The person moved to another family (joined, left, removed) while the trip was open: the ticks
+  // and the amount sheet belong to the old list, so go back to the list and say why.
+  const tripScope = useRef(scope)
+  useEffect(() => {
+    if (tripScope.current === scope) return
+    tripScope.current = scope
+    setChecked(new Set())
+    setPopId(null)
+    setFailed(false)
+    setNoWallet(false)
+    setStage((current) => (current === 'amount' ? 'trip' : current))
+    setFamilyChanged(true)
+  }, [scope])
 
   // Opened from the bot's button: show the result, or the manual entry when the bot did not get it.
   useEffect(() => {
@@ -214,6 +229,7 @@ export function ShoppingTripPage() {
 
   const onToggle = (id: string) => {
     if (!checked.has(id)) setPopId(id)
+    setFamilyChanged(false)
     setChecked((prev) => toggleChecked(prev, id))
   }
 
@@ -380,7 +396,13 @@ export function ShoppingTripPage() {
     )
   } else {
     body = (
-      <ShoppingTripView
+      <>
+        {familyChanged ? (
+          <div className="shopping-amount__fail" role="alert" ref={revealMessage}>
+            {t('familyChanged.generic')}
+          </div>
+        ) : null}
+        <ShoppingTripView
         items={items}
         checked={checked}
         popId={popId}
@@ -390,6 +412,7 @@ export function ShoppingTripPage() {
           if (canFinishTrip(new Set(ids))) setStage('amount')
         }}
       />
+      </>
     )
   }
 

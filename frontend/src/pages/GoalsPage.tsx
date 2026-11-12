@@ -8,11 +8,13 @@ import {
   patchGoal,
   type GoalResponse,
 } from '../api/goals'
+import { HomeApiError } from '../api/home'
 import { getWallets, type WalletResponse } from '../api/wallets'
 import { BlockError } from '../components/BlockError'
 import { GoalCard } from '../components/goals/GoalCard'
 import { GoalFormSheet, type GoalFormMode } from '../components/goals/GoalFormSheet'
 import { useAuthStore } from '../store/authStore'
+import { useDataCacheStore } from '../store/dataCacheStore'
 import { EmptyStateIcon } from '../components/EmptyStateIcon'
 
 type GoalTab = 'active' | 'closed'
@@ -30,6 +32,9 @@ export function GoalsPage() {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.user)
   const isOwner = user?.role === 'owner'
+  const familyId = user?.familyBudgetId ?? ''
+  // moves on every data change, a return to the app and a change of family
+  const homeEpoch = useDataCacheStore((state) => state.homeEpoch)
 
   const [tab, setTab] = useState<GoalTab>('active')
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
@@ -50,7 +55,7 @@ export function GoalsPage() {
 
   useEffect(() => {
     void loadGoals()
-  }, [loadGoals, reloadCount])
+  }, [loadGoals, reloadCount, familyId, homeEpoch])
 
   useEffect(() => {
     let cancelled = false
@@ -70,7 +75,7 @@ export function GoalsPage() {
     return () => {
       cancelled = true
     }
-  }, [reloadCount])
+  }, [reloadCount, familyId, homeEpoch])
 
   const goals = loadState.status === 'success' ? loadState.items : []
   const showEmpty = tab === 'active' && goals.length === 0 && loadState.status === 'success'
@@ -102,7 +107,14 @@ export function GoalsPage() {
     name?: string | null
     deadline?: string | null
   }) => {
-    await createGoal(payload)
+    try {
+      await createGoal(payload)
+    } catch (error) {
+      // The wallet already has a goal (made on another device a moment ago): show it, no error.
+      if (!(error instanceof HomeApiError) || error.code !== 'goal_already_exists') {
+        throw error
+      }
+    }
     refreshAfterMutation()
   }
 
@@ -212,6 +224,7 @@ export function GoalsPage() {
           mode={sheetState.mode}
           goal={selectedGoal}
           wallets={wallets}
+          editable={isOwner}
           onClose={closeSheets}
           onCreate={handleCreate}
           onUpdate={handleUpdate}
