@@ -12,7 +12,6 @@ vi.mock('react', async () => {
 })
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('@telegram-apps/telegram-ui', () => ({ Text: 'span', Spinner: () => null }))
-vi.mock('../../components/analytics/CategoryDonutChart', () => ({ CategoryDonutChart: () => null }))
 vi.mock('../../components/analytics/TrendChart', () => ({ TrendChart: () => null }))
 vi.mock('../../components/analytics/WeekdayBarChart', () => ({ WeekdayBarChart: () => null }))
 vi.mock('../../components/BlockError', () => ({ BlockError: () => null }))
@@ -62,10 +61,14 @@ function setPeriod(from: string, to: string, epoch = 0) {
 }
 
 /** Releases every request waiting right now with the usual answers of a month with spending. */
-async function answerAll(h: { settle: (n?: number) => Promise<void> }, comparison: Record<string, unknown>) {
+async function answerAll(
+  h: { settle: (n?: number) => Promise<void> },
+  comparison: Record<string, unknown>,
+  expenses?: unknown[],
+) {
   const answers: Record<string, unknown> = {
     comparison,
-    expenses: [{ category_id: 'food', category_name: 'Еда', category_translation_key: null, color_index: 0, amount: 120_000 }],
+    expenses: expenses ?? [{ category_id: 'food', category_name: 'Еда', category_translation_key: null, color_index: 0, amount: 120_000 }],
     income: [],
     summary: { by_currency: [{ currency: 'UZS', income: 0, expense: 120_000, transfer_net: 0, net_change: 0, average_daily_expense: 0, most_expensive_weekday: null, most_expensive_weekday_average: 0 }], day_of_week_expense: { UZS: [0, 0, 0, 0, 0, 0, 0] }, day_of_week_income: {} },
     trend: [],
@@ -97,6 +100,29 @@ const COMPARISON_SEPT = {
   prev_date_from: '2026-09-01T00:00:00+05:00',
   prev_date_to: '2026-09-30T23:59:59.999+05:00',
 }
+
+/** The category list under the donut exactly as it is drawn. */
+async function donutOnScreen(tree: unknown): Promise<string> {
+  const { findAll } = await import('../../test/elementTree')
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const { CategoryDonutChart } = await import('../../components/analytics/CategoryDonutChart')
+  const [donut] = findAll(tree, (el) => el.type === CategoryDonutChart)
+  return renderToStaticMarkup((CategoryDonutChart as (p: unknown) => React.ReactElement)(donut.props))
+}
+
+describe('Analytics charts: «новая» label (polish5)', () => {
+  const food = { category_id: 'food', category_name: 'Еда', category_translation_key: null, color_index: 0, amount: 120_000, prev_amount: 0 }
+  it('shown when last month had spending only in other categories', async () => {
+    const h = await mountHook(() => AnalyticsChartsTab())
+    await answerAll(h, COMPARISON_SEPT, [food])
+    expect(await donutOnScreen(h.result())).toContain('новая')
+  })
+  it('hidden when last month was empty as a whole', async () => {
+    const h = await mountHook(() => AnalyticsChartsTab())
+    await answerAll(h, { ...COMPARISON_SEPT, prev_total: 0 }, [food])
+    expect(await donutOnScreen(h.result())).not.toContain('новая')
+  })
+})
 
 describe('Analytics charts: comparison line', () => {
   it('for a 31-day range compared with a 30-day previous period it says 30 days, not 31', async () => {

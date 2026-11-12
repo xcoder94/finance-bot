@@ -19,6 +19,8 @@ type CategoryDonutChartProps = {
   centerLabel?: string
   /** Show the delta to the previous period on each row. */
   showDelta?: boolean
+  /** Whole previous period total (all categories); decides if «новая» makes sense. */
+  previousTotal?: number
 }
 
 export function CategoryDonutChart({
@@ -27,6 +29,7 @@ export function CategoryDonutChart({
   onSliceActivate,
   centerLabel,
   showDelta = true,
+  previousTotal,
 }: CategoryDonutChartProps) {
   if (slices.length === 0) {
     if (!emptyMessage) {
@@ -40,7 +43,8 @@ export function CategoryDonutChart({
     )
   }
 
-  const previousPeriodHasData = slices.some((slice) => (slice.prev ?? 0) > 0)
+  const previousPeriodHasData =
+    previousTotal !== undefined ? previousTotal > 0 : slices.some((slice) => (slice.prev ?? 0) > 0)
   const total = slices.reduce((sum, slice) => sum + slice.value, 0)
   const percents = formatSharePercents(slices.map((slice) => slice.value))
   const totalText = formatAnalyticsAmountDigits(total)

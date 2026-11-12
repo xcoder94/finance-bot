@@ -598,6 +598,11 @@ export function AnalyticsChartsTab() {
             slices={donutSlices}
             onSliceActivate={handleSliceActivate}
             centerLabel={t('home.expense')}
+            previousTotal={
+              drillParent === null && comparisonFetch.state.status === 'success'
+                ? comparisonFetch.state.data.prev_total
+                : undefined
+            }
           />
         )}
 

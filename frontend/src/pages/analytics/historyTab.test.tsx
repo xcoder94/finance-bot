@@ -43,6 +43,37 @@ describe('summary line', () => {
   })
 })
 
+describe('summary line shows only non-zero halves (polish5)', () => {
+  it('expense only: no «Доход», no separator', () => {
+    const html = wrap(<HistorySummaryLine summary={summary([['USD', 0, 25]])} />)
+    expect(html).toContain('Расход')
+    expect(html).toContain('$')
+    expect(html).not.toContain('Доход')
+    expect(html).not.toContain('·')
+  })
+  it('income only: no «Расход»', () => {
+    const html = wrap(<HistorySummaryLine summary={summary([['UZS', 500_000, 0]])} />)
+    expect(html).toContain('Доход')
+    expect(html).not.toContain('Расход')
+  })
+  it('both non-zero keep both halves', () => {
+    const html = wrap(<HistorySummaryLine summary={summary([['UZS', 1000, 400]])} />)
+    expect(html).toContain('Доход')
+    expect(html).toContain('Расход')
+    expect(html).toContain('·')
+  })
+  it('UZ: expense only shows just the expense label', async () => {
+    const uz = (await import('../../i18n/locales/uz.json')).default as { home: { income: string; expense: string } }
+    const uzI18n = i18n.createInstance()
+    await uzI18n.use(initReactI18next).init({ resources: { uz: { translation: uz } }, lng: 'uz', interpolation: { escapeValue: false } })
+    const html = renderToStaticMarkup(
+      <I18nextProvider i18n={uzI18n}><HistorySummaryLine summary={summary([['UZS', 0, 4000]])} /></I18nextProvider>,
+    )
+    expect(html).toContain(uz.home.expense)
+    expect(html).not.toContain(uz.home.income)
+  })
+})
+
 describe('summary line reserved space (polish4)', () => {
   it('renders the reserved container even while there is no summary yet, so the list does not jump', () => {
     const html = wrap(<HistorySummaryLine summary={null} />)
