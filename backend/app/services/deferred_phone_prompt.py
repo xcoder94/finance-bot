@@ -7,7 +7,10 @@ sent once to the bot chat. Event-driven (SQLAlchemy session events), no schedule
 Hot path: the decision is first made on the already loaded User row (is_candidate); for
 every existing user (eligible_at IS NULL) it is false and nothing else happens. Only a
 candidate costs one LIMIT-3 count and, at >= 3, one race-safe UPDATE ... RETURNING that
-claims the send. If the send fails the claim is released, so a later operation asks again (delivered -> once).
+claims the send. Delivered -> never again. Bot blocked -> never again. Any other failure
+(timeout, network): the request may or may not have arrived, so it is repeated not sooner
+than a day later and at most 3 times in all (see _reschedule). No extra columns: the retry
+time is kept in phone_prompt_eligible_at ("not before"), the cap is anchored to created_at.
 
 The phone number is never logged.
 """
@@ -17,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from typing import Any
 
@@ -44,9 +48,15 @@ class Claimed:
     user_id: uuid.UUID | None = None
 
 
+RETRY_AFTER_HOURS = 24
+# Retries stop 3 days after registration: with >= 24 h between tries that is at most 3 tries.
+RETRY_WINDOW_HOURS = 72
+
+
 def is_candidate(user: Any) -> bool:
     return (
         user.phone_prompt_eligible_at is not None
+        and user.phone_prompt_eligible_at <= datetime.now(UTC)
         and user.phone_prompted_at is None
         and user.phone is None
         and not user.is_deleted
@@ -68,7 +78,8 @@ async def claim(session: Any, user_id: uuid.UUID) -> Claimed | None:
         await session.execute(
             text(
                 "UPDATE users SET phone_prompted_at = now() WHERE id = :u "
-                "AND phone_prompt_eligible_at IS NOT NULL AND phone_prompted_at IS NULL "
+                "AND phone_prompt_eligible_at IS NOT NULL AND phone_prompt_eligible_at <= clock_timestamp() "
+                "AND phone_prompted_at IS NULL "
                 "AND phone IS NULL AND NOT is_deleted RETURNING telegram_id, language"
             ),
             {"u": user_id},
@@ -79,31 +90,37 @@ async def claim(session: Any, user_id: uuid.UUID) -> Claimed | None:
     return Claimed(telegram_id=row.telegram_id, language=row.language, user_id=user_id)
 
 
-async def _release_claim(user_id: uuid.UUID) -> None:
-    """The prompt did not reach the person: give the claim back so a later operation asks again."""
+async def _reschedule(user_id: uuid.UUID, *, give_up: bool) -> None:
+    """The request did not (surely) reach the person. Give the claim back, but not for a day;
+    after the retry window (or when the bot is blocked) never again."""
     async with async_session_factory() as session:
         await session.execute(
             text(
-                "UPDATE users SET phone_prompted_at = NULL WHERE id = :u "
-                "AND phone_prompt_closed_at IS NULL AND phone IS NULL"
+                "UPDATE users SET phone_prompted_at = NULL, phone_prompt_eligible_at = "
+                "CASE WHEN NOT :give_up AND clock_timestamp() + make_interval(hours => :retry) "
+                "< created_at + make_interval(hours => :window) "
+                "THEN clock_timestamp() + make_interval(hours => :retry) ELSE NULL END "
+                "WHERE id = :u AND phone_prompt_closed_at IS NULL AND phone IS NULL "
+                "AND phone_prompted_at IS NOT NULL"
             ),
-            {"u": user_id},
+            {
+                "u": user_id,
+                "give_up": give_up,
+                "retry": RETRY_AFTER_HOURS,
+                "window": RETRY_WINDOW_HOURS,
+            },
         )
         await session.commit()
 
 
 async def send_prompt(claimed: Claimed) -> None:
-    """Same safe path as the other notices (short timeout, errors logged by type only).
-
-    Delivered -> done, never again. Not delivered -> the claim is released, so the person is
-    asked after one of their next operations instead of never.
-    """
+    """Same safe path as the other notices (short timeout, errors logged by type only)."""
     from app.services import goal_notify
     from bot.phone_prompt import prompt_keyboard, prompt_text
 
     bot, owned = await goal_notify.resolve_bot(None)
     try:
-        delivered = await goal_notify.send_notice_safe(
+        outcome = await goal_notify.send_notice_outcome(
             bot,
             claimed.telegram_id,
             prompt_text(claimed.language),
@@ -115,11 +132,11 @@ async def send_prompt(claimed: Claimed) -> None:
                 await bot.session.close()
             except Exception:  # noqa: BLE001
                 pass
-    if not delivered and claimed.user_id is not None:
+    if outcome != "delivered" and claimed.user_id is not None:
         try:
-            await _release_claim(claimed.user_id)
+            await _reschedule(claimed.user_id, give_up=outcome == "blocked")
         except Exception:  # noqa: BLE001
-            logger.warning("deferred phone prompt claim not released", exc_info=True)
+            logger.warning("deferred phone prompt retry not scheduled", exc_info=True)
 
 
 async def run_for_user(user_id: uuid.UUID) -> None:

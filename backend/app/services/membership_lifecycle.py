@@ -100,6 +100,25 @@ async def evaluate_join_from_own_budget(
     return None
 
 
+async def lock_for_join(
+    session: AsyncSession, *, user: User, target: FamilyBudget
+) -> bool:
+    """Lock the joiner's own family and the target family (sorted ids, one global order), lock
+    the joiner, and re-read all three. False -> the target is gone or the joiner has moved
+    meanwhile: the caller answers "link invalid" and changes nothing.
+
+    Without it, B joining F while C joins B's own family P leaves C in the deleted P.
+    """
+    # user first (as detach and a request of this user do), then the families in sorted order
+    await session.refresh(user, with_for_update=True)
+    if user.is_deleted:
+        return False
+    for budget_id in sorted({user.family_budget_id, target.id}, key=str):
+        await lock_family_budget(session, budget_id)
+    await session.refresh(target)
+    return not target.is_deleted
+
+
 async def convert_join_with_own_budget(
     session: AsyncSession,
     *,

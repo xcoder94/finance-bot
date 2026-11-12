@@ -142,6 +142,22 @@ def _transfer_participants_stale(
     return False
 
 
+async def _lock_users(
+    session: AsyncSession, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, User]:
+    """Row-lock users in sorted id order and return their CURRENT state (not the cached one)."""
+    rows = (
+        await session.scalars(
+            select(User)
+            .where(User.id.in_(user_ids))
+            .order_by(User.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    return {row.id: row for row in rows}
+
+
 async def request_ownership_transfer(
     session: AsyncSession,
     *,
@@ -202,9 +218,18 @@ async def accept_ownership_transfer(
     if actor.id != transfer.to_user_id:
         raise TransferActorError()
 
-    former_owner = await session.get(User, transfer.from_user_id)
-    new_owner = await session.get(User, transfer.to_user_id)
-    budget = await session.get(FamilyBudget, transfer.family_budget_id)
+    # Lock both people (sorted ids), then the offer, and only then look at them: a parallel
+    # leave / remove / delete of either person either finishes before we look (-> stale) or
+    # waits for us. Same order as detach (user first, then the offer) - no deadlock.
+    locked = await _lock_users(session, [transfer.from_user_id, transfer.to_user_id])
+    await session.refresh(transfer, with_for_update=True)
+    if transfer.status != "pending":
+        raise TransferNotPendingError()
+    former_owner = locked.get(transfer.from_user_id)
+    new_owner = locked.get(transfer.to_user_id)
+    budget = await session.get(
+        FamilyBudget, transfer.family_budget_id, populate_existing=True
+    )
 
     if _transfer_participants_stale(transfer, former_owner, new_owner, budget):
         transfer.status = "cancelled"
@@ -253,7 +278,12 @@ async def refuse_ownership_transfer(
     actor: User,
     bot: Bot | None = None,
 ) -> None:
-    transfer = await _get_pending_transfer(session, transfer_id)
+    transfer = await _get_transfer(session, transfer_id)
+    if transfer is not None:
+        # lock the offer so a parallel accept/refuse is decided once (no lost update)
+        await session.refresh(transfer, with_for_update=True)
+        if transfer.status != "pending":
+            transfer = None
     if transfer is None:
         raise TransferNotFoundError()
     if transfer.status != "pending":

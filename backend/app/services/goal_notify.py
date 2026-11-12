@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -105,10 +106,10 @@ async def resolve_bot(bot: Bot | None) -> tuple[Bot, bool]:
         return _InertBot(), False  # type: ignore[return-value]
 
 
-async def send_notice_safe(bot: Bot, chat_id: int, text: str, **kwargs: Any) -> bool:
-    """Best-effort Telegram notice: a delivery failure never breaks the caller's
-    already-decided state change. The error is logged (type only, no text).
-    A hanging Telegram is cut off after NOTICE_TIMEOUT_SECONDS."""
+async def send_notice_outcome(bot: Bot, chat_id: int, text: str, **kwargs: Any) -> str:
+    """Like send_notice_safe, but says what happened: "delivered", "blocked" (the person
+    blocked the bot / the chat is gone: asking again is pointless) or "failed" (timeout,
+    network, anything else: unknown whether it arrived)."""
     try:
         await asyncio.wait_for(
             bot.send_message(chat_id, text, **kwargs), timeout=NOTICE_TIMEOUT_SECONDS
@@ -117,8 +118,19 @@ async def send_notice_safe(bot: Bot, chat_id: int, text: str, **kwargs: Any) -> 
         logging.getLogger(__name__).warning(
             "telegram notice to %s not delivered: %s", chat_id, type(exc).__name__
         )
-        return False
-    return True
+        if isinstance(exc, TelegramForbiddenError) or (
+            isinstance(exc, TelegramBadRequest) and "chat not found" in str(exc).lower()
+        ):
+            return "blocked"
+        return "failed"
+    return "delivered"
+
+
+async def send_notice_safe(bot: Bot, chat_id: int, text: str, **kwargs: Any) -> bool:
+    """Best-effort Telegram notice: a delivery failure never breaks the caller's
+    already-decided state change. The error is logged (type only, no text).
+    A hanging Telegram is cut off after NOTICE_TIMEOUT_SECONDS."""
+    return await send_notice_outcome(bot, chat_id, text, **kwargs) == "delivered"
 
 
 # --- Deferred delivery (ux-r7) -------------------------------------------------

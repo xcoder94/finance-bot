@@ -176,6 +176,10 @@ async def delete_member(
     except MemberAlreadyDetachedError:
         await session.rollback()
         raise HTTPException(status_code=404) from None
+    except OwnerCannotDetachError:
+        # the person has just accepted the ownership: they are the owner now, not removable
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="member_is_owner") from None
     await session.commit()
 
     return MemberDeleteResponse(

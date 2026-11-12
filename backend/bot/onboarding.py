@@ -310,6 +310,14 @@ async def language_callback(callback: CallbackQuery, state: FSMContext, bot: Bot
                     await callback.answer()
                     return
                 await lock_family_budget(session, budget_id)
+                # re-read: it may have been converted away while we waited for the lock
+                budget = await session.get(FamilyBudget, budget_id, populate_existing=True)
+                if budget is None or budget.is_deleted:
+                    existing_language = language
+                    await callback.message.edit_text(invite_link_invalid(language))
+                    await state.clear()
+                    await callback.answer()
+                    return
                 if await count_active_members(session, budget_id) >= MEMBER_LIMIT:
                     existing_language = language
                     await callback.message.edit_text(invite_family_full_chat(language))

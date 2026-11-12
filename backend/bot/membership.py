@@ -17,6 +17,7 @@ from app.services.membership_lifecycle import (
     FamilyFullError,
     JoinBlockReason,
     convert_join_with_own_budget,
+    lock_for_join,
     count_active_members,
     count_all_wallets_for_user_budget,
     evaluate_join_from_own_budget,
@@ -85,7 +86,10 @@ async def join_accept(callback: CallbackQuery) -> None:
                 await callback.answer()
                 return
 
-            await lock_family_budget(session, budget.id)
+            if not await lock_for_join(session, user=user, target=budget):
+                await callback.message.edit_text(invite_link_invalid(user))
+                await callback.answer()
+                return
             if await count_active_members(session, budget.id) >= MEMBER_LIMIT:
                 await callback.message.edit_text(invite_family_full_chat(user))
                 await callback.answer()

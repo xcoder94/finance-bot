@@ -77,7 +77,7 @@ import time  # noqa: E402
 from datetime import UTC, datetime  # noqa: E402
 from unittest.mock import AsyncMock  # noqa: E402
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import select, text  # noqa: E402
 
 from app.models.user import User  # noqa: E402
 from app.services import deferred_phone_prompt as dpp  # noqa: E402
@@ -152,7 +152,17 @@ async def test_failed_send_is_asked_again_on_a_later_operation_then_only_once(
         assert len(attempts) == 1  # failed: the person has not got it yet
         fresh = await session.scalar(select(User).where(User.id == user.id))
         await session.refresh(fresh)
-        assert fresh.phone_prompted_at is None  # so the next operation asks again
+        assert fresh.phone_prompted_at is None  # so a later operation may ask again
+        await _add_ops(session, user, budget, wallet, 1)
+        await session.commit()
+        await dpp.drain()
+        assert len(attempts) == 1  # but not the same day (ux-r12)
+        await session.execute(  # a day later
+            text("UPDATE users SET created_at = created_at - interval '25 hours', "
+                 "phone_prompt_eligible_at = phone_prompt_eligible_at - interval '25 hours' "
+                 "WHERE id = :u"), {"u": user.id})
+        await session.commit()
+        await session.refresh(user)
         await _add_ops(session, user, budget, wallet, 1)
         await session.commit()
         await dpp.drain()
