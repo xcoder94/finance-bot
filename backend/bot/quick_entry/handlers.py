@@ -79,6 +79,7 @@ from app.services.quick_entry_wallets import (
     CurrencyMissing,
     list_wallets_for_parse,
     resolve_wallet,
+    strip_wallet_mention,
 )
 from app.services.bot_texts import t as catalogue_t
 from app.services.display_name import display_name
@@ -611,6 +612,8 @@ async def _process_parsed_response(
         wallet = resolved
         currency = wallet.currency  # type: ignore[assignment]  # card, limits and wallet agree
         comment = _strip_op_comment(op, source_text)
+        if op.wallet_hint:
+            comment = strip_wallet_mention(comment, wallet.name, op.wallet_hint)
         category_id = await resolve_category_id(
             session,
             user.family_budget_id,
@@ -692,7 +695,13 @@ async def _process_parsed_response(
             currency=currency,
             wallet_id=resolved.id,
             category_raw=op.category,
-            comment=_strip_op_comment(op, source_text),
+            comment=(
+                strip_wallet_mention(
+                    _strip_op_comment(op, source_text), resolved.name, op.wallet_hint
+                )
+                if op.wallet_hint
+                else _strip_op_comment(op, source_text)
+            ),
             operation_date=op_date,
             channel=channel,
             charge_on_confirm=not bool(clear_ops),

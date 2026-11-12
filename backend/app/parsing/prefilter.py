@@ -332,13 +332,35 @@ def _verb_type(
     return None
 
 
+def _wallet_span(text: str, name: str) -> tuple[int, int] | None:
+    pattern = r"\s+".join(re.escape(p) for p in name.split())
+    found = re.search(r"(?<!\w)" + pattern + r"(?!\w)", text, re.IGNORECASE)
+    return found.span() if found else None
+
+
+def _match_wallet_spans(
+    text: str, wallet_names: list[str]
+) -> list[tuple[str, tuple[int, int]]]:
+    """Wallets named in full; a name inside a longer matched name ("Карта" in "Карта сум") is dropped."""
+    hits = [
+        (name, span)
+        for name in wallet_names
+        if (span := _wallet_span(text, name)) is not None
+    ]
+    return [
+        (name, span)
+        for name, span in hits
+        if not any(
+            other_span[0] <= span[0]
+            and span[1] <= other_span[1]
+            and (other_span[1] - other_span[0]) > (span[1] - span[0])
+            for _, other_span in hits
+        )
+    ]
+
+
 def _match_wallets(text: str, wallet_names: list[str]) -> list[str]:
-    folded = text.casefold()
-    matched: list[str] = []
-    for name in wallet_names:
-        if name.casefold() in folded:
-            matched.append(name)
-    return matched
+    return [name for name, _ in _match_wallet_spans(text, wallet_names)]
 
 
 def _build_comment(
@@ -397,7 +419,8 @@ def try_prefilter(
 
     if not resolved and verb_type in ("expense", "income") and _has_debt_context(text):
         # Debt phrase ("qarzga oldim", "qarzni qaytardim"): verb decides, no category.
-        debt_wallets = _match_wallets(text, wallet_names)
+        debt_hits = _match_wallet_spans(text, wallet_names)
+        debt_wallets = [n for n, _ in debt_hits]
         if len(debt_wallets) > 1:
             return PrefilterResult(operation=None, reason="wallet_ambiguous")
         return PrefilterResult(
@@ -407,7 +430,7 @@ def try_prefilter(
                 currency=amount.currency,
                 wallet_hint=debt_wallets[0] if debt_wallets else None,
                 category=None,
-                comment=_build_comment(text, amount.span, []),
+                comment=_build_comment(text, amount.span, [sp for _, sp in debt_hits]),
             ),
             reason=None,
         )
@@ -419,7 +442,9 @@ def try_prefilter(
         return PrefilterResult(operation=None, reason=reason)
 
     match = resolved[0]
-    wallet_hits = _match_wallets(text, wallet_names)
+    wallet_hit_spans = _match_wallet_spans(text, wallet_names)
+    wallet_hits = [n for n, _ in wallet_hit_spans]
+    wallet_spans = [sp for _, sp in wallet_hit_spans]
     if len(wallet_hits) > 1:
         return PrefilterResult(operation=None, reason="wallet_ambiguous")
 
@@ -435,17 +460,17 @@ def try_prefilter(
         # an ordinary category, same as without the debt word.
         op_type = match.op_type
         category_name = match.category.name
-        comment = _build_comment(text, amount.span, [match.span])
+        comment = _build_comment(text, amount.span, [match.span, *wallet_spans])
     elif verb_type is not None and verb_type != match.op_type:
         # Verb contradicts the category's type: the verb wins, category dropped
         # (it stays in the comment text).
         op_type: Literal["expense", "income"] = verb_type
         category_name: str | None = None
-        comment = _build_comment(text, amount.span, [])
+        comment = _build_comment(text, amount.span, wallet_spans)
     else:
         op_type = match.op_type
         category_name = match.category.name
-        comment = _build_comment(text, amount.span, [match.span])
+        comment = _build_comment(text, amount.span, [match.span, *wallet_spans])
 
     return PrefilterResult(
         operation=ParsedOperation(

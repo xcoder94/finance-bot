@@ -17,7 +17,7 @@ from app.services.family_guard import guard_family_unchanged
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
     list_wallets_for_parse,
-    wallet_matches_hint,
+    pick_wallet_by_hint,
 )
 from app.services.transactions import validate_transfer_refs
 
@@ -69,13 +69,9 @@ def _pick_by_hint(
     hint: str,
     *,
     exclude: Wallet | None = None,
+    currency: str | None = None,
 ) -> Wallet | None:
-    for wallet in wallets:
-        if exclude is not None and wallet.id == exclude.id:
-            continue
-        if wallet_matches_hint(hint, wallet.name):
-            return wallet
-    return None
+    return pick_wallet_by_hint(wallets, hint, exclude=exclude, currency=currency)
 
 
 def _find_wallet_in_currency(
@@ -109,7 +105,7 @@ def _resolve_from_wallet(
     default_wallet: Wallet,
 ) -> Wallet | CurrencyMissing:
     if from_hint:
-        matched = _pick_by_hint(wallets, from_hint)
+        matched = _pick_by_hint(wallets, from_hint, currency=amount_currency)
         if matched is not None:
             if matched.currency == amount_currency:
                 return matched
@@ -135,7 +131,9 @@ def _resolve_to_wallet(
     default_wallet: Wallet,
 ) -> Wallet | CurrencyMissing:
     if to_hint:
-        matched = _pick_by_hint(wallets, to_hint, exclude=from_wallet)
+        matched = _pick_by_hint(
+            wallets, to_hint, exclude=from_wallet, currency=from_wallet.currency
+        )
         if matched is not None:
             return matched
 
