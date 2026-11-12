@@ -26,6 +26,7 @@ from app.services.membership_lifecycle import (
 )
 from app.services.ownership_transfer import (
     InvalidTransferTargetError,
+    RecipientGoneError,
     TransferConflictError,
     request_ownership_transfer,
 )
@@ -252,6 +253,8 @@ async def transfer_ownership(
             budget=budget,
             bot=None,
         )
+    except RecipientGoneError as exc:
+        raise HTTPException(status_code=404) from exc
     except InvalidTransferTargetError as exc:
         raise HTTPException(status_code=400, detail="invalid_transfer_target") from exc
     except TransferConflictError as exc:

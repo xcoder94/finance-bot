@@ -19,6 +19,10 @@ from app.services.member_texts import (
 )
 
 
+class RecipientGoneError(Exception):
+    """The chosen member left, was removed or moved while the request was waiting."""
+
+
 class InvalidTransferTargetError(Exception):
     pass
 
@@ -166,6 +170,17 @@ async def request_ownership_transfer(
     budget: FamilyBudget,
     bot: Bot | None = None,
 ) -> OwnershipTransfer:
+    # Lock both people (sorted ids, as accept/refuse do) and decide on their CURRENT state: a
+    # parallel leave / removal of the recipient either finished before (-> gone) or waits for us.
+    locked = await _lock_users(session, [owner.id, recipient.id])
+    fresh_recipient = locked.get(recipient.id)
+    if (
+        fresh_recipient is None
+        or fresh_recipient.is_deleted
+        or fresh_recipient.family_budget_id != owner.family_budget_id
+    ):
+        await session.rollback()
+        raise RecipientGoneError()
     if owner.role != "owner":
         raise InvalidTransferTargetError()
     if recipient.id == owner.id:

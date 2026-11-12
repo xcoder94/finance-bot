@@ -111,19 +111,21 @@ async def check_goal_achievement(
     *,
     bot: Bot | None = None,
 ) -> None:
-    # Cheap unlocked look first: when nothing changes (goal far from the threshold or already
-    # flagged) no row lock is taken, so nothing is held across the next wallet.
-    goal = await get_active_goal_for_wallet(session, wallet_id)
-    if goal is None:
-        return
-    balance = await wallet_balance(session, wallet_id)
-    if (balance >= goal.target_amount) == goal.crossed:
-        return
+    """Bring the goal flag in line with the balance: crossed == (balance >= target).
 
-    # The flag must flip: lock, re-read the committed flag (a concurrent request may have
-    # flipped it already) and decide again.
+    Invariant: once every concurrent request has finished, the flag equals the balance
+    condition, and a notice goes out exactly once per "below -> reached" transition.
+    Scheme: every writer commits its change first and then calls this; the decision is made
+    only under the goal row lock, the balance is read after the lock is taken. The last
+    checker takes the lock after every writer has committed, so it sees the final balance and
+    the flag left by earlier checkers; nobody decides from a stale look taken without the lock.
+    The lock is released by the commit at the end (also when nothing changed), so a request
+    never holds one goal lock while waiting for another; callers with several wallets go in
+    sorted order (check_goals_after_write) as well, so there is no cycle of waits.
+    """
     goal = await get_active_goal_for_wallet(session, wallet_id, lock=True)
     if goal is None:
+        await session.commit()
         return
     balance = await wallet_balance(session, wallet_id)
     now_crossed = balance >= goal.target_amount
@@ -134,10 +136,20 @@ async def check_goal_achievement(
         goal.crossed = True
         for chat_id, text, reply_markup in outbox:
             queue_notice(session, bot, chat_id, text, reply_markup=reply_markup)
-        await session.commit()
     elif not now_crossed and goal.crossed:
         goal.crossed = False
-        await session.commit()
+    await session.commit()
+
+
+async def check_goals_after_write(
+    session: AsyncSession,
+    wallet_ids: set[uuid.UUID] | list[uuid.UUID],
+    *,
+    bot: Bot | None = None,
+) -> None:
+    """The one entry point for every write path (API, transfer, purchase, bot)."""
+    for wallet_id in sorted(set(wallet_ids), key=str):
+        await check_goal_achievement(session, wallet_id, bot=bot)
 
 
 async def list_goals(

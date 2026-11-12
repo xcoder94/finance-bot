@@ -41,7 +41,7 @@ from app.parsing.types import (
     ParserMalformed,
     ParserUnavailable,
 )
-from app.services.goals import check_goal_achievement
+from app.services.goals import check_goals_after_write
 from app.services.quick_entry_balance import wallet_balance
 from app.services.quick_entry_categories import strip_parent_category
 from app.services.quick_entry_counters import (
@@ -225,8 +225,7 @@ async def _check_wallets_after_write(
     wallet_ids: set[uuid.UUID],
     bot: Bot,
 ) -> None:
-    for wallet_id in wallet_ids:
-        await check_goal_achievement(session, wallet_id, bot=bot)
+    await check_goals_after_write(session, wallet_ids, bot=bot)
 
 
 async def _txn_category_label(

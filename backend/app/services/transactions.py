@@ -27,7 +27,7 @@ from app.services.change_log import (
     record_income_changes,
     record_transfer_changes,
 )
-from app.services.goals import check_goal_achievement
+from app.services.goals import check_goals_after_write
 from app.services.wallet_visibility import require_wallet_visible
 from app.services.wallets_categories import (
     get_active_expense_category,
@@ -42,10 +42,7 @@ async def _check_affected_wallets(
     *,
     bot: Bot | None = None,
 ) -> None:
-    # Fixed order (sorted ids): concurrent requests touching the same wallets never lock
-    # goal rows crosswise.
-    for wallet_id in sorted(wallet_ids, key=str):
-        await check_goal_achievement(session, wallet_id, bot=bot)
+    await check_goals_after_write(session, wallet_ids, bot=bot)
 
 
 def transaction_to_response(
