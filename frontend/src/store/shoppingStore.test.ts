@@ -150,6 +150,15 @@ describe('shoppingStore.purchase', () => {
     expect(s().items).toHaveLength(1)
   })
 
+  it('404 not_found: its own outcome, the list is re-read from the server and shows what is left', async () => {
+    useShoppingStore.setState({ items: [mk('1', 'a'), mk('2', 'b')], status: 'ready', scope: 'fam' })
+    m.createShoppingPurchase.mockRejectedValue(new ShoppingApiError('not_found', 404))
+    m.listShoppingItems.mockResolvedValue([mk('2', 'b')])
+    expect(await s().purchase(body)).toEqual({ kind: 'stale' })
+    expect(m.listShoppingItems).toHaveBeenCalledTimes(1)
+    expect(s().items.map((i) => i.id)).toEqual(['2'])
+  })
+
   it('ok: returns the purchase and removes bought ids from the shown list', async () => {
     useShoppingStore.setState({ items: [mk('1', 'a'), mk('2', 'b')], status: 'ready', scope: 'fam' })
     m.createShoppingPurchase.mockResolvedValue({ purchase: done, replay: false })

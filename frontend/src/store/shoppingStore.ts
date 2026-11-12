@@ -23,6 +23,8 @@ export type PurchaseOutcome =
   | { kind: 'no_wallet' }
   /** the person's family changed while saving: nothing was recorded */
   | { kind: 'family_changed' }
+  /** 404: an item is no longer in the current list; nothing was recorded, the list was re-read */
+  | { kind: 'stale' }
   /** definite = the server answered with a 4xx (nothing was recorded); otherwise the outcome is unknown. */
   | { kind: 'failed'; definite: boolean }
 
@@ -153,6 +155,10 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
     } catch (error) {
       if (error instanceof FamilyChangedError) return { kind: 'family_changed' }
       if (codeOf(error) === 'no_wallet') return { kind: 'no_wallet' }
+      if (codeOf(error) === 'not_found') {
+        await get().load(get().scope, { silent: true })
+        return { kind: 'stale' }
+      }
       const status = error instanceof ShoppingApiError ? error.status : 0
       return { kind: 'failed', definite: status >= 400 && status < 500 }
     }

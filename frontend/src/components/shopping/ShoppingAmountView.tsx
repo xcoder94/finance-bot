@@ -20,6 +20,8 @@ type ShoppingAmountViewProps = {
   failed: boolean
   /** the family changed while saving; nothing was recorded */
   familyChanged?: boolean
+  /** the server no longer has some ticked item (404); nothing was recorded, the list was re-read */
+  staleList?: boolean
   noWallet: boolean
   /** Photo way is offered only when the server says the bot reads receipts. */
   photoEnabled: boolean
@@ -57,6 +59,7 @@ export function ShoppingAmountView({
   busy,
   failed,
   familyChanged = false,
+  staleList = false,
   noWallet,
   photoEnabled,
   botMethod,
@@ -137,9 +140,13 @@ export function ShoppingAmountView({
         </>
       )}
 
-      {failed || noWallet || familyChanged ? (
+      {failed || noWallet || familyChanged || staleList ? (
         <div className="shopping-amount__fail" role="alert" ref={revealMessage}>
-          {familyChanged ? t('familyChanged.generic') : t('shopping.recordFailed')}
+          {familyChanged
+            ? t('familyChanged.generic')
+            : staleList
+              ? t('shopping.staleList')
+              : t('shopping.recordFailed')}
         </div>
       ) : null}
 

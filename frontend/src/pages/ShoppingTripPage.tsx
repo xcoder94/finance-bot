@@ -93,6 +93,7 @@ export function ShoppingTripPage() {
   const [failed, setFailed] = useState(false)
   const [noWallet, setNoWallet] = useState(false)
   const [familyChanged, setFamilyChanged] = useState(false)
+  const [staleList, setStaleList] = useState(false)
   const [result, setResult] = useState<{ purchase: ShoppingPurchase; requested: number } | null>(
     null,
   )
@@ -144,6 +145,7 @@ export function ShoppingTripPage() {
     setFailed(false)
     setNoWallet(false)
     setStage((current) => (current === 'amount' ? 'trip' : current))
+    setStaleList(false)
     setFamilyChanged(true)
   }, [scope])
 
@@ -231,10 +233,16 @@ export function ShoppingTripPage() {
   const onToggle = (id: string) => {
     if (!checked.has(id)) setPopId(id)
     setFamilyChanged(false)
+    setStaleList(false)
     setChecked((prev) => toggleChecked(prev, id))
   }
 
   const ids = checkedIdsInListOrder(items, checked)
+
+  // Every ticked item vanished from the list (a mate bought/deleted it): nothing to finish.
+  useEffect(() => {
+    if (stage === 'amount' && ids.length === 0) setStage('trip')
+  }, [stage, ids.length])
 
   const onSubmit = async () => {
     const parsed = parsePositiveInt(amount)
@@ -244,6 +252,7 @@ export function ShoppingTripPage() {
     setFailed(false)
     setNoWallet(false)
     setFamilyChanged(false)
+    setStaleList(false)
     const outcome = await submitter.current!.submit(ids, parsed)
     submitting.current = false
     setBusy(false)
@@ -256,6 +265,9 @@ export function ShoppingTripPage() {
       setStage('result')
     } else if (outcome.kind === 'no_wallet') {
       setNoWallet(true)
+    } else if (outcome.kind === 'stale') {
+      haptic.error()
+      setStaleList(true)
     } else if (outcome.kind === 'family_changed') {
       haptic.error()
       setFamilyChanged(true)
@@ -336,6 +348,7 @@ export function ShoppingTripPage() {
         failed={failed}
         noWallet={noWallet}
         familyChanged={familyChanged}
+        staleList={staleList}
         photoEnabled={photoEnabled}
         botMethod={botMethod}
         onBotMethod={(method) => void startBot(method, ids)}
@@ -344,6 +357,7 @@ export function ShoppingTripPage() {
           setFailed(false)
           setNoWallet(false)
           setFamilyChanged(false)
+          setStaleList(false)
         }}
         onOverLimit={setOverLimit}
         onSubmit={() => void onSubmit()}
@@ -400,9 +414,9 @@ export function ShoppingTripPage() {
   } else {
     body = (
       <>
-        {familyChanged ? (
+        {familyChanged || staleList ? (
           <div className="shopping-amount__fail" role="alert" ref={revealMessage}>
-            {t('familyChanged.generic')}
+            {familyChanged ? t('familyChanged.generic') : t('shopping.staleList')}
           </div>
         ) : null}
         <ShoppingTripView

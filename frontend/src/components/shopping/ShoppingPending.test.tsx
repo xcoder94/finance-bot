@@ -40,6 +40,14 @@ describe('ShoppingAmountView: family changed', () => {
   })
 })
 
+describe('ShoppingAmountView: stale list (404)', () => {
+  it('says the list changed, not the usual record failure', () => {
+    const html = wrap(<ShoppingAmountView {...amountProps} failed={false} staleList />)
+    expect(html).toContain('Список изменился')
+    expect(html).not.toContain(ru.shopping.recordFailed)
+  })
+})
+
 describe('ShoppingAmountView: finish sheet with methods (mockup, dev-fix2)', () => {
   it('is a sheet (dialog) with title, close, caption and the three tabs when the photo flag is on', () => {
     const html = wrap(<ShoppingAmountView {...amountProps} />)

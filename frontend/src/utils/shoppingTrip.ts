@@ -47,6 +47,7 @@ export type TripSubmitResult =
   | { kind: 'ok'; purchase: ShoppingPurchase; requested: number }
   | { kind: 'no_wallet' }
   | { kind: 'family_changed' }
+  | { kind: 'stale' }
   | { kind: 'failed' }
 
 /**
@@ -67,6 +68,10 @@ export function createTripSubmitter(send: (body: ShoppingPurchaseBody) => Promis
       if (outcome.kind === 'no_wallet') {
         token = newClientToken()
         return { kind: 'no_wallet' }
+      }
+      if (outcome.kind === 'stale') {
+        token = newClientToken()
+        return { kind: 'stale' }
       }
       if (outcome.kind === 'family_changed') {
         token = newClientToken()
