@@ -78,10 +78,12 @@ describe('ShoppingResultView (recorded vs ticked)', () => {
     expect(html).not.toContain('Записано 3')
     expect(html).toContain('Эти позиции уже купил кто-то из семьи.')
   })
-  it('zero recorded is shown as 0', () => {
+  it('nothing recorded but the sum was written: says so honestly, not "recorded 0 items"', () => {
     const html = wrap(
       <ShoppingResultView purchase={{ ...purchase, items_recorded: 0 }} requested={2} categoryLabel={null} walletLabel={null} onDone={() => {}} />,
     )
-    expect(html).toContain('Записано 0 товаров')
+    expect(html).not.toContain('Записано 0')
+    expect(html).toContain('Расход записан, но ни одна позиция не отмечена купленной')
+    expect(html).toContain('Этих позиций нет в списке вашей семьи')
   })
 })

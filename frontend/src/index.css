@@ -4751,3 +4751,12 @@ a.tabbar-link:active {
   font-weight: 600;
   cursor: pointer;
 }
+
+.goals-page__notice {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sec-bg, rgba(127, 127, 127, 0.12));
+  color: var(--tx);
+  font-size: 14px;
+  line-height: 1.35;
+}

@@ -93,6 +93,7 @@ export function EditExpensePage() {
   const [loadRetry, setLoadRetry] = useState(0)
   // The fields are filled from the saved operation once; a reload (family changed) must not overwrite what was typed.
   const filledFor = useRef<string | null>(null)
+  const filledFamily = useRef<string | null>(null)
 
   const [transactionDate, setTransactionDate] = useState('')
   const [dateError, setDateError] = useState(false)
@@ -157,6 +158,14 @@ export function EditExpensePage() {
         setCategoryLabel(selection.label)
         setComment(transaction.comment ?? '')
         filledFor.current = id
+        filledFamily.current = familyId
+      } else if (filledFamily.current !== familyId) {
+        // The person moved to another family and the operation moved with them: its category and wallet
+        // now have the new budget's ids. Take them; amount, date and comment stay as typed.
+        setCategoryId(selection.categoryId)
+        setCategoryLabel(selection.label)
+        setWalletId(transaction.wallet_id)
+        filledFamily.current = familyId
       }
       setLoadState({ status: 'success', wallets, categories, transaction })
     } catch {

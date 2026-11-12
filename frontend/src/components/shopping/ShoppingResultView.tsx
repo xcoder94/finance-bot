@@ -29,6 +29,9 @@ export function ShoppingResultView({
   useEffect(() => {
     haptic.success()
   }, [])
+  // The server wrote the sum but none of the sent items belong to this family's list (the person moved
+  // to another family, or the items were bought elsewhere): do not claim items were recorded.
+  const none = requested !== undefined && requested > 0 && purchase.items_recorded === 0
   const lost = requested !== undefined && purchase.items_recorded < requested
 
   return (
@@ -37,7 +40,7 @@ export function ShoppingResultView({
         <AnimatedTick size={26} />
       </div>
       <div className="shopping-result__title" role="status">
-        {t('shopping.resultTitle', { count: purchase.items_recorded })}
+        {none ? t('shopping.resultNoneTitle') : t('shopping.resultTitle', { count: purchase.items_recorded })}
       </div>
       <div className="shopping-list shopping-result__card">
         <div className="shopping-result__row">
@@ -54,8 +57,8 @@ export function ShoppingResultView({
       <div className="shopping-result__note">
         {line}
         <br />
-        {t('shopping.resultNote', { k: purchase.items_left })}
-        {lost ? (
+        {none ? t('shopping.resultNoneNote') : t('shopping.resultNote', { k: purchase.items_left })}
+        {lost && !none ? (
           <>
             <br />
             {t('shopping.alreadyBought')}

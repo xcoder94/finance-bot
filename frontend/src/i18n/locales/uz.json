@@ -51,6 +51,8 @@
     "resultSum": "summa",
     "resultLeft": "qoldi",
     "resultNote": "Sotib olinganlar ro'yxatdan chiqdi, belgilanmaganlar ({{k}}) qoldi.",
+    "resultNoneTitle": "Xarajat yozildi, lekin birorta pozitsiya sotib olingan deb belgilanmadi",
+    "resultNoneNote": "Bu pozitsiyalar oilangiz ro'yxatida yo'q: ehtimol boshqa oilaga o'tgansiz yoki ularni allaqachon sotib olishgan. Ro'yxatni tekshiring.",
     "done": "Tayyor",
     "alreadyBought": "Bu pozitsiyalarni oiladan kimdir allaqachon sotib olgan.",
     "recordFailed": "Yozib bo'lmadi. Qayta urinib ko'ring.",
@@ -429,6 +431,7 @@
     "transfers_gifts": "O'tkazmalar va sovg'alar"
   },
   "goals": {
+    "alreadyExists": "Bunday maqsad allaqachon bor",
     "title": "Maqsadlar",
     "newGoal": "Yangi maqsad",
     "tabActive": "Jarayonda",

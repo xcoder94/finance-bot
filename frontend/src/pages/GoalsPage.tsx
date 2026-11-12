@@ -41,6 +41,7 @@ export function GoalsPage() {
   const [wallets, setWallets] = useState<WalletResponse[]>([])
   const [reloadCount, setReloadCount] = useState(0)
   const [sheetState, setSheetState] = useState<SheetState>({ kind: 'closed' })
+  const [alreadyExists, setAlreadyExists] = useState(false)
   const [closingGoalId, setClosingGoalId] = useState<string | null>(null)
 
   const loadGoals = useCallback(async () => {
@@ -86,6 +87,7 @@ export function GoalsPage() {
       : null
 
   const openCreateForm = () => {
+    setAlreadyExists(false)
     setSheetState({ kind: 'form', mode: 'create', goalId: null })
   }
 
@@ -114,6 +116,7 @@ export function GoalsPage() {
       if (!(error instanceof HomeApiError) || error.code !== 'goal_already_exists') {
         throw error
       }
+      setAlreadyExists(true)
     }
     refreshAfterMutation()
   }
@@ -151,6 +154,12 @@ export function GoalsPage() {
             </button>
           ) : null}
         </div>
+
+        {alreadyExists ? (
+          <div className="goals-page__notice" role="status">
+            {t('goals.alreadyExists')}
+          </div>
+        ) : null}
 
         <div className="goals-page__tabs analytics-tabs" role="tablist" aria-label={t('goals.title')}>
           <button

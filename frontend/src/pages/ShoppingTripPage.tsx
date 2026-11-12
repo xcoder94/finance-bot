@@ -15,6 +15,7 @@ import {
 import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
 import { ShoppingAmountView } from '../components/shopping/ShoppingAmountView'
 import { ShoppingManualView } from '../components/shopping/ShoppingManualView'
+import { refreshPersonOnReturn } from '../api/familyChanged'
 import { ShoppingResultView } from '../components/shopping/ShoppingResultView'
 import { ShoppingTripView } from '../components/shopping/ShoppingTripView'
 import { closeMiniApp } from '../telegram/closeMiniApp'
@@ -249,6 +250,8 @@ export function ShoppingTripPage() {
     if (outcome.kind === 'ok') {
       invalidateWalletData(scope)
       invalidateHomeData(scope)
+      // none of the items was ours: the person may have moved to another family — reread who they are
+      if (outcome.requested > 0 && outcome.purchase.items_recorded === 0) void refreshPersonOnReturn()
       setResult({ purchase: outcome.purchase, requested: outcome.requested })
       setStage('result')
     } else if (outcome.kind === 'no_wallet') {

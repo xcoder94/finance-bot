@@ -74,5 +74,10 @@ describe('Goals page', () => {
     await expect(form().props.onCreate({ wallet_id: 'w', target_amount: 5 })).resolves.toBeUndefined()
     await h.settle(10)
     expect(findAll(h.result(), (e) => e.type === GoalCard)).toHaveLength(1)
+    // and the person is told why nothing new appeared
+    const { textOf } = await import('../test/elementTree')
+    const notice = findAll(h.result(), (e) => e.props.role === 'status')[0]
+    expect(notice).toBeDefined()
+    expect(textOf(notice)).toContain('goals.alreadyExists')
   })
 })
