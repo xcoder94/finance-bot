@@ -81,6 +81,9 @@ async def _cancel_pending_for_family(
                 OwnershipTransfer.family_budget_id == family_budget_id,
                 OwnershipTransfer.status == "pending",
             )
+            .order_by(OwnershipTransfer.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
     ).all()
     for row in pending:
