@@ -336,20 +336,31 @@ def _overlaps(span: tuple[int, int], others: list[tuple[int, int]]) -> bool:
     return any(span[0] < o[1] and o[0] < span[1] for o in others)
 
 
-def _match_wallet_spans(
+# A wallet word is a mention of the wallet (and not a thing in the phrase, "пополнил карту метро")
+# only when the phrase gives it a role: a preposition before it, a case ending added to the name
+# that says "by/from/to" (Uzbek -dan/-ga/-da.., Russian instrumental -ой/-ом/-ыми), the end of
+# the phrase (only the amount after it), or a place right after the amount.
+_WALLET_PREPOSITIONS = {"с", "со", "из", "от", "на", "в", "во", "к", "по", "через"}
+_UZ_ROLE_ENDINGS = ("dan", "ga", "da", "qa", "ka", "ra", "dagi", "gacha")
+_RU_INSTRUMENTAL = ("ыми", "ими", "ой", "ою", "ей", "ею", "ом", "ем")
+
+
+def _wallet_runs(
     text: str,
     wallet_names: list[str],
     exclude: list[tuple[int, int]] | None = None,
-) -> list[tuple[str, tuple[int, int]]]:
-    """Mentions of a wallet: runs of neighbouring words that read as words of wallet names
-    (case and ending tolerant: "картой", "humodan", "naqdga"). Returns (the phrase as typed, span);
-    which wallet it is, is decided later by the one matcher the AI path uses too.
+    amount_spans: list[tuple[int, int]] | None = None,
+) -> list[tuple[str, tuple[int, int], bool]]:
+    """Runs of neighbouring words that read as words of wallet names (case and ending tolerant:
+    "картой", "humodan", "naqdga"): (the phrase as typed, span, plays a wallet role).
+    Which wallet it is, is decided later by the one matcher the AI path uses too.
     Words inside `exclude` (the amount, the category) never belong to a mention.
     """
     from app.services.quick_entry_wallets import (  # local: services import the models
         _CURRENCY_TOKENS,
         _same_word,
         _tokens,
+        is_plain_name_word,
     )
 
     name_toks = [_tokens(name) for name in wallet_names]
@@ -357,6 +368,7 @@ def _match_wallet_spans(
     if not named:
         return []
     cut = exclude or []
+    amounts = amount_spans or []
     words = []
     for m in re.finditer(r"[\w']+", text.translate(_APOSTROPHES)):
         keys = _tokens(m.group())
@@ -390,11 +402,46 @@ def _match_wallet_spans(
         start, hit, common = (idx, got[0], set(got[1])) if got is not None else (None, False, set())
     if start is not None and hit:
         runs.append((start, len(words) - 1))
+
+    def plays_role(a: int, b: int) -> bool:
+        if a > 0:
+            before = text[words[a - 1][1][0] : words[a - 1][1][1]].casefold()
+            if before in _WALLET_PREPOSITIONS or _overlaps(words[a - 1][1], amounts):
+                return True
+        for i in range(a, b + 1):
+            raw = text[words[i][1][0] : words[i][1][1]].casefold()
+            if words[i][0] in _CURRENCY_TOKENS or is_plain_name_word(raw, wallet_names):
+                continue
+            if raw.isascii() and raw.endswith(_UZ_ROLE_ENDINGS):
+                return True
+            if not raw.isascii() and raw.endswith(_RU_INSTRUMENTAL):
+                return True
+        return all(_overlaps(w[1], amounts) for w in words[b + 1 :])
+
     result = []
     for a, b in runs:
         span = (words[a][1][0], words[b][1][1])
-        result.append((text[span[0] : span[1]], span))
+        result.append((text[span[0] : span[1]], span, plays_role(a, b)))
     return result
+
+
+def _match_wallet_spans(
+    text: str,
+    wallet_names: list[str],
+    exclude: list[tuple[int, int]] | None = None,
+    amount_spans: list[tuple[int, int]] | None = None,
+) -> list[tuple[str, tuple[int, int]]]:
+    """Mentions of a wallet: the runs of `_wallet_runs` that play a wallet role."""
+    return [(p, sp) for p, sp, role in _wallet_runs(text, wallet_names, exclude, amount_spans) if role]
+
+
+def wallet_words_are_only_things(text: str, wallet_names: list[str]) -> bool:
+    """The text has words that look like a wallet name, but none of them plays a wallet role
+    ("пополнил карту метро 30000"): a wallet hint for this text is not a mention. The AI path
+    uses it to drop such a hint, so it agrees with the quick path."""
+    amount_spans = [a.span for a in _find_amounts(text)]
+    runs = _wallet_runs(text, wallet_names, amount_spans, amount_spans)
+    return bool(runs) and not any(role for _, _, role in runs)
 
 
 def _build_comment(
@@ -453,7 +500,7 @@ def try_prefilter(
 
     if not resolved and verb_type in ("expense", "income") and _has_debt_context(text):
         # Debt phrase ("qarzga oldim", "qarzni qaytardim"): verb decides, no category.
-        debt_hits = _match_wallet_spans(text, wallet_names, [amount.span])
+        debt_hits = _match_wallet_spans(text, wallet_names, [amount.span], [amount.span])
         debt_wallets = [n for n, _ in debt_hits]
         if len(debt_wallets) > 1:
             return PrefilterResult(operation=None, reason="wallet_ambiguous")
@@ -476,7 +523,9 @@ def try_prefilter(
         return PrefilterResult(operation=None, reason=reason)
 
     match = resolved[0]
-    wallet_hit_spans = _match_wallet_spans(text, wallet_names, [amount.span, match.span])
+    wallet_hit_spans = _match_wallet_spans(
+        text, wallet_names, [amount.span, match.span], [amount.span]
+    )
     wallet_hits = [n for n, _ in wallet_hit_spans]
     wallet_spans = [sp for _, sp in wallet_hit_spans]
     if len(wallet_hits) > 1:

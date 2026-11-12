@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import replace
 from contextlib import suppress
 import logging
 import uuid
@@ -30,11 +31,16 @@ from app.models.income_category import IncomeCategory
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.wallet import Wallet
-from app.services.family_guard import guard_family_unchanged
+from app.services.family_guard import budget_of_user, guard_family_unchanged
 from app.parsing.base import MessageParser
 from app.parsing.factory import get_parser
 from app.services import ai_usage
-from app.parsing.prefilter import PrefilterCategory, build_seed_name_by_key, try_prefilter
+from app.parsing.prefilter import (
+    PrefilterCategory,
+    build_seed_name_by_key,
+    try_prefilter,
+    wallet_words_are_only_things,
+)
 from app.parsing.types import (
     ParseRequest,
     ParsedOperation,
@@ -397,6 +403,22 @@ def _currency_word(currency: str | None, language: str | None) -> str:
     return "сум" if language == "ru" else "so'm"
 
 
+async def _drop_hints_that_are_things(
+    session: AsyncSession,
+    user: User,
+    operations: list[ParsedOperation],
+    source_text: str,
+) -> list[ParsedOperation]:
+    """Same rule as the quick path: a word that looks like a wallet name but plays no wallet role
+    in the phrase ("пополнил карту метро 30000") is not a wallet mention, whatever the model says."""
+    if not source_text or not any(op.wallet_hint for op in operations):
+        return operations
+    wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
+    if not wallet_words_are_only_things(source_text, [w.name for w in wallets]):
+        return operations
+    return [replace(op, wallet_hint=None) if op.wallet_hint else op for op in operations]
+
+
 async def _process_parsed_response(
     message: Message,
     bot: Bot,
@@ -412,6 +434,7 @@ async def _process_parsed_response(
     model_call_granted: bool = False,
 ) -> None:
     countable = _filter_countable(response.operations)
+    countable = await _drop_hints_that_are_things(session, user, countable, source_text)
     clear_ops = [op for op in countable if _is_clear(op)]
     ambiguous_ops = [op for op in countable if _is_ambiguous(op)]
     transfer_ops = [op for op in countable if _is_transfer_op(op)]
@@ -736,8 +759,8 @@ async def process_quick_entry_text(
             await message.answer(catalogue_t(user, "quick.too_long"))
             return
 
-        budget = await session.get(FamilyBudget, user.family_budget_id)
-        if budget is None or budget.is_deleted:
+        budget = await budget_of_user(session, user)
+        if budget is None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 
@@ -919,8 +942,8 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 
-        budget = await session.get(FamilyBudget, user.family_budget_id)
-        if budget is None or budget.is_deleted:
+        budget = await budget_of_user(session, user)
+        if budget is None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 

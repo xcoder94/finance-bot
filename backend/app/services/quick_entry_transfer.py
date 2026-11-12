@@ -16,6 +16,7 @@ from app.parsing.types import ParsedOperation
 from app.services.family_guard import guard_family_unchanged
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
+    is_plain_name_word,
     list_wallets_for_parse,
     pick_wallet_by_hint,
 )
@@ -70,8 +71,11 @@ _SOURCE_ENDINGS = ("dan", "den", "дан", "дэн")
 _TARGET_ENDINGS = ("ga", "ka", "qa", "ra", "ға", "га", "ка", "қа")
 
 
-def _hint_role(hint: str | None) -> str | None:
-    """'source' / 'target' by the Russian preposition or the Uzbek case ending, else None."""
+def _hint_role(hint: str | None, wallet_names: list[str] | None = None) -> str | None:
+    """'source' / 'target' by the Russian preposition or the Uzbek case ending, else None.
+
+    An ending counts only when it was ADDED to the wallet's name ("kartaga"): a name that itself
+    ends like one ("Копилка", "Наличка", "Karta") is just a name and says nothing."""
     words = (hint or "").casefold().replace("\u2019", "'").split()
     if not words:
         return None
@@ -80,6 +84,8 @@ def _hint_role(hint: str | None) -> str | None:
     if words[0] in _TARGET_PREPOSITIONS and len(words) > 1:
         return "target"
     last = words[-1].strip(".,;")
+    if wallet_names and is_plain_name_word(last, wallet_names):
+        return None
     for endings, role in ((_SOURCE_ENDINGS, "source"), (_TARGET_ENDINGS, "target")):
         if any(last.endswith(e) and len(last) - len(e) >= 3 for e in endings):
             return role
@@ -87,11 +93,12 @@ def _hint_role(hint: str | None) -> str | None:
 
 
 def order_transfer_hints(
-    from_hint: str | None, to_hint: str | None
+    from_hint: str | None, to_hint: str | None, wallet_names: list[str] | None = None
 ) -> tuple[str | None, str | None]:
     """The model may hand the two hints over the wrong way round ("kartadan naqdga" -> from
-    naqdga): the words themselves say which end is which, so swap when they contradict."""
-    role_from, role_to = _hint_role(from_hint), _hint_role(to_hint)
+    naqdga): the words themselves say which end is which, so swap when they contradict.
+    No sign, or signs that disagree with each other: the model's order stays."""
+    role_from, role_to = _hint_role(from_hint, wallet_names), _hint_role(to_hint, wallet_names)
     if (role_from == "target" and role_to != "target") or (
         role_to == "source" and role_from != "source"
     ):
@@ -201,7 +208,9 @@ async def resolve_transfer_wallets(
     default_wallet: Wallet,
 ) -> ResolvedTransferWallets | CurrencyMissing:
     visible = await list_wallets_for_parse(session, family_budget_id, writer)
-    from_hint, to_hint = order_transfer_hints(from_hint, to_hint)
+    from_hint, to_hint = order_transfer_hints(
+        from_hint, to_hint, [w.name for w in visible]
+    )
 
     from_result = _resolve_from_wallet(
         visible,

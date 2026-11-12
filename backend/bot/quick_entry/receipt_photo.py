@@ -57,6 +57,7 @@ from app.services.quick_entry_wallets import (
     list_wallets_for_parse,
     resolve_wallet,
 )
+from app.services.family_guard import budget_of_user
 from bot.onboarding import MESSAGES, get_active_user_by_telegram_id
 from bot.quick_entry.shopping_pending import finish_unrecognized, finish_with_amount, op_sum
 from bot.quick_entry.cards import card_keyboard, format_card
@@ -222,8 +223,8 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 
-        budget = await session.get(FamilyBudget, user.family_budget_id)
-        if budget is None or budget.is_deleted:
+        budget = await budget_of_user(session, user)
+        if budget is None:
             await message.answer(MESSAGES["not_registered"]["ru"])
             return
 

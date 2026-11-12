@@ -92,7 +92,7 @@ async def test_equal_names_resolved_by_amount_currency() -> None:
             assert got.id == exp.id
         got = await resolve_wallet(session=session, family_budget_id=budget.id, writer=user,
                                    wallet_hint="карты", currency=None, default_wallet=cash)
-        assert got.id == cash.id
+        assert got.id == uzs.id  # no currency in the phrase: the default wallet's (UZS) decides
 
 
 async def test_handler_two_cards_picks_by_currency_of_amount(monkeypatch) -> None:

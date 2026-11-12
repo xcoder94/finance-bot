@@ -127,7 +127,7 @@ HINT_TABLE = [
     # a card per currency: the amount's currency decides, without it the default is kept
     (FOUR, "Наличный сум", "карта", "USD", "Карта USD"),
     (FOUR, "Наличный USD", "карта", "UZS", "Карта сум"),
-    (FOUR, "Наличный сум", "карта", None, "Наличный сум"),
+    (FOUR, "Наличный сум", "карта", None, "Карта сум"),  # next3: the default wallet's currency
     # personal wallet of the writer
     (PERSONAL, "Общий", "моя карта", None, "Моя карта"),
     (PERSONAL, "Общий", "карта", None, "Моя карта"),

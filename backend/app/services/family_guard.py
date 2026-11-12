@@ -17,6 +17,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.family_budget import FamilyBudget
 from app.models.user import User
 
 FAMILY_CHANGED = "family_changed"
@@ -37,3 +38,20 @@ async def guard_family_unchanged(session: AsyncSession, user: User) -> None:
     seen: uuid.UUID = user.family_budget_id
     if row is None or row.is_deleted or row.family_budget_id != seen:
         raise FamilyChangedError()
+
+
+async def budget_of_user(session: AsyncSession, user: User) -> FamilyBudget | None:
+    """The person's budget. If it is gone because the person has just joined another family (the
+    join deleted the old one while this message was already read), that is not "not registered":
+    raise FamilyChangedError, the bot asks to repeat the message in the person's language."""
+    budget = await session.get(FamilyBudget, user.family_budget_id)
+    if budget is not None and not budget.is_deleted:
+        return budget
+    row = (
+        await session.execute(
+            select(User.family_budget_id, User.is_deleted).where(User.id == user.id)
+        )
+    ).first()
+    if row is not None and not row.is_deleted and row.family_budget_id != user.family_budget_id:
+        raise FamilyChangedError()
+    return None
