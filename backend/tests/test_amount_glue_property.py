@@ -101,9 +101,12 @@ def test_single_number_hits_iff_neighbours_whitelisted() -> None:
     for _ in range(6_000):
         n = rnd.randint(1, 10**rnd.randint(1, 9))
         before, after = rnd.choice(_AROUND), rnd.choice(_AROUND)
-        text = f"такси{rnd.choice(['', ' '])}{before}{n}{after}"
+        gap = rnd.choice(["", " "])
+        text = f"такси{gap}{before}{n}{after}"
         op = _run(text)
-        expect = before in _OK_BEFORE and after in _OK_AFTER
+        # a dash glued to the word on its left is a separator (I3 extension, amount5)
+        before_ok = before in _OK_BEFORE or (gap == "" and before in "-–—")
+        expect = before_ok and after in _OK_AFTER
         if expect != (op is not None) or (op is not None and op.amount != n):
             bad.append((text, None if op is None else op.amount))
     assert not bad, bad[:10]
