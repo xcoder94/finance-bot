@@ -519,10 +519,15 @@ class TestAttachedMultiplierOrCurrency:
     @pytest.mark.parametrize(
         "text",
         ["такси 20 тыс-", "такси 20 млн$", "такси 20 k/день", "такси 20 тыс+", "такси 20 ming#",
-         "такси 20 сум-", "такси 20 $-", "такси $ 20", "такси 20 usd+"],
+         "такси 20 сум-", "такси 20 $-", "такси 20 usd+"],
     )
     def test_goes_to_model(self, text: str) -> None:
         assert self._run(text).operation is None
+
+    def test_spaced_dollar_sign_is_usd(self) -> None:
+        # next release: "$ 20" == "$20" (dollars), supersedes the old "goes to model" expectation
+        op = self._run("такси $ 20").operation
+        assert op is not None and (op.amount, op.currency) == (20, "USD")
 
     @pytest.mark.parametrize(
         ("text", "amount"),
