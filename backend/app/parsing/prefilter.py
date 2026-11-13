@@ -83,28 +83,48 @@ _APOSTROPHES = str.maketrans({"\u2019": "'", "\u02bc": "'", "\u02bb": "'", "\u20
 _MULTI_OP_CONNECTORS: tuple[str, ...] = (" и ", " а также ")
 
 # One number: either digit groups of exactly 3 after a first group of 1-3 digits
-# ("20 000", "1 215 000", "20_000") or plain digits. Separate numbers ("20000 2",
-# "12 15000") are never glued: they stay separate amounts and go to the model.
-# A digit run glued to a word ("express24") is part of that word, not an amount.
-_NUM = r"\d{1,3}(?:[ \t_\u00a0\u202f]\d{3})+(?!\d)|\d+"
+# ("20 000", "1 215 000", "20_000"; separator: space, nbsp, thin/narrow nbsp, "_"; never tab
+# or newline) or plain digits. Separate numbers ("20000 2", "12 15000") are never glued.
+# Whitelist of neighbours: an amount is well-formed only when the char before it is the text
+# start, whitespace or one of ( [ « " ' , ; : and the char after the whole token (suffix
+# included) is the text end, whitespace or one of . , ; : ! ? ) ] » " '. Anything else glued
+# to the digits (letter, digit, "_", sign, multiplier look-alike) means "not an amount".
+_NUM = r"\d{1,3}(?:[ \u00a0\u202f\u2009_]\d{3})+(?!\d)|\d+"
+# Extra neighbours, nothing more: a dash/hyphen glued to a LETTER on its left is a separator
+# ("такси-20000", "бензин-200 тыс"; a dash after a space or digit stays a sign); an emoji glued
+# to the number counts as a space. Multiplication-like symbols (U+2715..2718, U+274C) are NOT emoji here.
+_EMOJI = (
+    "\u2600-\u2714\u2705\u2728\u2764\u2b50\u2b55\U0001f300-\U0001faff"
+)
+_BEFORE = (
+    r"(?:(?<![^\s(\[\u00ab\"',;:])"
+    r"|(?<=[^\W\d_][-\u2010\u2011\u2013\u2014])"
+    r"|(?<=[" + _EMOJI + r"\ufe0f]))"
+)
+_AFTER = r"(?![^\s.,;:!?)\]\u00bb\"'" + _EMOJI + r"])"
 
 _THOUSAND_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)",
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)" + _AFTER,
     re.IGNORECASE,
 )
 # Uzbek / short magnitude words after a number: "25 ming", "25 минг", "25k", "3 mln".
 _THOUSAND_WORD_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:ming\w*|минг[\w\u0400-\u04ff]*|k|к)(?![\w\u0400-\u04ff])",
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:ming[^\W\d_]*|минг[^\W\d_]*|k|к)" + _AFTER,
     re.IGNORECASE,
 )
 _MILLION_WORD_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?(?![\w\u0400-\u04ff])",
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?" + _AFTER,
     re.IGNORECASE,
 )
+# "$20" / "кофе $20": currency sign glued before the number (not together with a suffix).
 _PLAIN_AMOUNT_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*"
-    r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?)?(?!\d)",
+    _BEFORE + r"(?P<cur_pre>\$)?(?P<num>" + _NUM + r")"
+    r"(?:\s*(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?))?"
+    + _AFTER,
     re.IGNORECASE,
+)
+_MAGNITUDE_TAIL_RE = re.compile(
+    r"\s*(?:тыс|ming|минг|mln|million|млн|миллион|[kк](?![^\W\d_]))", re.IGNORECASE
 )
 
 
@@ -189,11 +209,31 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
             continue
         value = _normalize_number(num_raw)
         currency = _parse_currency(match.group("currency"))
+        if match.group("cur_pre"):
+            # "$20 usd" is two currency marks, "$20 тыс" is a magnitude: not for the fast path.
+            if match.group("currency") or _MAGNITUDE_TAIL_RE.match(text, end):
+                continue
+            currency = "USD"
         amounts.append(_ParsedAmount(value=value, currency=currency, span=(start, end)))
         for i in range(start, end):
             covered[i] = True
 
     return amounts
+
+
+_DIGIT_RE = re.compile(r"\d")
+
+
+def _all_digits_covered(text: str, amounts: list[_ParsedAmount]) -> bool:
+    """Whitelist check: exactly one amount and every digit char of the text lies inside it.
+
+    Any other digit (a second number, a count, "x2", "express24", "2по20000") means the
+    phrase is not understood by the fast path and goes to the model.
+    """
+    if len(amounts) != 1:
+        return False
+    start, end = amounts[0].span
+    return all(start <= m.start() < end for m in _DIGIT_RE.finditer(text))
 
 
 def _has_transfer_signal(text: str) -> bool:
@@ -520,7 +560,7 @@ def _build_comment(
     comment = text
     for start, end in remove_ranges:
         comment = comment[:start] + " " + comment[end:]
-    cleaned = re.sub(r"\s+", " ", comment).strip(" ,.-")
+    cleaned = re.sub(r"\s+", " ", comment).strip(" ,.-\u2010\u2011\u2013\u2014")
     return cleaned or None
 
 
@@ -542,7 +582,7 @@ def try_prefilter(
     amounts = _find_amounts(text)
     if _has_multi_op_signal(text, amounts):
         return PrefilterResult(operation=None, reason="multi_operation")
-    if len(amounts) != 1:
+    if not _all_digits_covered(text, amounts):
         return PrefilterResult(operation=None, reason="amount_not_singular")
 
     amount = amounts[0]

@@ -470,7 +470,7 @@ UZ_PHRASES = [
     ("tushlik 35000", "cafes_restaurants"), ("nonushta 20000", "cafes_restaurants"),
     ("choyxona 80000", "cafes_restaurants"), ("oshxona 50000", "cafes_restaurants"),
     ("чойхона 80000", "cafes_restaurants"),
-    ("wolt 60000", "delivery"), ("express24 55000", "delivery"), ("delivery 30000", "delivery"),
+    ("wolt 60000", "delivery"), ("delivery 30000", "delivery"),
     ("ijaraga 3000000", "rent"), ("kvartira 4000000", "rent"), ("ижара 3000000", "rent"),
     ("suv 20000", "utilities"), ("tok 60000", "utilities"), ("kommunalka 300000", "utilities"),
     ("мусор 10000", "utilities"), ("elektr energiya 80000", "utilities"),
@@ -525,6 +525,12 @@ UZ_PHRASES = [
 def test_uzbek_keywords_resolve_to_category(phrase: str, expected: str) -> None:
     key, _ = _prefilter_category_key(phrase)
     assert key == expected, (phrase, key)
+
+
+def test_brand_with_digits_goes_to_model_not_fast_path() -> None:
+    # digits glued to a brand word are a second digit run: the fast path no longer guesses
+    key, _ = _prefilter_category_key("express24 55000")
+    assert key == "amount_not_singular"
 
 
 def test_every_default_category_has_latin_and_cyrillic_uzbek_terms() -> None:
