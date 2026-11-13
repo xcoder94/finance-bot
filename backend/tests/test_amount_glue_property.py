@@ -154,3 +154,20 @@ def test_currency_word_before_number_goes_to_model() -> None:
 def test_word_that_only_starts_like_a_currency_is_not_a_mark(w: str) -> None:
     op = _run(f"такси {w} 20000")
     assert op is not None and op.amount == 20_000
+
+
+def test_spaced_k_plus_word_below_1000_never_saved() -> None:
+    """Fast path never saves N<1000 when " к "/" k " + word follows N (ambiguous -> model)."""
+    rnd = random.Random(13)
+    bad = []
+    for _ in range(5_000):
+        n = rnd.choice([rnd.randint(1, 999), rnd.randint(1000, 999_999)])
+        k, w = rnd.choice(["к", "k", "К", "K"]), rnd.choice(["врачу", "такси", "с", "vrachu"])
+        gap = rnd.choice([" ", "  ", " "])
+        text = f"такси {n}{gap}{k}{gap}{w}"
+        op = _run(text)
+        if n < 1000 and op is not None:
+            bad.append(text)
+        if n >= 1000 and (op is None or op.amount != n):
+            bad.append(text)
+    assert not bad, bad[:10]

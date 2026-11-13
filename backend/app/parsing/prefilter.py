@@ -111,6 +111,9 @@ _THOUSAND_RE = re.compile(
 # Spaced one-letter "к"/"k" followed by a word is the preposition ("20000 к врачу"), not
 # "thousand": the amount stays plain and "к врачу" stays in the comment. Glued ("20к") is a multiplier.
 _PREPOSITION_K_NOT = r"(?!\s+[kк]\s+[^\W\d_])"
+# ...but only for a number >= 1000 ("20000 к врачу"). Below 1000 it is ambiguous ("обед 50 к с
+# друзьями" = 50 000 or 50?): the fast path saves nothing, the model decides.
+_SPACED_K_WORD_RE = re.compile(r"\s+[kк]\s+[^\W\d_]", re.IGNORECASE)
 _THOUSAND_WORD_RE = re.compile(
     _BEFORE + r"(?P<num>" + _NUM + r")" + _PREPOSITION_K_NOT +
     r"\s*(?:ming[^\W\d_]*|минг[^\W\d_]*|k|к)" + _AFTER,
@@ -236,6 +239,8 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
         ):
             continue
         value = _normalize_number(num_raw)
+        if value < 1000 and not match.group("currency") and _SPACED_K_WORD_RE.match(text, end):
+            continue
         currency = _parse_currency(match.group("currency"))
         if match.group("cur_pre"):
             # "$20 usd" is two currency marks, "$20 тыс" is a magnitude: not for the fast path.
