@@ -197,7 +197,9 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
 
 
 _DIGITS_RE = re.compile(r"\d+")
-_MULT_CHARS = "xх×*"  # latin x, cyrillic х, times sign, asterisk
+# multiplier signs, compared after casefold (X/Х = x/х): latin x, cyrillic х, times sign,
+# heavy multiplication marks, asterisk, middle dot
+_MULT_CHARS = "xх×✕✖*·"
 
 
 def _has_stray_number(text: str, amounts: list[_ParsedAmount]) -> bool:
@@ -219,9 +221,9 @@ def _has_stray_number(text: str, amounts: list[_ParsedAmount]) -> bool:
         after = text[end] if end < len(text) else ""
         if before == "_" or after == "_":
             return True
-        if before and before in _MULT_CHARS:
+        if before and before.casefold() in _MULT_CHARS:
             return True
-        if after and after in "xх×":
+        if after and after.casefold() in _MULT_CHARS:
             return True
     return False
 
