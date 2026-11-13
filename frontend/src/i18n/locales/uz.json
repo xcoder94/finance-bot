@@ -1,6 +1,7 @@
 {
   "familyChanged": {
     "message": "Oila tarkibi o'zgardi. Kategoriya va hamyonni tekshirib, yana saqlang",
+    "pickReplaced": "Tanlangan hamyon yoki kategoriya yangi byudjetda yo'q — operatsiyadagisi qo'yildi. Tekshirib, yana saqlang",
     "generic": "Oila tarkibi o'zgardi. Ma'lumotlarni tekshirib, yana saqlang",
     "categoriesOwnerOnly": "Kategoriyalarni faqat byudjet egasi o'zgartira oladi",
     "goalsOwnerOnly": "Maqsadlarni faqat byudjet egasi yaratishi va o'zgartirishi mumkin",

@@ -101,6 +101,12 @@ describe('createBotStarter (client_token per attempt)', () => {
     expect(await starter.start('voice', ['a'])).toBe('closed')
     expect(tokenOf(create, 0)).toBe(tokenOf(create, 1))
   })
+  it('an item already gone (404) is told apart from a network failure and does not close the app', async () => {
+    const create = vi.fn().mockRejectedValue(new ShoppingApiError('not_found', 404))
+    const { starter, close } = mk(create)
+    expect(await starter.start('voice', ['a'])).toBe('stale')
+    expect(close).not.toHaveBeenCalled()
+  })
   it('another way after a failed one gets a NEW token', async () => {
     const create = vi.fn()
       .mockRejectedValueOnce(new ShoppingApiError('network'))

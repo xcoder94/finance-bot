@@ -29,6 +29,8 @@ const world = vi.hoisted(() => ({
   ],
   categories: [{ id: 'food', name: 'Еда', translation_key: null, parent_id: null }],
   incomeCategories: [{ id: 'salary', name: 'Зарплата', translation_key: null }],
+  newCategories: null as null | Array<Record<string, unknown>>,
+  newIncomeCategories: null as null | Array<Record<string, unknown>>,
 }))
 vi.mock('react-router-dom', () => ({
   useNavigate: () => world.navigate,
@@ -71,8 +73,8 @@ vi.mock('../store/authStore', () => ({
 }))
 vi.mock('../store/dataCacheStore', () => ({
   cacheTransaction: vi.fn(),
-  getCachedExpenseCategories: async () => world.categories,
-  getCachedIncomeCategories: async () => world.incomeCategories,
+  getCachedExpenseCategories: async (f: string) => (f === 'new' && world.newCategories) || world.categories,
+  getCachedIncomeCategories: async (f: string) => (f === 'new' && world.newIncomeCategories) || world.incomeCategories,
   getCachedWallets: async () => world.wallets,
   getCachedTransaction: async (_f: string, _id: string, fetcher: () => Promise<unknown>) => fetcher(),
   invalidateTransactionData: vi.fn(),
@@ -163,5 +165,107 @@ describe.each(pages.slice(0, 2))('Edit %s: the operation moved with the person t
       world.categories = saved.categories
       world.incomeCategories = saved.incomeCategories
     }
+  })
+})
+
+describe.each(pages.slice(0, 2))('Edit %s: the person picked another wallet/category, then the family changed', (_name, kind, load) => {
+  const setup = async () => {
+    const saved = { wallets: world.wallets, categories: world.categories, incomeCategories: world.incomeCategories }
+    world.categories = [
+      { id: 'food', name: 'Еда', translation_key: null, parent_id: null },
+      { id: 'taxi', name: 'Такси', translation_key: null, parent_id: null },
+    ]
+    world.incomeCategories = [
+      { id: 'salary', name: 'Зарплата', translation_key: null },
+      { id: 'gift', name: 'Подарок', translation_key: null },
+    ]
+    world.newCategories = [
+      { id: 'food9', name: 'Еда', translation_key: null, parent_id: null },
+      { id: 'taxi9', name: 'Такси', translation_key: null, parent_id: null },
+    ]
+    world.newIncomeCategories = [
+      { id: 'salary9', name: 'Зарплата', translation_key: null },
+      { id: 'gift9', name: 'Подарок', translation_key: null },
+    ]
+    world.readable = true
+    return () => {
+      world.wallets = saved.wallets
+      world.categories = saved.categories
+      world.incomeCategories = saved.incomeCategories
+      world.newCategories = null
+      world.newIncomeCategories = null
+    }
+  }
+  const moved = { wallet_id: 'w1', expense_category_id: 'food9', income_category_id: 'salary9' }
+  const pick = async (h: Awaited<ReturnType<typeof openAndSave>>['h']) => {
+    const { WalletPickerSheet } = await import('../components/forms/transactionAddFields')
+    const { CategoryPickerSheet } = await import('../components/forms/CategoryPickerSheet')
+    const props = (type: unknown) => (findAll(h.result(), (e) => e.type === type)[0] as { props: Record<string, any> }).props
+    props(WalletPickerSheet).onSelect('w2')
+    props(CategoryPickerSheet).onSelect(
+      kind === 'expense' ? { categoryId: 'taxi', label: 'Такси' } : { categoryId: 'gift', label: 'Подарок' },
+    )
+    await h.settle(2)
+    return props
+  }
+  const errorKey = (h: Awaited<ReturnType<typeof openAndSave>>['h']) =>
+    (findAll(h.result(), (e) => e.type === TransactionSubmitError)[0] as { props: Record<string, any> } | undefined)?.props.messageKey
+
+  it('Save path: the picked wallet and the same-named category stay, the message is shown, the next Save writes them', async () => {
+    const restore = await setup()
+    try {
+      world.familyId = 'old'; world.moved = moved; world.saved = []; world.tx.type = kind
+      const Page = await load()
+      const h = await mountHook(() => Page(), 40)
+      await pick(h)
+      const one = (type: unknown) => findAll(h.result(), (e) => e.type === type)[0] as { props: Record<string, any> }
+      one(FormSheet).props.onPrimary()
+      await h.settle(40)
+      expect(errorKey(h)).toBe('familyChanged.message')
+      one(FormSheet).props.onPrimary()
+      await h.settle(40)
+      expect(world.saved).toHaveLength(1)
+      expect(world.saved[0]).toMatchObject({ wallet_id: 'w2' })
+      expect(kind === 'expense' ? world.saved[0].expense_category_id : world.saved[0].income_category_id).toBe(kind === 'expense' ? 'taxi9' : 'gift9')
+    } finally { restore() }
+  })
+
+  it('return path: the message is shown before any Save and the pick stays', async () => {
+    const restore = await setup()
+    try {
+      world.familyId = 'old'; world.moved = moved; world.saved = []; world.tx.type = kind
+      const Page = await load()
+      const h = await mountHook(() => Page(), 40)
+      await pick(h)
+      world.familyId = 'new'
+      h.rerender()
+      await h.settle(40)
+      expect(errorKey(h)).toBe('familyChanged.message')
+      const one = (type: unknown) => findAll(h.result(), (e) => e.type === type)[0] as { props: Record<string, any> }
+      one(FormSheet).props.onPrimary()
+      await h.settle(40)
+      expect(world.saved[0]).toMatchObject({ wallet_id: 'w2' })
+      expect(kind === 'expense' ? world.saved[0].expense_category_id : world.saved[0].income_category_id).toBe(kind === 'expense' ? 'taxi9' : 'gift9')
+    } finally { restore() }
+  })
+
+  it('a picked category with no counterpart in the new budget: the moved operation category is taken and the person is told', async () => {
+    const restore = await setup()
+    try {
+      world.newCategories = [{ id: 'food9', name: 'Еда', translation_key: null, parent_id: null }]
+      world.newIncomeCategories = [{ id: 'salary9', name: 'Зарплата', translation_key: null }]
+      world.familyId = 'old'; world.moved = moved; world.saved = []; world.tx.type = kind
+      const Page = await load()
+      const h = await mountHook(() => Page(), 40)
+      await pick(h)
+      world.familyId = 'new'
+      h.rerender()
+      await h.settle(40)
+      expect(errorKey(h)).toBe('familyChanged.pickReplaced')
+      const one = (type: unknown) => findAll(h.result(), (e) => e.type === type)[0] as { props: Record<string, any> }
+      one(FormSheet).props.onPrimary()
+      await h.settle(40)
+      expect(kind === 'expense' ? world.saved[0].expense_category_id : world.saved[0].income_category_id).toBe(kind === 'expense' ? 'food9' : 'salary9')
+    } finally { restore() }
   })
 })

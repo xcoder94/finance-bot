@@ -28,6 +28,7 @@ import {
 } from '../components/forms/transactionAddFields'
 import { useNativeBackButtonOverlay } from '../components/nativeBackButtonContext'
 import { saveErrorKey } from '../api/familyChanged'
+import { matchCategoryInBudget } from '../utils/matchCategory'
 import { TransactionSubmitError } from '../components/transaction-form/TransactionFormShared'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -69,6 +70,10 @@ export function EditIncomePage() {
   // The fields are filled from the saved operation once; a reload (family changed) must not overwrite what was typed.
   const filledFor = useRef<string | null>(null)
   const filledFamily = useRef<string | null>(null)
+  // What the person picked by hand, and what the form shows now (loadData reads these when the family changes).
+  const picked = useRef({ wallet: false, category: false })
+  const shown = useRef({ walletId: '', categoryId: '' })
+  const shownCategories = useRef<Array<{ id: string; name: string; translation_key?: string | null; parent_id?: string | null }>>([])
 
   const [transactionDate, setTransactionDate] = useState('')
   const [dateError, setDateError] = useState(false)
@@ -77,6 +82,7 @@ export function EditIncomePage() {
   const [walletId, setWalletId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [categoryLabel, setCategoryLabel] = useState('')
+  shown.current = { walletId, categoryId }
   const [comment, setComment] = useState('')
 
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
@@ -133,12 +139,34 @@ export function EditIncomePage() {
         filledFamily.current = familyId
       } else if (filledFamily.current !== familyId) {
         // The person moved to another family and the operation moved with them: its category and wallet
-        // now have the new budget's ids. Take them; amount, date and comment stay as typed.
-        setCategoryId(transaction.income_category_id ?? '')
-        setCategoryLabel(categoryName)
-        setWalletId(transaction.wallet_id)
+        // now have the new budget's ids. What the person picked by hand stays when the new budget has it;
+        // amount, date and comment stay as typed. Either way they are told, before anything is written.
+        const labelOf = (id: string) => {
+          const found = categories.find((item) => item.id === id)
+          return found ? getDisplayName(found, t) : '—'
+        }
+        let notice = 'familyChanged.message'
+        if (picked.current.wallet && wallets.some((item) => item.id === shown.current.walletId)) {
+          // wallets keep their ids when a person moves: the pick stays
+        } else {
+          setWalletId(transaction.wallet_id)
+          if (picked.current.wallet) notice = 'familyChanged.pickReplaced'
+        }
+        const matched = picked.current.category
+          ? matchCategoryInBudget(shownCategories.current, categories, shown.current.categoryId)
+          : null
+        if (matched) {
+          setCategoryId(matched)
+          setCategoryLabel(labelOf(matched))
+        } else {
+          setCategoryId(transaction.income_category_id ?? '')
+          setCategoryLabel(categoryName)
+          if (picked.current.category) notice = 'familyChanged.pickReplaced'
+        }
+        setSubmitError(notice)
         filledFamily.current = familyId
       }
+      shownCategories.current = categories
       setLoadState({ status: 'success', wallets, categories, transaction })
     } catch {
       setLoadState({ status: filledFor.current === id ? 'gone' : 'error' })
@@ -341,6 +369,7 @@ export function EditIncomePage() {
         selectedCategoryId={categoryId}
         onClose={() => setCategoryPickerOpen(false)}
         onSelect={(selection) => {
+          picked.current.category = true
           setCategoryId(selection.categoryId)
           setCategoryLabel(selection.label)
         }}
@@ -351,7 +380,10 @@ export function EditIncomePage() {
         wallets={wallets}
         selectedWalletId={walletId}
         onClose={() => setWalletPickerOpen(false)}
-        onSelect={setWalletId}
+        onSelect={(id) => {
+          picked.current.wallet = true
+          setWalletId(id)
+        }}
       />
 
       <DeleteConfirmSheet

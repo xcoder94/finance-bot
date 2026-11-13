@@ -60,7 +60,7 @@ export function clearPending(storage: PendingStorage | null): void {
   }
 }
 
-export type StartBotResult = 'closed' | 'receipt_disabled' | 'failed' | 'conflict'
+export type StartBotResult = 'closed' | 'receipt_disabled' | 'failed' | 'conflict' | 'stale'
 
 /** Create the wait, remember it, and only then minimise the app (the bot is waiting for the user). */
 export async function startBotAmount(
@@ -81,6 +81,8 @@ export async function startBotAmount(
     const { pending } = await deps.create({ item_ids: ids, method, client_token: clientToken })
     deps.remember({ id: pending.id, method, ids })
   } catch (e) {
+    // an item of the list is already gone (a mate bought or deleted it): not a network failure
+    if (e instanceof ShoppingApiError && e.code === 'not_found') return 'stale'
     if (e instanceof ShoppingApiError &&
       (e.code === 'token_conflict' || e.code === 'purchase_closed')) return 'conflict'
     return e instanceof ShoppingApiError && e.code === 'receipt_disabled'
@@ -108,7 +110,7 @@ export function createBotStarter(deps: StartDeps, makeToken: () => string) {
         attempt = { key, token: makeToken() }
         result = await startBotAmount(deps, method, ids, attempt.token)
       }
-      if (result === 'closed' || result === 'conflict') attempt = null // a refused token is never reused
+      if (result === 'closed' || result === 'conflict' || result === 'stale') attempt = null // a refused token is never reused
       return result === 'conflict' ? 'failed' : result
     },
   }

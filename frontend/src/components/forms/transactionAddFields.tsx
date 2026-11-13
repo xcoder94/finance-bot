@@ -62,7 +62,8 @@ export function FormSheetAmountField({
 
   useEffect(() => {
     if (autoFocus) {
-      inputRef.current?.focus()
+      // no scrolling: re-focusing after the form re-opened must not undo revealMessage lifting the message above Save
+      inputRef.current?.focus({ preventScroll: true })
     }
   }, [autoFocus])
 

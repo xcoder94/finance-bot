@@ -282,11 +282,18 @@ export function ShoppingTripPage() {
     submitting.current = true
     setBusy(true)
     setFailed(false)
+    setStaleList(false)
     setBotMethod(method)
     const outcome = await botStarter.current!.start(method, ids)
     submitting.current = false
     setBusy(false)
-    if (outcome !== 'closed') {
+    if (outcome === 'stale') {
+      // same as the manual way: re-read the list (the gone item drops out), keep the sheet, say so
+      await load(scope, { silent: true })
+      setBotMethod(null)
+      haptic.error()
+      setStaleList(true)
+    } else if (outcome !== 'closed') {
       setBotMethod(null)
       haptic.error()
       setFailed(true)
@@ -414,8 +421,8 @@ export function ShoppingTripPage() {
   } else {
     body = (
       <>
-        {familyChanged || staleList ? (
-          <div className="shopping-amount__fail" role="alert" ref={revealMessage}>
+        {(familyChanged || staleList) && stage !== 'amount' ? (
+          <div className="shopping-amount__fail shopping-trip__notice" role="alert" ref={revealMessage}>
             {familyChanged ? t('familyChanged.generic') : t('shopping.staleList')}
           </div>
         ) : null}

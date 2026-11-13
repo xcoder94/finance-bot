@@ -3971,6 +3971,11 @@ button.home-ops-row:focus-visible {
   color: var(--exp);
 }
 
+/* the notice above the trip list sits outside .shopping-page: same side padding as the page */
+.shopping-trip__notice {
+  padding: 10px 14px 0;
+}
+
 .shopping-result {
   justify-content: center;
   min-height: 70vh;

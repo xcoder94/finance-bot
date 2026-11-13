@@ -4,10 +4,10 @@ import { revealMessage } from './revealMessage'
 
 // The error message sits at the end of the fields; the Cancel/Save row is sticky over the panel's
 // bottom edge. The message must end up above that row (visible without scrolling by hand).
-function scene(messageBottom: number, footerTop: number | null) {
+function scene(messageBottom: number, footerTop: number | null, animations: Array<{ finished: Promise<unknown> }> = []) {
   const scrollBy = vi.fn()
   const footer = footerTop === null ? null : { getBoundingClientRect: () => ({ top: footerTop }) }
-  const panel = { querySelector: () => footer, scrollBy }
+  const panel = { querySelector: () => footer, scrollBy, getAnimations: () => animations }
   const element = {
     scrollIntoView: vi.fn(),
     closest: () => panel,
@@ -35,5 +35,15 @@ describe('revealMessage', () => {
     revealMessage(s.element)
     expect(s.scrollIntoView).toHaveBeenCalled()
     expect(s.scrollBy).not.toHaveBeenCalled()
+  })
+
+  it('sheet still sliding up (form re-opened after the family changed): waits for the animation, then lifts the message', async () => {
+    let done: () => void = () => undefined
+    const s = scene(706, 600, [{ finished: new Promise<void>((resolve) => { done = resolve }) }])
+    revealMessage(s.element)
+    expect(s.scrollBy).not.toHaveBeenCalled()
+    done()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(s.scrollBy).toHaveBeenCalledWith({ top: 106 + 8 })
   })
 })
