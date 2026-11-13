@@ -348,6 +348,7 @@ def _overlaps(span: tuple[int, int], others: list[tuple[int, int]]) -> bool:
 # the phrase (only the amount after it), or a place right after the amount.
 _WALLET_PREPOSITIONS = {"с", "со", "из", "от", "на", "в", "во", "к", "по", "через"}
 _UZ_ROLE_ENDINGS = ("dan", "ga", "da", "qa", "ka", "ra", "dagi", "gacha")
+_UZ_POSTPOSITIONS = {"bilan", "orqali"}
 _RU_INSTRUMENTAL = ("ыми", "ими", "ой", "ою", "ей", "ею", "ом", "ем")
 
 
@@ -356,6 +357,7 @@ def _wallet_runs(
     wallet_names: list[str],
     exclude: list[tuple[int, int]] | None = None,
     amount_spans: list[tuple[int, int]] | None = None,
+    category_spans: list[tuple[int, int]] | None = None,
 ) -> list[tuple[str, tuple[int, int], bool]]:
     """Runs of neighbouring words that read as words of wallet names (case and ending tolerant:
     "картой", "humodan", "naqdga"): (the phrase as typed, span, plays a wallet role).
@@ -375,6 +377,7 @@ def _wallet_runs(
         return []
     cut = exclude or []
     amounts = amount_spans or []
+    categories = category_spans or []
     words = []
     for m in re.finditer(r"[\w']+", text.translate(_APOSTROPHES)):
         keys = _tokens(m.group())
@@ -422,11 +425,43 @@ def _wallet_runs(
                 return True
             if not raw.isascii() and raw.endswith(_RU_INSTRUMENTAL):
                 return True
+        # Uzbek postposition right after the name: "humo bilan ...", "naqd pul orqali ..."
+        after = [text[w[1][0] : w[1][1]].casefold() for w in words[b + 1 : b + 3]]
+        if after[:1] and after[0] in _UZ_POSTPOSITIONS:
+            return True
+        if len(after) == 2 and after[0] == "pul" and after[1] in _UZ_POSTPOSITIONS:
+            return True
+        # The name first, and what is left is a whole record (a category and the amount):
+        # "карта такси 20000". Only the name as written; "карта памяти 50000" has no category.
+        if (
+            a == 0
+            and categories
+            and all(
+                words[i][0] in _CURRENCY_TOKENS or is_plain_name_word(
+                    text[words[i][1][0] : words[i][1][1]], wallet_names
+                )
+                for i in range(a, b + 1)
+            )
+            and all(
+                _overlaps(w[1], amounts) or _overlaps(w[1], categories)
+                for w in words[b + 1 :]
+            )
+        ):
+            return True
         return all(_overlaps(w[1], amounts) for w in words[b + 1 :])
+
+    def with_postposition(b: int) -> int:
+        """The run's last word, moved over a following "bilan/orqali" (and "pul" before it)."""
+        after = [text[w[1][0] : w[1][1]].casefold() for w in words[b + 1 : b + 3]]
+        if after[:1] and after[0] in _UZ_POSTPOSITIONS:
+            return b + 1
+        if len(after) == 2 and after[0] == "pul" and after[1] in _UZ_POSTPOSITIONS:
+            return b + 2
+        return b
 
     result = []
     for a, b in runs:
-        span = (words[a][1][0], words[b][1][1])
+        span = (words[a][1][0], words[with_postposition(b)][1][1])
         result.append((text[span[0] : span[1]], span, plays_role(a, b)))
     return result
 
@@ -436,17 +471,43 @@ def _match_wallet_spans(
     wallet_names: list[str],
     exclude: list[tuple[int, int]] | None = None,
     amount_spans: list[tuple[int, int]] | None = None,
+    category_spans: list[tuple[int, int]] | None = None,
 ) -> list[tuple[str, tuple[int, int]]]:
     """Mentions of a wallet: the runs of `_wallet_runs` that play a wallet role."""
-    return [(p, sp) for p, sp, role in _wallet_runs(text, wallet_names, exclude, amount_spans) if role]
+    return [
+        (p, sp)
+        for p, sp, role in _wallet_runs(text, wallet_names, exclude, amount_spans, category_spans)
+        if role
+    ]
 
 
-def wallet_words_are_only_things(text: str, wallet_names: list[str]) -> bool:
+def category_spans_in(
+    text: str,
+    expense_categories: list[PrefilterCategory],
+    income_categories: list[PrefilterCategory],
+    seed_name_by_key: dict[str, str] | None = None,
+) -> list[tuple[int, int]]:
+    """Where the one category the quick path would pick stands in the text ([] if none or many)."""
+    seeds = seed_name_by_key if seed_name_by_key is not None else build_seed_name_by_key()
+    resolved = _unique_categories(
+        _find_category_matches(text, expense_categories, "expense", seeds)
+        + _find_category_matches(text, income_categories, "income", seeds)
+    )
+    return [resolved[0].span] if len(resolved) == 1 else []
+
+
+def wallet_words_are_only_things(
+    text: str,
+    wallet_names: list[str],
+    category_spans: list[tuple[int, int]] | None = None,
+) -> bool:
     """The text has words that look like a wallet name, but none of them plays a wallet role
     ("пополнил карту метро 30000"): a wallet hint for this text is not a mention. The AI path
     uses it to drop such a hint, so it agrees with the quick path."""
     amount_spans = [a.span for a in _find_amounts(text)]
-    runs = _wallet_runs(text, wallet_names, amount_spans, amount_spans)
+    runs = _wallet_runs(
+        text, wallet_names, [*amount_spans, *(category_spans or [])], amount_spans, category_spans
+    )
     return bool(runs) and not any(role for _, _, role in runs)
 
 
@@ -530,7 +591,7 @@ def try_prefilter(
 
     match = resolved[0]
     wallet_hit_spans = _match_wallet_spans(
-        text, wallet_names, [amount.span, match.span], [amount.span]
+        text, wallet_names, [amount.span, match.span], [amount.span], [match.span]
     )
     wallet_hits = [n for n, _ in wallet_hit_spans]
     wallet_spans = [sp for _, sp in wallet_hit_spans]

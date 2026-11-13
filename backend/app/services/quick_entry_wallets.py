@@ -27,7 +27,7 @@ _USD_PREFIXES = ("доллар", "dollar", "usd")
 _UZS_WORDS = {"сум", "сумы", "сумов", "сумм", "сума", "сўм", "сум.", "so'm", "som", "sum", "uzs"}
 # Currency words and nothing else: they are shared by most wallets, so they never pick one.
 _CURRENCY_TOKENS = {"usd", "uzs"}
-_CONNECTORS = {"с", "со", "из", "на", "в", "по", "от", "за"}
+_CONNECTORS = {"с", "со", "из", "на", "в", "по", "от", "за", "через"}
 
 
 # Uzbek (Latin) words for the usual wallet kinds, folded to the Russian word: a wallet named in
@@ -69,7 +69,7 @@ _TRANSLIT = {
     "ф": ["f"], "х": ["x", "kh", "h"], "ц": ["ts", "s"], "ч": ["ch"], "ш": ["sh"], "щ": ["sh"],
     "ъ": [""], "ы": ["i", "y"], "ь": [""], "э": ["e"], "ю": ["yu", "u"], "я": ["ya", "a"],
 }
-_MIN_TRANSLIT_STEM = 4
+_MIN_TRANSLIT_STEM = 3
 
 
 def _is_cyrillic(word: str) -> bool:
@@ -133,6 +133,8 @@ def _same_word(a: str, b: str) -> bool:
     наличный/наличными), or a Latin spelling of a Russian word with such an ending."""
     if a == b:
         return True
+    if _is_cash_word(a) and _is_cash_word(b):
+        return True
     sa, sb = _stems(a), _stems(b)
     if any(len(x) >= _MIN_STEM for x in sa & sb):
         return True
@@ -144,6 +146,16 @@ def _same_word(a: str, b: str) -> bool:
             if len(stem) >= _MIN_TRANSLIT_STEM and _lat_variants(stem) & lat_stems:
                 return True
     return False
+
+
+# Cash by its colloquial names. These are forms of ONE wallet kind: "налом", "наличкой", "налик",
+# "наликом", "nal", "naldan" all read as the cash wallet ("Наличные", "Нал"). Whether a person
+# means a given wallet is decided in pick_wallet_by_hint: only when the person has exactly one.
+_CASH_STEMS = {"наличн", "наличк", "налик", "нал", "nalik", "nal"}
+
+
+def _is_cash_word(word: str) -> bool:
+    return bool(_stems(word) & _CASH_STEMS)
 
 
 def _has_word(tokens: list[str], word: str) -> bool:
@@ -234,11 +246,22 @@ def _word_key(word: str) -> str | None:
     return found[0] if found else None
 
 
+_POSTPOSITIONS = {"bilan", "orqali"}  # Uzbek "with / through", after the wallet's name
+
+
+def _is_symbol_word(word: str) -> bool:
+    """An emoji or a sign standing alone (the "💳" of a wallet called "💳 Карта")."""
+    return not _WORD_RE.search(word)
+
+
 def _cut_phrase(words: list[str], phrase: str) -> list[str]:
-    """Remove every run of whole words that reads as `phrase` (case/ending tolerant)."""
-    wanted = [k for k in (_word_key(p) for p in phrase.split()) if k]
+    """Remove every run of whole words that reads as `phrase` (case/ending tolerant), with the
+    emoji of the name beside it and the Uzbek "bilan/orqali" (and "pul" before it) after it."""
+    parts = phrase.split()
+    wanted = [k for k in (_word_key(p) for p in parts) if k]
     if not wanted:
         return words
+    symbols = {p for p in parts if _is_symbol_word(p)}
     keys = [_word_key(w) for w in words]
     out: list[str] = []
     i = 0
@@ -247,7 +270,16 @@ def _cut_phrase(words: list[str], phrase: str) -> list[str]:
         if len(window) == len(wanted) and all(
             k is not None and _same_word(k, w) for k, w in zip(window, wanted)
         ):
+            while out and out[-1] in symbols:
+                out.pop()
             i += len(wanted)
+            while i < len(words) and words[i] in symbols:
+                i += 1
+            after = [w.casefold().translate(_APOSTROPHES) for w in words[i : i + 2]]
+            if after[:1] and after[0] in _POSTPOSITIONS:
+                i += 1
+            elif len(after) == 2 and after[0] == "pul" and after[1] in _POSTPOSITIONS:
+                i += 2
             continue
         out.append(words[i])
         i += 1
@@ -264,6 +296,8 @@ def strip_wallet_mention(
     phrases = sorted(filter(None, (wallet_name, hint)), key=lambda p: -len(p.split()))
     for phrase in phrases:
         words = _cut_phrase(words, phrase)
+    emoji = {p for ph in phrases for p in ph.split() if _is_symbol_word(p)}
+    words = [w for w in words if w not in emoji]  # the name's emoji typed beside it
     while words and words[0].casefold() in _CONNECTORS:
         words.pop(0)
     while words and words[-1].casefold() in _CONNECTORS:

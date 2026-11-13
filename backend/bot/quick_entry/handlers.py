@@ -38,6 +38,7 @@ from app.services import ai_usage
 from app.parsing.prefilter import (
     PrefilterCategory,
     build_seed_name_by_key,
+    category_spans_in,
     try_prefilter,
     wallet_words_are_only_things,
 )
@@ -414,7 +415,12 @@ async def _drop_hints_that_are_things(
     if not source_text or not any(op.wallet_hint for op in operations):
         return operations
     wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
-    if not wallet_words_are_only_things(source_text, [w.name for w in wallets]):
+    spans = category_spans_in(
+        source_text,
+        await _list_expense_categories_for_prefilter(session, user.family_budget_id),
+        await _list_income_categories_for_prefilter(session, user.family_budget_id),
+    )
+    if not wallet_words_are_only_things(source_text, [w.name for w in wallets], spans):
         return operations
     return [replace(op, wallet_hint=None) if op.wallet_hint else op for op in operations]
 
