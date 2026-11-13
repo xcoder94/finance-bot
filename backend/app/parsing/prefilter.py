@@ -82,21 +82,27 @@ _APOSTROPHES = str.maketrans({"\u2019": "'", "\u02bc": "'", "\u02bb": "'", "\u20
 
 _MULTI_OP_CONNECTORS: tuple[str, ...] = (" и ", " а также ")
 
+# One number: either digit groups of exactly 3 after a first group of 1-3 digits
+# ("20 000", "1 215 000", "20_000") or plain digits. Separate numbers ("20000 2",
+# "12 15000") are never glued: they stay separate amounts and go to the model.
+# A digit run glued to a word ("express24") is part of that word, not an amount.
+_NUM = r"\d{1,3}(?:[ \t_\u00a0\u202f]\d{3})+(?!\d)|\d+"
+
 _THOUSAND_RE = re.compile(
-    r"(?P<num>\d[\d\s_]*)\s*(?:тысяч(?:а|и)?|тыс\.?)",
+    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)",
     re.IGNORECASE,
 )
 # Uzbek / short magnitude words after a number: "25 ming", "25 минг", "25k", "3 mln".
 _THOUSAND_WORD_RE = re.compile(
-    r"(?P<num>\d[\d\s_]*)\s*(?:ming\w*|минг[\w\u0400-\u04ff]*|k|к)(?![\w\u0400-\u04ff])",
+    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:ming\w*|минг[\w\u0400-\u04ff]*|k|к)(?![\w\u0400-\u04ff])",
     re.IGNORECASE,
 )
 _MILLION_WORD_RE = re.compile(
-    r"(?P<num>\d[\d\s_]*)\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?(?![\w\u0400-\u04ff])",
+    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?(?![\w\u0400-\u04ff])",
     re.IGNORECASE,
 )
 _PLAIN_AMOUNT_RE = re.compile(
-    r"(?<!\d)(?P<num>\d[\d\s_]*)\s*"
+    r"(?<!\w)(?P<num>" + _NUM + r")\s*"
     r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?)?(?!\d)",
     re.IGNORECASE,
 )
