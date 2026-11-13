@@ -26,7 +26,7 @@ from tests.test_phase16_prefilter_handlers import (
 
 
 def _rule() -> str:
-    start = PROMPT.index("- Multipliers, counts")
+    start = PROMPT.index("- Counts and multipliers")
     return PROMPT[start : PROMPT.index("\n", start)]
 
 
@@ -34,10 +34,15 @@ def test_prompt_rule_covers_every_multiplier_shape() -> None:
     rule = _rule()
     for marker in ("20000 x2", "x2 20000", "2 x 20000", "3 шт по 15000", "2 раза по 20000", "2 ta 15000 dan"):
         assert marker in rule
-    assert "any order and case" in rule
+    assert "in any order and case" in rule
+    assert "✕ ✖" in rule
     assert "2 × 20000" in rule
     assert "20000 2 раза" in rule and "2 чел 45000" in rule
-    assert "12 15000" in rule and "NOT type ambiguous" in rule and "NOT two operations" in rule
+    assert "12 15000" in rule and "Never return two operations or a sum of the numbers" in rule
+    # scope: separate purchases are separate operations; exchange «по» is the rate marker
+    assert "такси 20000 и обед 30000" in rule and "separate operations" in rule
+    assert "rate marker" in rule and "never a multiplier" in rule
+    assert "NOT type ambiguous" not in rule
 
 
 def test_prompt_has_no_dangling_ambiguity_reference() -> None:

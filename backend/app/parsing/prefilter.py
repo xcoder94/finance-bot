@@ -83,27 +83,33 @@ _APOSTROPHES = str.maketrans({"\u2019": "'", "\u02bc": "'", "\u02bb": "'", "\u20
 _MULTI_OP_CONNECTORS: tuple[str, ...] = (" и ", " а также ")
 
 # One number: either digit groups of exactly 3 after a first group of 1-3 digits
-# ("20 000", "1 215 000", "20_000") or plain digits. Separate numbers ("20000 2",
-# "12 15000") are never glued: they stay separate amounts and go to the model.
-# A digit run glued to a word ("express24") is part of that word, not an amount.
-_NUM = r"\d{1,3}(?:[ \t_\u00a0\u202f]\d{3})+(?!\d)|\d+"
+# ("20 000", "1 215 000", "20_000"; separator: space, nbsp, thin/narrow nbsp, "_"; never tab
+# or newline) or plain digits. Separate numbers ("20000 2", "12 15000") are never glued.
+# Whitelist of neighbours: an amount is well-formed only when the char before it is the text
+# start, whitespace or one of ( [ « " ' , ; : and the char after the whole token (suffix
+# included) is the text end, whitespace or one of . , ; : ! ? ) ] » " '. Anything else glued
+# to the digits (letter, digit, "_", sign, multiplier look-alike) means "not an amount".
+_NUM = r"\d{1,3}(?:[ \u00a0\u202f\u2009_]\d{3})+(?!\d)|\d+"
+_BEFORE = r"(?<![^\s(\[\u00ab\"',;:])"
+_AFTER = r"(?![^\s.,;:!?)\]\u00bb\"'])"
 
 _THOUSAND_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)",
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)" + _AFTER,
     re.IGNORECASE,
 )
 # Uzbek / short magnitude words after a number: "25 ming", "25 минг", "25k", "3 mln".
 _THOUSAND_WORD_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:ming\w*|минг[\w\u0400-\u04ff]*|k|к)(?![\w\u0400-\u04ff])",
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:ming\w*|минг[\w\u0400-\u04ff]*|k|к)" + _AFTER,
     re.IGNORECASE,
 )
 _MILLION_WORD_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?(?![\w\u0400-\u04ff])",
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?" + _AFTER,
     re.IGNORECASE,
 )
 _PLAIN_AMOUNT_RE = re.compile(
-    r"(?<!\w)(?P<num>" + _NUM + r")\s*"
-    r"(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?)?(?!\d)",
+    _BEFORE + r"(?P<num>" + _NUM + r")"
+    r"(?:\s*(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?))?"
+    + _AFTER,
     re.IGNORECASE,
 )
 
@@ -196,36 +202,19 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
     return amounts
 
 
-_DIGITS_RE = re.compile(r"\d+")
-# multiplier signs, compared after casefold (X/Х = x/х): latin x, cyrillic х, times sign,
-# heavy multiplication marks, asterisk, middle dot
-_MULT_CHARS = "xх×✕✖*·"
+_DIGIT_RE = re.compile(r"\d")
 
 
-def _has_stray_number(text: str, amounts: list[_ParsedAmount]) -> bool:
-    """A digit run that is not an amount but may be one more number or a multiplier.
+def _all_digits_covered(text: str, amounts: list[_ParsedAmount]) -> bool:
+    """Whitelist check: exactly one amount and every digit char of the text lies inside it.
 
-    Digits glued to a word are a name ("express24") and are ignored, unless they are
-    a multiplier ("x2", "х2", "*2", "2х") or hang on an underscore ("20__000", "2_0000"):
-    those are not guessed, the phrase goes to the model.
+    Any other digit (a second number, a count, "x2", "express24", "2по20000") means the
+    phrase is not understood by the fast path and goes to the model.
     """
-    covered = [False] * (len(text) + 1)
-    for amount in amounts:
-        for i in range(*amount.span):
-            covered[i] = True
-    for match in _DIGITS_RE.finditer(text):
-        start, end = match.span()
-        if covered[start]:
-            continue
-        before = text[start - 1] if start > 0 else ""
-        after = text[end] if end < len(text) else ""
-        if before == "_" or after == "_":
-            return True
-        if before and before.casefold() in _MULT_CHARS:
-            return True
-        if after and after.casefold() in _MULT_CHARS:
-            return True
-    return False
+    if len(amounts) != 1:
+        return False
+    start, end = amounts[0].span
+    return all(start <= m.start() < end for m in _DIGIT_RE.finditer(text))
 
 
 def _has_transfer_signal(text: str) -> bool:
@@ -410,7 +399,7 @@ def try_prefilter(
     amounts = _find_amounts(text)
     if _has_multi_op_signal(text, amounts):
         return PrefilterResult(operation=None, reason="multi_operation")
-    if len(amounts) != 1 or _has_stray_number(text, amounts):
+    if not _all_digits_covered(text, amounts):
         return PrefilterResult(operation=None, reason="amount_not_singular")
 
     amount = amounts[0]

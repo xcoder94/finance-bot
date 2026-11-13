@@ -62,12 +62,31 @@ CASES = [
     ("такси 15 000 х3", 45_000, False),
     ("такси 2х20000", 40_000, False),
     # glued digits that are part of a name stay on the fast path
-    ("такси express24 55000", 55_000, True),
+    ("такси express24 55000", 55_000, False),
     # wrong underscore grouping is never guessed
     ("такси 20__000", 20_000, False),
     ("такси 2_0000", 20_000, False),
     ("такси 20 _000", 20_000, False),
-    ("такси 20_000_", 20_000, True),
+    ("такси 20_000_", 20_000, False),
+    # whitelist: digits glued to words/signs, signs, tab -> model
+    ("такси 2по20000", 20_000, False),
+    ("такси 2шт20000", 20_000, False),
+    ("taksi 2ta20000", 20_000, False),
+    ("такси 20000 Ｘ2", 40_000, False),
+    ("такси 20000 ҳ2", 40_000, False),
+    ("такси 20к2", 20_000, False),
+    ("такси 3x", 3, False),
+    ("такси −20000", 20_000, False),
+    ("такси 4\t661", 4_661, False),
+    ("такси 20000раз2", 20_000, False),
+    ("такси 20000 2 раза", 20_000, False),
+    ("такси 20 000,50", 20_000, False),
+    ("такси 1.5 млн", 1_500_000, False),
+    # fast path controls
+    ("такси 20000.", 20_000, True),
+    ("такси (20000)", 20_000, True),
+    ("такси 20 000,", 20_000, True),
+    ("такси 20\u2009000", 20_000, True),
 ]
 
 
