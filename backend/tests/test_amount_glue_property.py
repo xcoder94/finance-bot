@@ -116,3 +116,41 @@ def test_single_number_hits_iff_neighbours_whitelisted() -> None:
 @pytest.mark.parametrize("text", ["такси 20000 {}2", "20000{}2", "ТАКСИ 20000 {}2", "{}2 20000 такси", "2{}20000 такси", "2 {} 20000 такси"])
 def test_every_multiplier_symbol_and_case_goes_to_model(mult: str, text: str) -> None:
     assert _run(text.format(mult)) is None
+
+
+@pytest.mark.parametrize(
+    "text,amount,comment",
+    [
+        ("такси 20000 к врачу", 20_000, "к врачу"),
+        ("такси 15000 к работе", 15_000, "к работе"),
+        ("такси 20 к", 20_000, None),
+        ("такси 20к", 20_000, None),
+        ("такси 20 k.", 20_000, None),
+    ],
+)
+def test_spaced_k_is_preposition_only_before_a_word(text: str, amount: int, comment) -> None:
+    op = _run(text)
+    assert op is not None and op.amount == amount and op.comment == comment
+
+
+_CUR_WORDS = ["usd", "USD", "Usd", "доллар", "долларов", "доллара", "dollar", "dollarlar", "долл", "долл.", "$", "uzs", "сум"]
+
+
+def test_currency_word_before_number_goes_to_model() -> None:
+    """I4 mirrored: a currency word/sign left of the number that is not in the sum -> model."""
+    rnd = random.Random(9)
+    bad = []
+    for _ in range(4_000):
+        w, n = rnd.choice(_CUR_WORDS), rnd.randint(1, 999_999)
+        tail = rnd.choice(["", " тыс", " млн", "к", " сум", " usd", "."])
+        gap = rnd.choice([" ", "  ", " "])
+        text = rnd.choice(["такси {w}{g}{n}{t}", "{w}{g}{n}{t} такси"]).format(w=w, g=gap, n=n, t=tail)
+        if _run(text) is not None:
+            bad.append(text)
+    assert not bad, bad[:10]
+
+
+@pytest.mark.parametrize("w", ["сумма", "сумка", "usdt", "ксум"])
+def test_word_that_only_starts_like_a_currency_is_not_a_mark(w: str) -> None:
+    op = _run(f"такси {w} 20000")
+    assert op is not None and op.amount == 20_000
