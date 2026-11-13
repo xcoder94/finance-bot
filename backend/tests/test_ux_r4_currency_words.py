@@ -16,7 +16,7 @@ from tests.test_phase16_prefilter import _expense
         ("taksi 50$", "USD"),
         ("такси 50 доллары", "USD"),
         ("такси 50 долларов", "USD"),
-        ("taksi 50 so'm", None),
+        ("taksi 50 so'm", "UZS"),
         ("taksi 50000", None),
     ],
 )

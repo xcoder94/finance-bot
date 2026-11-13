@@ -116,13 +116,18 @@ _MILLION_WORD_RE = re.compile(
     _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?" + _AFTER,
     re.IGNORECASE,
 )
-# "$20" / "кофе $20": currency sign glued before the number (not together with a suffix).
+# Every spelling of the sum word (so'm with any apostrophe form or backtick, сўм, сум, sum, UZS) is UZS.
+_SUM_WORD = r"so['\u2018\u2019\u02bb\u02bc`]m|с[ўу]м|sum|uzs"
+# "$20" / "$ 20" / "кофе $20": currency sign before the number, spaces allowed between
+# (not together with a suffix).
 _PLAIN_AMOUNT_RE = re.compile(
-    _BEFORE + r"(?P<cur_pre>\$)?(?P<num>" + _NUM + r")"
-    r"(?:\s*(?P<currency>сум|uzs|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?))?"
+    _BEFORE + r"(?P<cur_pre>\$[ \u00a0]*)?(?P<num>" + _NUM + r")"
+    r"(?:\s*(?P<currency>" + _SUM_WORD + r"|\$|usd|доллар(?:ов|ы|а|ах)?|dollar(?:lar|ga|da|dan|ni)?(?![a-z])|долл\.?))?"
     + _AFTER,
     re.IGNORECASE,
 )
+# "$ 20 тыс": a dollar sign before a magnitude number is two currency/scale marks: not for the fast path.
+_DOLLAR_BEFORE_RE = re.compile(r"\$[ \u00a0]*$")
 _MAGNITUDE_TAIL_RE = re.compile(
     r"\s*(?:тыс|ming|минг|mln|million|млн|миллион|[kк](?![^\W\d_]))", re.IGNORECASE
 )
@@ -168,7 +173,7 @@ def _parse_currency(token: str | None) -> Literal["UZS", "USD"] | None:
     lowered = token.casefold()
     if lowered in ("$", "usd", "долл", "долл.") or lowered.startswith(("доллар", "dollar")):
         return "USD"
-    if lowered in ("сум", "uzs"):
+    if re.fullmatch(_SUM_WORD, lowered):
         return "UZS"
     return None
 
@@ -179,7 +184,7 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
 
     for match in _THOUSAND_RE.finditer(text):
         start, end = match.span()
-        if any(covered[start:end]):
+        if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, 0, start):
             continue
         value = _normalize_number(match.group("num")) * 1000
         amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
@@ -193,7 +198,7 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
     ):
         for match in pattern.finditer(text):
             start, end = match.span()
-            if any(covered[start:end]):
+            if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, 0, start):
                 continue
             value = _normalize_number(match.group("num")) * factor
             amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))

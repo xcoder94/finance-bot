@@ -117,8 +117,6 @@ def test_prefilter_fast(text: str, amount: int, currency: str | None, comment: s
         "такси 20000☕2",
         "такси 20000☕ x2",
         "такси 20000x☕2",
-        "такси 20000so'm",
-        "такси 20000сўм",
     ],
 )
 def test_prefilter_still_model(text: str) -> None:
