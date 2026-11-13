@@ -486,3 +486,50 @@ class TestDebtContextRound2:
         ).operation
         assert op is not None
         assert (op.type, op.category) == ("income", None)
+
+
+class TestAttachedMultiplierOrCurrency:
+    """Bare number next to a multiplier/currency mark that failed the neighbour check is never saved."""
+
+    @staticmethod
+    def _run(text: str):  # type: ignore[no-untyped-def]
+        return try_prefilter(
+            text,
+            wallet_names=[],
+            expense_categories=[_expense("Такси")],
+            income_categories=[],
+            seed_name_by_key={},
+        )
+
+    _WORDS = ["тыс", "тысяч", "тысячи", "k", "к", "ming", "минг", "млн", "mln", "million", "миллион"]
+    _BAD_TAILS = ["-", "+", "#", "$", "€", "%", "/день", "*", "~", "=", "&", "—"]
+
+    def test_property_no_recognised_mark_left_outside_amount(self) -> None:
+        saved = []
+        for w in self._WORDS:
+            for tail in self._BAD_TAILS:
+                for sp in ("", " "):
+                    text = f"такси 20{sp}{w}{tail}"
+                    op = self._run(text).operation
+                    if op is not None:
+                        saved.append((text, op.amount, op.currency))
+        # Whatever is saved must carry the multiplier (I4): never a bare 20.
+        assert [s for s in saved if s[1] == 20] == []
+
+    @pytest.mark.parametrize(
+        "text",
+        ["такси 20 тыс-", "такси 20 млн$", "такси 20 k/день", "такси 20 тыс+", "такси 20 ming#",
+         "такси 20 сум-", "такси 20 $-", "такси $ 20", "такси 20 usd+"],
+    )
+    def test_goes_to_model(self, text: str) -> None:
+        assert self._run(text).operation is None
+
+    @pytest.mark.parametrize(
+        ("text", "amount"),
+        [("такси 20 тыс", 20000), ("такси 20 млн", 20_000_000), ("такси 20 k", 20000),
+         ("такси 20", 20), ("такси 20 сумма", 20), ("такси $20", 20)],
+    )
+    def test_clean_phrases_unchanged(self, text: str, amount: int) -> None:
+        op = self._run(text).operation
+        assert op is not None
+        assert op.amount == amount
