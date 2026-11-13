@@ -132,6 +132,18 @@ _MAGNITUDE_TAIL_RE = re.compile(
     r"\s*(?:тыс|ming|минг|mln|million|млн|миллион|[kк](?![^\W\d_]))", re.IGNORECASE
 )
 
+# A bare number must never be accepted when a magnitude word or currency mark is attached to it
+# (space or glued), whether or not that mark itself passed the neighbour check ("20 тыс-",
+# "20 млн$", "20 k/день"): the mark then is not part of the amount and the sum would be wrong.
+# Stems that may continue with letters ("тысячи", "dollarlar") vs. marks that may not ("сумма").
+_ATTACHED_MARK_RE = re.compile(
+    r"\s*(?:\$|(?:тыс|ming|минг|million|миллион|доллар|dollar|долл)"
+    r"|(?:сум|uzs|usd|mln|млн|[kк])(?![^\W\d_]))",
+    re.IGNORECASE,
+)
+# Same on the left: "$ 20" (currency sign before the number, space between).
+_MARK_BEFORE_RE = re.compile(r"\$\s*$")
+
 
 @dataclass(frozen=True)
 class PrefilterResult:
@@ -211,6 +223,10 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
             continue
         num_raw = match.group("num")
         if not num_raw.strip():
+            continue
+        if (not match.group("currency") and _ATTACHED_MARK_RE.match(text, end)) or (
+            not match.group("cur_pre") and _MARK_BEFORE_RE.search(text, 0, start)
+        ):
             continue
         value = _normalize_number(num_raw)
         currency = _parse_currency(match.group("currency"))
