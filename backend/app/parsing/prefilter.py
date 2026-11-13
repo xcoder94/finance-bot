@@ -196,6 +196,36 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
     return amounts
 
 
+_DIGITS_RE = re.compile(r"\d+")
+_MULT_CHARS = "xх×*"  # latin x, cyrillic х, times sign, asterisk
+
+
+def _has_stray_number(text: str, amounts: list[_ParsedAmount]) -> bool:
+    """A digit run that is not an amount but may be one more number or a multiplier.
+
+    Digits glued to a word are a name ("express24") and are ignored, unless they are
+    a multiplier ("x2", "х2", "*2", "2х") or hang on an underscore ("20__000", "2_0000"):
+    those are not guessed, the phrase goes to the model.
+    """
+    covered = [False] * (len(text) + 1)
+    for amount in amounts:
+        for i in range(*amount.span):
+            covered[i] = True
+    for match in _DIGITS_RE.finditer(text):
+        start, end = match.span()
+        if covered[start]:
+            continue
+        before = text[start - 1] if start > 0 else ""
+        after = text[end] if end < len(text) else ""
+        if before == "_" or after == "_":
+            return True
+        if before and before in _MULT_CHARS:
+            return True
+        if after and after in "xх×":
+            return True
+    return False
+
+
 def _has_transfer_signal(text: str) -> bool:
     folded = text.casefold()
     return any(signal in folded for signal in _TRANSFER_SIGNALS)
@@ -378,7 +408,7 @@ def try_prefilter(
     amounts = _find_amounts(text)
     if _has_multi_op_signal(text, amounts):
         return PrefilterResult(operation=None, reason="multi_operation")
-    if len(amounts) != 1:
+    if len(amounts) != 1 or _has_stray_number(text, amounts):
         return PrefilterResult(operation=None, reason="amount_not_singular")
 
     amount = amounts[0]
