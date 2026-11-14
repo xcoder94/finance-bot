@@ -119,6 +119,23 @@ CASES = [
     ("такси 20000 к. врачу", 20_000, True),
     ("такси 20000 к «врачу»", 20_000, True),
     ("такси 20 к. врачу", 20, False),
+    # next5 NEW-1: every spelling of the sum word left of the number -> model
+    ("taksi so'm 20000", 20_000, False),
+    ("taksi so'm: 20000", 20_000, False),
+    ("taksi so\u2018m 20000", 20_000, False),
+    ("taksi so\u2019m 20000", 20_000, False),
+    ("taksi so\u02bbm 20000", 20_000, False),
+    ("taksi so\u02bcm 20000", 20_000, False),
+    ("taksi so`m 20000", 20_000, False),
+    ("taksi SO'M 20000", 20_000, False),
+    ("такси сўм 20000", 20_000, False),
+    ("такси сўм: 20000", 20_000, False),
+    ("такси СУМ 20000", 20_000, False),
+    ("taksi sum 20000", 20_000, False),
+    ("taksi uzs 20000", 20_000, False),
+    # the word on the right of the number stays on the fast path
+    ("taksi 20000 so'm", 20_000, True),
+    ("такси 20000 сўм", 20_000, True),
     # fast path controls
     ("такси 20000.", 20_000, True),
     ("такси (20000)", 20_000, True),

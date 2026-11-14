@@ -154,7 +154,7 @@ _ATTACHED_MARK_RE = re.compile(
 # between; the word must be a whole word: "сумма 20" is not a currency mark). Only spaces and
 # punctuation may separate mark and number: "usd: 20", "usd - 20", "usd-20", "(usd) 20", "$: 20".
 _MARK_BEFORE_RE = re.compile(
-    r"(?:\$|(?<![^\W\d_])(?:usd|uzs|сум|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*))[^\w]*$",
+    r"(?:\$|(?<![^\W\d_])(?:" + _SUM_WORD + r"|usd|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*))[^\w]*$",
     re.IGNORECASE,
 )
 
