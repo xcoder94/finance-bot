@@ -153,6 +153,18 @@ _ATTACHED_MARK_RE = re.compile(
 # Same on the left: "$ 20", "usd 20", "доллар 20" (currency sign/word before the number, space
 # between; the word must be a whole word: "сумма 20" is not a currency mark). Only spaces and
 # punctuation may separate mark and number: "usd: 20", "usd - 20", "usd-20", "(usd) 20", "$: 20".
+# Currency word/sign right after a magnitude word ("20 тыс $", "20 ming so'm"): the fast path
+# would drop it, so the phrase goes to the model. Same word list as everywhere above.
+_MARK_AFTER_MAGNITUDE_RE = re.compile(
+    r"\s*(?:\$|(?:" + _SUM_WORD + r"|usd|долл\.?)(?![^\W\d_])|доллар[^\W\d_]*|dollar[^\W\d_]*)",
+    re.IGNORECASE,
+)
+# A currency word/sign anywhere in the phrase ("$ такси 20", "so'm такси 20000"): if it is not
+# part of the amount, a wallet name or a category, the fast path must not ignore it.
+_ANY_MARK_RE = re.compile(
+    r"\$|(?<![^\W\d_])(?:" + _SUM_WORD + r"|usd|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*)(?![^\W\d_])",
+    re.IGNORECASE,
+)
 _MARK_BEFORE_RE = re.compile(
     r"(?:\$|(?<![^\W\d_])(?:" + _SUM_WORD + r"|usd|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*))[^\w]*$",
     re.IGNORECASE,
@@ -212,7 +224,7 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
         start, end = match.span()
         if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, 0, start):
             continue
-        if _MARK_BEFORE_RE.search(text, 0, start):
+        if _MARK_BEFORE_RE.search(text, 0, start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
             continue
         value = _normalize_number(match.group("num")) * 1000
         amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
@@ -228,7 +240,7 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
             start, end = match.span()
             if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, 0, start):
                 continue
-            if _MARK_BEFORE_RE.search(text, 0, start):
+            if _MARK_BEFORE_RE.search(text, 0, start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
                 continue
             value = _normalize_number(match.group("num")) * factor
             amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
