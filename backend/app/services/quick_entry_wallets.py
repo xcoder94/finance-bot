@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.wallet_visibility import wallet_is_visible
 
 SHARED_WALLET_LIMIT = 10
 
@@ -376,3 +377,20 @@ async def resolve_wallet(
     if replacement is None:
         return CurrencyMissing(currency=currency)
     return replacement
+
+
+async def get_default_wallet(session: AsyncSession, user: User) -> Wallet | None:
+    """The person's default wallet if it is still usable for him: alive, in his family budget
+    and visible to him (not another person's personal wallet). Otherwise the first wallet he can
+    see; None when he sees none (the bot then says so)."""
+    if user.default_wallet_id is not None:
+        wallet = await session.get(Wallet, user.default_wallet_id)
+        if (
+            wallet is not None
+            and not wallet.is_deleted
+            and wallet.family_budget_id == user.family_budget_id
+            and wallet_is_visible(wallet, user)
+        ):
+            return wallet
+    wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
+    return wallets[0] if wallets else None

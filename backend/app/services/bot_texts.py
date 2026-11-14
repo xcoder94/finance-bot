@@ -85,6 +85,12 @@ CATALOGUE: dict[str, dict[str, str]] = {
         "uz": "Xabarda summani topa olmadim.\n"
         "Mana bunday yozing: `taksi 25 ming` yoki `oziq-ovqat 200 ming kartadan`",
     },
+    "quick.no_wallet": {
+        "ru": "Не вижу доступного кошелька для записи. "
+        "Выберите кошелёк по умолчанию в приложении и отправьте сообщение ещё раз.",
+        "uz": "Yozish uchun mavjud hamyon topilmadi. "
+        "Ilovada standart hamyonni tanlang va xabarni yana yuboring.",
+    },
     "quick.model_fail": {
         "ru": "Не получилось записать — дело не в вашем сообщении. "
         "Попробуйте отправить его ещё раз через минуту или "

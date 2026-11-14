@@ -54,6 +54,7 @@ from app.services.quick_entry_create import (
 from app.services.quick_entry_dates import apply_date_hint, strip_date_words
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
+    get_default_wallet,
     list_wallets_for_parse,
     resolve_wallet,
 )
@@ -190,12 +191,7 @@ async def _list_income_category_names(
 
 
 async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | None:
-    if user.default_wallet_id is not None:
-        wallet = await session.get(Wallet, user.default_wallet_id)
-        if wallet is not None and not wallet.is_deleted:
-            return wallet
-    wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
-    return wallets[0] if wallets else None
+    return await get_default_wallet(session, user)
 
 
 async def _reply_unreadable(
@@ -237,7 +233,7 @@ async def handle_receipt_photo(message: Message, bot: Bot) -> None:
         open_purchase = await find_open_purchase(session, user.id)
         pending = open_purchase
         if default_wallet is None and pending is None:
-            await message.answer(catalogue_t(user, "quick.no_amount"))
+            await message.answer(catalogue_t(user, "quick.no_wallet"))
             return
 
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")

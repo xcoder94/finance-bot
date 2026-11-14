@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.admin import is_admin_telegram_id
 from app.auth.deps import AppPassClaimsDep
-from app.auth.user_deps import CurrentUserDep
+from app.auth.user_deps import CurrentUserDep, WriteUserDep
 from app.config import receipt_photo_enabled
 from app.db import async_session_factory, get_session
 from app.models.family_budget import FamilyBudget
@@ -76,7 +76,7 @@ async def get_me(
 @router.patch("/me")
 async def patch_me(
     body: MeUpdate,
-    user: CurrentUserDep,
+    user: WriteUserDep,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> MeResponse:
     if "default_wallet_id" in body.model_fields_set:

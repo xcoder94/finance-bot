@@ -85,6 +85,7 @@ from app.services.quick_entry_dates import (
 )
 from app.services.quick_entry_wallets import (
     CurrencyMissing,
+    get_default_wallet,
     list_wallets_for_parse,
     resolve_wallet,
     strip_wallet_mention,
@@ -360,12 +361,7 @@ async def _list_income_categories_for_prefilter(
 
 
 async def _get_default_wallet(session: AsyncSession, user: User) -> Wallet | None:
-    if user.default_wallet_id is not None:
-        wallet = await session.get(Wallet, user.default_wallet_id)
-        if wallet is not None and not wallet.is_deleted:
-            return wallet
-    wallets = await list_wallets_for_parse(session, user.family_budget_id, user)
-    return wallets[0] if wallets else None
+    return await get_default_wallet(session, user)
 
 
 async def _try_add_shopping_items(
@@ -823,7 +819,7 @@ async def process_quick_entry_text(
         if prefilter_hit:
             await ai_usage.record_message("prefilter", "text", "ok")
             if default_wallet is None:
-                await message.answer(catalogue_t(user, "quick.no_amount"))
+                await message.answer(catalogue_t(user, "quick.no_wallet"))
                 return
             response = ParseResponse(operations=[prefilter_op])
         else:
@@ -903,7 +899,7 @@ async def process_quick_entry_text(
         if default_wallet is None:
             await refund_model_call(session, budget)
             await session.commit()
-            await message.answer(catalogue_t(user, "quick.no_amount"))
+            await message.answer(catalogue_t(user, "quick.no_wallet"))
             return
 
         await _process_parsed_response(
@@ -1061,7 +1057,7 @@ async def handle_quick_entry_voice(message: Message, bot: Bot) -> None:
         if default_wallet is None:
             await refund_model_call(session, budget)
             await session.commit()
-            await message.answer(catalogue_t(user, "quick.no_amount"))
+            await message.answer(catalogue_t(user, "quick.no_wallet"))
             return
 
         await _process_parsed_response(
