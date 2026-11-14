@@ -103,8 +103,18 @@ _BEFORE = (
 )
 _AFTER = r"(?![^\s.,;:!?)\]\u00bb\"'" + _EMOJI + r"])"
 
+# Every spelling of the sum word (so'm with any apostrophe form or backtick, сўм, сум, sum, UZS) is UZS.
+# One list for the whole parse (left, right, after a magnitude word): the stem plus an optional ending
+# from a CLOSED list ("so'mga", "so'mlik", "сумов", "сўмдан"), never "any letters" ("сумка", "сумма",
+# "summa", "some", "somsa" stay ordinary words).
+_SUM_ENDING = r"(?:ning|dagi|gacha|lik|li|ga|da|dan|ni|нинг|лик|ли|га|да|дан|ни|ами|ов|ах|ам|ом|а|ы|у|е)?"
+_SUM_WORD = (
+    r"(?:so(?:u?|['\u2018\u2019\u02bb\u02bc`])m|с[ўу]м|sum)" + _SUM_ENDING + r"|uzs"
+)
+# Currency word glued right after a magnitude word ("mingso'm", "ксум"): look-ahead only.
+_GLUED_CUR = r"(?=(?:" + _SUM_WORD + r"|usd|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*)(?![^\W\d_]))"
 _THOUSAND_RE = re.compile(
-    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)" + _AFTER,
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:тысяч(?:а|и)?|тыс\.?)(?:" + _AFTER + r"|" + _GLUED_CUR + r")",
     re.IGNORECASE,
 )
 # Uzbek / short magnitude words after a number: "25 ming", "25 минг", "25k", "3 mln".
@@ -118,15 +128,13 @@ _PREPOSITION_K_NOT = r"(?!" + _SPACED_K_WORD + r")"
 _SPACED_K_WORD_RE = re.compile(_SPACED_K_WORD, re.IGNORECASE)
 _THOUSAND_WORD_RE = re.compile(
     _BEFORE + r"(?P<num>" + _NUM + r")" + _PREPOSITION_K_NOT +
-    r"\s*(?:ming[^\W\d_]*|минг[^\W\d_]*|k|к)" + _AFTER,
+    r"\s*(?:(?:ming|минг|k|к)" + _GLUED_CUR + r"|(?:ming[^\W\d_]*|минг[^\W\d_]*|k|к)" + _AFTER + r")",
     re.IGNORECASE,
 )
 _MILLION_WORD_RE = re.compile(
-    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)\.?" + _AFTER,
+    _BEFORE + r"(?P<num>" + _NUM + r")\s*(?:million|mln|миллион(?:а|ов)?|млн)(?:\.?" + _AFTER + r"|" + _GLUED_CUR + r")",
     re.IGNORECASE,
 )
-# Every spelling of the sum word (so'm with any apostrophe form or backtick, сўм, сум, sum, UZS) is UZS.
-_SUM_WORD = r"so['\u2018\u2019\u02bb\u02bc`]m|с[ўу]м|sum|uzs"
 # "$20" / "$ 20" / "кофе $20": currency sign before the number, spaces allowed between
 # (not together with a suffix).
 _PLAIN_AMOUNT_RE = re.compile(
@@ -150,7 +158,7 @@ _MAGNITUDE_TAIL_RE = re.compile(
 # Stems that may continue with letters ("тысячи", "dollarlar") vs. marks that may not ("сумма").
 _ATTACHED_MARK_RE = re.compile(
     _PREPOSITION_K_NOT + r"\s*(?:\$|(?:тыс|ming|минг|million|миллион|доллар|dollar|долл)"
-    r"|(?:сум|uzs|usd|mln|млн|[kк])(?![^\W\d_]))",
+    r"|(?:" + _SUM_WORD + r"|usd|mln|млн|[kк])(?![^\W\d_]))",
     re.IGNORECASE,
 )
 # Same on the left: "$ 20", "usd 20", "доллар 20" (currency sign/word before the number, space
