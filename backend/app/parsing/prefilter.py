@@ -289,6 +289,13 @@ def _all_digits_covered(text: str, amounts: list[_ParsedAmount]) -> bool:
     return all(start <= m.start() < end for m in _DIGIT_RE.finditer(text))
 
 
+def _stray_currency_mark(text: str, own_spans: list[tuple[int, int]]) -> bool:
+    """A currency word/sign that is neither in the amount, nor a wallet name, nor a category."""
+    return any(
+        not _overlaps(m.span(), own_spans) for m in _ANY_MARK_RE.finditer(text)
+    )
+
+
 def _has_transfer_signal(text: str) -> bool:
     folded = text.casefold()
     return any(signal in folded for signal in _TRANSFER_SIGNALS)
@@ -662,6 +669,8 @@ def try_prefilter(
         # Debt phrase ("qarzga oldim", "qarzni qaytardim"): verb decides, no category.
         debt_hits = _match_wallet_spans(text, wallet_names, [amount.span], [amount.span])
         debt_wallets = [n for n, _ in debt_hits]
+        if _stray_currency_mark(text, [amount.span, *[sp for _, sp in debt_hits]]):
+            return PrefilterResult(operation=None, reason="amount_not_singular")
         if len(debt_wallets) > 1:
             return PrefilterResult(operation=None, reason="wallet_ambiguous")
         return PrefilterResult(
@@ -690,6 +699,8 @@ def try_prefilter(
     wallet_spans = [sp for _, sp in wallet_hit_spans]
     if len(wallet_hits) > 1:
         return PrefilterResult(operation=None, reason="wallet_ambiguous")
+    if _stray_currency_mark(text, [amount.span, match.span, *wallet_spans]):
+        return PrefilterResult(operation=None, reason="amount_not_singular")
 
     generic_only = verb_type is not None and _verb_type(text, include_generic=False) != verb_type
     all_categories = {c.id: c for c in (*expense_categories, *income_categories)}
