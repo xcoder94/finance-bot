@@ -1,5 +1,5 @@
 import { ownerFormErrorKey } from '../../api/familyChanged'
-import { FormNotice } from '../FormNotice'
+import { FormNotice, NoticeRetry } from '../FormNotice'
 import { noticeKindForKey } from '../../utils/noticeKind'
 import {
   type KeyboardEvent,
@@ -443,9 +443,7 @@ export function GoalFormSheet({
         <FormNotice kind={noticeKindForKey(editable ? saveError! : 'familyChanged.goalsOwnerOnly')} reveal>
           <p>{t(editable ? saveError! : 'familyChanged.goalsOwnerOnly')}</p>
           {editable && saveError === 'settings.submitError' ? (
-            <button type="button" onClick={() => void handleSave()} disabled={saving}>
-              {t('auth.retry')}
-            </button>
+            <NoticeRetry onClick={() => void handleSave()} disabled={saving} />
           ) : null}
         </FormNotice>
       ) : null}

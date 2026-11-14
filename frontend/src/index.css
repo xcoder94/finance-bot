@@ -2611,7 +2611,6 @@ button.home-ops-row:focus-visible {
   opacity: 0.72;
 }
 
-.form-sheet-loading,
 .form-notice {
   display: flex;
   align-items: flex-start;
@@ -2653,21 +2652,19 @@ button.home-ops-row:focus-visible {
   color: inherit;
 }
 
-.form-notice .form-notice__body button {
-  margin-top: 4px;
-  border: none;
-  padding: 0;
-  background: none;
-  color: var(--acc);
+.form-notice .form-notice__retry {
+  min-height: 36px;
+  margin-top: 2px;
+  padding: 0 4px;
   font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
 }
 
 .form-notice--error { color: var(--exp); }
 .form-notice--warning { color: var(--app-category-color-4); }
 .form-notice--info .form-notice__icon { color: var(--acc); }
 
+.form-sheet-loading,
 .form-sheet-load-error {
   display: flex;
   flex-direction: column;

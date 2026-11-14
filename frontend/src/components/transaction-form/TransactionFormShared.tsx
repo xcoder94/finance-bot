@@ -6,7 +6,7 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react'
-import { FormNotice } from '../FormNotice'
+import { FormNotice, NoticeRetry } from '../FormNotice'
 import { noticeKindForKey } from '../../utils/noticeKind'
 import { Button, Input, Modal, Spinner, Text, Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
@@ -125,11 +125,7 @@ export function TransactionSubmitError({
   return (
     <FormNotice kind={noticeKindForKey(messageKey)} reveal className="transaction-form__submit-error">
       <Text>{t(messageKey)}</Text>
-      {retryable ? (
-        <Button mode="plain" size="s" onClick={onRetry}>
-          {t('auth.retry')}
-        </Button>
-      ) : null}
+      {retryable ? <NoticeRetry onClick={onRetry} /> : null}
     </FormNotice>
   )
 }

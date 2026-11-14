@@ -1,4 +1,6 @@
+import { Button } from '@telegram-apps/telegram-ui'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { revealMessage } from '../utils/revealMessage'
 
@@ -35,5 +37,15 @@ export function FormNotice({
       </span>
       <div className="form-notice__body">{children}</div>
     </div>
+  )
+}
+
+/** The "Try again" control inside a message: one look and one tap target (36 px) on every form. */
+export function NoticeRetry({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
+  const { t } = useTranslation()
+  return (
+    <Button mode="plain" size="s" className="form-notice__retry" onClick={onClick} disabled={disabled}>
+      {t('auth.retry')}
+    </Button>
   )
 }

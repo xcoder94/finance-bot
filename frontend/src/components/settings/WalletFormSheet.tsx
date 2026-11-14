@@ -1,5 +1,5 @@
 import { saveErrorKey } from '../../api/familyChanged'
-import { FormNotice } from '../FormNotice'
+import { FormNotice, NoticeRetry } from '../FormNotice'
 import { noticeKindForKey } from '../../utils/noticeKind'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -290,9 +290,7 @@ export function WalletFormSheet({
         <FormNotice kind={noticeKindForKey(saveError)} reveal>
           <p>{t(saveError)}</p>
           {saveError === 'settings.submitError' ? (
-            <button type="button" onClick={() => void handleSave()} disabled={saving}>
-              {t('auth.retry')}
-            </button>
+            <NoticeRetry onClick={() => void handleSave()} disabled={saving} />
           ) : null}
         </FormNotice>
       ) : null}

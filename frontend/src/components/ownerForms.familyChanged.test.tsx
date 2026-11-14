@@ -19,7 +19,7 @@ const { findAll, textOf } = await import('../test/elementTree')
 const { FamilyChangedError } = await import('../api/familyChanged')
 const { useAuthStore } = await import('../store/authStore')
 const { FormSheet } = await import('./forms/FormSheet')
-const { FormNotice } = await import('./FormNotice')
+const { FormNotice, NoticeRetry } = await import('./FormNotice')
 const { CategoryFormSheet } = await import('./settings/CategoryFormSheet')
 const { GoalFormSheet } = await import('./goals/GoalFormSheet')
 const { WalletFormSheet } = await import('./settings/WalletFormSheet')
@@ -29,7 +29,13 @@ const setRole = (role: string) =>
 
 const alerts = (tree: unknown) => findAll(tree, (e) => e.type === FormNotice)
 const retryButtons = (tree: unknown) =>
-  findAll(tree, (e) => e.type === 'button' && textOf(e.props.children) === 'auth.retry')
+  findAll(tree, (e) => e.props.onClick !== undefined && (e.type === NoticeRetry || textOf(e.props.children) === 'auth.retry'))
+// P4 of ux-next6: the retry control inside a message is one and the same element on every form.
+const retryTypes: unknown[] = []
+const noteRetry = (tree: unknown) => {
+  expect(retryButtons(tree)).toHaveLength(1)
+  retryTypes.push(retryButtons(tree)[0].type)
+}
 const sheet = (tree: unknown) => findAll(tree, (e) => e.type === FormSheet)[0] as { props: Record<string, any> }
 
 describe('CategoryFormSheet', () => {
@@ -77,7 +83,7 @@ describe('CategoryFormSheet', () => {
     sheet(h.result()).props.onPrimary()
     await h.settle(5)
     expect(textOf(alerts(h.result()))).toContain('settings.submitError')
-    expect(retryButtons(h.result())).toHaveLength(1)
+    noteRetry(h.result())
   })
 })
 
@@ -102,6 +108,12 @@ describe('GoalFormSheet', () => {
     const h = await submitted(async () => { throw new FamilyChangedError() })
     expect(textOf(alerts(h.result()))).toContain('familyChanged.goalsOwnerOnly')
     expect(retryButtons(h.result())).toHaveLength(0)
+  })
+
+  it('an ordinary failure keeps its retry button', async () => {
+    const h = await submitted(async () => { throw new Error('x') })
+    expect(textOf(alerts(h.result()))).toContain('settings.submitError')
+    noteRetry(h.result())
   })
 
   it('a member sees the owner-only sentence up front and Save is off', async () => {
@@ -130,5 +142,35 @@ describe('WalletFormSheet', () => {
     await h.settle(5)
     expect(textOf(alerts(h.result()))).toContain('familyChanged.generic')
     expect(retryButtons(h.result())).toHaveLength(0)
+  })
+})
+
+describe('WalletFormSheet retry', () => {
+  it('an ordinary failure keeps its retry button', async () => {
+    const h = await mountHook(
+      () =>
+        WalletFormSheet({
+          open: true, mode: 'create', wallet: null, sharedWalletCount: 0, personalWalletCount: 0,
+          canPickWalletType: false, editable: true, onClose: () => undefined,
+          onSave: async () => { throw new Error('x') },
+          walletTypePickerOpen: false, onWalletTypePickerOpenChange: () => undefined,
+        } as never),
+      5,
+    )
+    const name = findAll(h.result(), (e) => e.type === 'input')[0] as { props: Record<string, any> }
+    name.props.onChange({ target: { value: 'Копилка' } })
+    await h.settle(3)
+    sheet(h.result()).props.onPrimary()
+    await h.settle(5)
+    noteRetry(h.result())
+  })
+})
+
+describe('retry control is one on every form', () => {
+  it('category, goal, wallet and transaction forms use the very same element', async () => {
+    const { TransactionSubmitError } = await import('./transaction-form/TransactionFormShared')
+    noteRetry((TransactionSubmitError as unknown as (p: object) => unknown)({ onRetry: () => undefined }))
+    expect(retryTypes).toHaveLength(4)
+    expect(new Set(retryTypes).size).toBe(1)
   })
 })
