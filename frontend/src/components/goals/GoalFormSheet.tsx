@@ -1,5 +1,6 @@
 import { ownerFormErrorKey } from '../../api/familyChanged'
-import { revealMessage } from '../../utils/revealMessage'
+import { FormNotice } from '../FormNotice'
+import { noticeKindForKey } from '../../utils/noticeKind'
 import {
   type KeyboardEvent,
   type ClipboardEvent,
@@ -439,14 +440,14 @@ export function GoalFormSheet({
       ) : null}
 
       {!editable || saveError ? (
-        <div className="form-sheet-load-error" role="alert" ref={revealMessage}>
+        <FormNotice kind={noticeKindForKey(editable ? saveError! : 'familyChanged.goalsOwnerOnly')} reveal>
           <p>{t(editable ? saveError! : 'familyChanged.goalsOwnerOnly')}</p>
           {editable && saveError === 'settings.submitError' ? (
             <button type="button" onClick={() => void handleSave()} disabled={saving}>
               {t('auth.retry')}
             </button>
           ) : null}
-        </div>
+        </FormNotice>
       ) : null}
     </FormSheet>
   )

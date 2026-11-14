@@ -19,6 +19,7 @@ const { findAll, textOf } = await import('../test/elementTree')
 const { FamilyChangedError } = await import('../api/familyChanged')
 const { useAuthStore } = await import('../store/authStore')
 const { FormSheet } = await import('./forms/FormSheet')
+const { FormNotice } = await import('./FormNotice')
 const { CategoryFormSheet } = await import('./settings/CategoryFormSheet')
 const { GoalFormSheet } = await import('./goals/GoalFormSheet')
 const { WalletFormSheet } = await import('./settings/WalletFormSheet')
@@ -26,7 +27,7 @@ const { WalletFormSheet } = await import('./settings/WalletFormSheet')
 const setRole = (role: string) =>
   useAuthStore.setState({ status: 'ready', user: { id: 'u', familyBudgetId: 'f', role } as never })
 
-const alerts = (tree: unknown) => findAll(tree, (e) => e.props.role === 'alert')
+const alerts = (tree: unknown) => findAll(tree, (e) => e.type === FormNotice)
 const retryButtons = (tree: unknown) =>
   findAll(tree, (e) => e.type === 'button' && textOf(e.props.children) === 'auth.retry')
 const sheet = (tree: unknown) => findAll(tree, (e) => e.type === FormSheet)[0] as { props: Record<string, any> }

@@ -16,6 +16,7 @@ import { GoalFormSheet, type GoalFormMode } from '../components/goals/GoalFormSh
 import { useAuthStore } from '../store/authStore'
 import { useDataCacheStore } from '../store/dataCacheStore'
 import { EmptyStateIcon } from '../components/EmptyStateIcon'
+import { FormNotice } from '../components/FormNotice'
 
 type GoalTab = 'active' | 'closed'
 
@@ -156,9 +157,9 @@ export function GoalsPage() {
         </div>
 
         {alreadyExists ? (
-          <div className="goals-page__notice" role="status">
+          <FormNotice kind="warning" role="status" className="goals-page__notice">
             {t('goals.alreadyExists')}
-          </div>
+          </FormNotice>
         ) : null}
 
         <div className="goals-page__tabs analytics-tabs" role="tablist" aria-label={t('goals.title')}>

@@ -54,7 +54,7 @@ import {
 import { parsePositiveInt } from '../utils/transactionForm'
 import { walletCurrencySuffix } from '../utils/transactionFormFields'
 import { FailBox } from '../components/FailBox'
-import { revealMessage } from '../utils/revealMessage'
+import { FormNotice } from '../components/FormNotice'
 
 type Stage = 'launch' | 'trip' | 'amount' | 'manual' | 'result'
 
@@ -422,9 +422,9 @@ export function ShoppingTripPage() {
     body = (
       <>
         {(familyChanged || staleList) && stage !== 'amount' ? (
-          <div className="shopping-amount__fail shopping-trip__notice" role="alert" ref={revealMessage}>
+          <FormNotice kind="warning" reveal className="shopping-trip__notice">
             {familyChanged ? t('familyChanged.generic') : t('shopping.staleList')}
-          </div>
+          </FormNotice>
         ) : null}
         <ShoppingTripView
         items={items}

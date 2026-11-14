@@ -87,6 +87,7 @@ const { findAll, textOf } = await import('../test/elementTree')
 const { ShoppingTripPage } = await import('./ShoppingTripPage')
 const { ShoppingTripView } = await import('../components/shopping/ShoppingTripView')
 const { ShoppingAmountView } = await import('../components/shopping/ShoppingAmountView')
+const { FormNotice } = await import('../components/FormNotice')
 
 beforeEach(() => {
   world.items = [{ id: 'a', name: 'Молоко', created_at: '' }, { id: 'b', name: 'Хлеб', created_at: '' }]
@@ -150,7 +151,8 @@ describe('Shopping trip: the "list changed" notice on the list screen', () => {
     await h.settle(8)
     expect(one(ShoppingAmountView)).toBeUndefined()
     expect(textOf(h.result())).toContain('LIST CHANGED')
-    const [notice] = findAll(h.result(), (e) => e.props?.role === 'alert') as Array<{ props: Record<string, any> }>
+    const [notice] = findAll(h.result(), (e) => e.type === FormNotice) as Array<{ props: Record<string, any> }>
     expect(notice.props.className).toContain('shopping-trip__notice')
+    expect(notice.props.kind).toBe('warning')
   })
 })

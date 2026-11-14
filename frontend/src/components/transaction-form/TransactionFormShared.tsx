@@ -6,7 +6,8 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react'
-import { revealMessage } from '../../utils/revealMessage'
+import { FormNotice } from '../FormNotice'
+import { noticeKindForKey } from '../../utils/noticeKind'
 import { Button, Input, Modal, Spinner, Text, Title } from '@telegram-apps/telegram-ui'
 import { useTranslation } from 'react-i18next'
 
@@ -122,14 +123,14 @@ export function TransactionSubmitError({
   const retryable = !messageKey.startsWith('familyChanged.')
 
   return (
-    <div className="transaction-form__submit-error" role="alert" ref={revealMessage}>
+    <FormNotice kind={noticeKindForKey(messageKey)} reveal className="transaction-form__submit-error">
       <Text>{t(messageKey)}</Text>
       {retryable ? (
         <Button mode="plain" size="s" onClick={onRetry}>
           {t('auth.retry')}
         </Button>
       ) : null}
-    </div>
+    </FormNotice>
   )
 }
 

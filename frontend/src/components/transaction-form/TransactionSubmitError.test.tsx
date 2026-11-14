@@ -12,6 +12,7 @@ vi.mock('../../i18n/t', () => ({ t: (key: string) => key }))
 vi.mock('../../i18n', () => ({ default: { language: 'ru' } }))
 
 const { TransactionSubmitError } = await import('./TransactionFormShared')
+const { FormNotice } = await import('../FormNotice')
 const { findAll } = await import('../../test/elementTree')
 
 const render = (messageKey?: string) =>
@@ -19,9 +20,12 @@ const render = (messageKey?: string) =>
 
 describe('TransactionSubmitError', () => {
   it('scrolls itself into view when it appears', () => {
-    const root = render('familyChanged.message') as unknown as { ref: (el: unknown) => void }
+    const root = render('familyChanged.message') as unknown as { type: (p: object) => { ref: (el: unknown) => void }; props: { reveal: boolean } }
+    expect(root.type).toBe(FormNotice)
+    expect(root.props.reveal).toBe(true)
+    const notice = FormNotice(root.props as never) as unknown as { ref: (el: unknown) => void }
     const scrollIntoView = vi.fn()
-    root.ref({ scrollIntoView })
+    notice.ref({ scrollIntoView })
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
   })
 

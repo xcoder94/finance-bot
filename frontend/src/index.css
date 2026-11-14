@@ -1613,8 +1613,7 @@ button.home-ops-row:focus-visible {
   font-size: 13px;
 }
 
-.transaction-form__load-error,
-.transaction-form__submit-error {
+.transaction-form__load-error {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2613,6 +2612,62 @@ button.home-ops-row:focus-visible {
 }
 
 .form-sheet-loading,
+.form-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--tx);
+}
+
+.form-notice__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.form-notice__body {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.form-notice .form-notice__body > * {
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.form-notice .form-notice__body button {
+  margin-top: 4px;
+  border: none;
+  padding: 0;
+  background: none;
+  color: var(--acc);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.form-notice--error { color: var(--exp); }
+.form-notice--warning { color: var(--app-category-color-4); }
+.form-notice--info .form-notice__icon { color: var(--acc); }
+
 .form-sheet-load-error {
   display: flex;
   flex-direction: column;
@@ -3886,6 +3941,7 @@ button.home-ops-row:focus-visible {
 }
 
 .shopping-trip__bar {
+  flex-wrap: wrap;
   position: sticky;
   bottom: 0;
   display: flex;
@@ -3927,10 +3983,24 @@ button.home-ops-row:focus-visible {
   color: var(--acct);
 }
 
-.shopping-trip__cancel:disabled,
-.shopping-trip__finish:disabled {
+.shopping-trip__cancel:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* off «finish»: neutral chip with hint-coloured label (readable), not a faded blue */
+.shopping-trip__finish:disabled {
+  background: var(--chip);
+  color: var(--hint);
+  cursor: default;
+}
+
+.shopping-trip__hint {
+  flex: 1 0 100%;
+  color: var(--hint);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .shopping-amount__caption {
@@ -4758,10 +4828,5 @@ a.tabbar-link:active {
 }
 
 .goals-page__notice {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--sec-bg, rgba(127, 127, 127, 0.12));
-  color: var(--tx);
-  font-size: 14px;
-  line-height: 1.35;
+  margin: 0;
 }

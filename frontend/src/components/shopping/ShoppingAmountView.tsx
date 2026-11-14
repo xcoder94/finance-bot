@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { revealMessage } from '../../utils/revealMessage'
+import { FormNotice } from '../FormNotice'
 import { useTranslation } from 'react-i18next'
 
 import type { PendingMethod } from '../../api/shopping'
@@ -141,13 +141,13 @@ export function ShoppingAmountView({
       )}
 
       {failed || noWallet || familyChanged || staleList ? (
-        <div className="shopping-amount__fail" role="alert" ref={revealMessage}>
+        <FormNotice kind={familyChanged || staleList ? 'warning' : 'error'} reveal>
           {familyChanged
             ? t('familyChanged.generic')
             : staleList
               ? t('shopping.staleList')
               : t('shopping.recordFailed')}
-        </div>
+        </FormNotice>
       ) : null}
 
       <div className="shopping-amount__rows">

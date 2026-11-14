@@ -67,6 +67,7 @@ export function ShoppingTripView({
       </div>
 
       <div className="shopping-trip__bar">
+        {canFinishTrip(checked) ? null : <div className="shopping-trip__hint">{t('shopping.finishHint')}</div>}
         <button type="button" className="shopping-trip__cancel" onClick={onCancel}>
           {t('shopping.cancel')}
         </button>
