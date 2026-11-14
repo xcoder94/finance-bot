@@ -136,6 +136,9 @@ _PLAIN_AMOUNT_RE = re.compile(
     re.IGNORECASE,
 )
 # "$ 20 тыс": a dollar sign before a magnitude number is two currency/scale marks: not for the fast path.
+# Marks before a number are looked for in a short window only (a scan from the text start per
+# number is quadratic on long texts); a mark farther away is caught by _ANY_MARK_RE.
+_LOOKBACK = 64
 _DOLLAR_BEFORE_RE = re.compile(r"\$[ \u00a0]*$")
 _MAGNITUDE_TAIL_RE = re.compile(
     r"\s*(?:тыс|ming|минг|mln|million|млн|миллион|[kк](?![^\W\d_]))", re.IGNORECASE
@@ -222,9 +225,9 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
 
     for match in _THOUSAND_RE.finditer(text):
         start, end = match.span()
-        if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, 0, start):
+        if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start):
             continue
-        if _MARK_BEFORE_RE.search(text, 0, start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
+        if _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
             continue
         value = _normalize_number(match.group("num")) * 1000
         amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
@@ -238,9 +241,9 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
     ):
         for match in pattern.finditer(text):
             start, end = match.span()
-            if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, 0, start):
+            if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start):
                 continue
-            if _MARK_BEFORE_RE.search(text, 0, start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
+            if _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
                 continue
             value = _normalize_number(match.group("num")) * factor
             amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
@@ -255,7 +258,7 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
         if not num_raw.strip():
             continue
         if (not match.group("currency") and _ATTACHED_MARK_RE.match(text, end)) or (
-            not match.group("cur_pre") and _MARK_BEFORE_RE.search(text, 0, start)
+            not match.group("cur_pre") and _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start)
         ):
             continue
         value = _normalize_number(num_raw)
