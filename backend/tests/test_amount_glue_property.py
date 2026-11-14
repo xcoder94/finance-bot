@@ -145,6 +145,8 @@ def test_currency_word_before_number_goes_to_model() -> None:
         tail = rnd.choice(["", " тыс", " млн", "к", " сум", " usd", "."])
         gap = rnd.choice([" ", "  ", " "])
         text = rnd.choice(["такси {w}{g}{n}{t}", "{w}{g}{n}{t} такси"]).format(w=w, g=gap, n=n, t=tail)
+        if w == "$" and tail in ("", "."):
+            continue  # next release: "$ 20" == "$20" == USD, fast path (see test below)
         if _run(text) is not None:
             bad.append(text)
     assert not bad, bad[:10]
@@ -171,3 +173,56 @@ def test_spaced_k_plus_word_below_1000_never_saved() -> None:
         if n >= 1000 and (op is None or op.amount != n):
             bad.append(text)
     assert not bad, bad[:10]
+
+
+@pytest.mark.parametrize("sep", [": ", " - ", "-", ", ", " , ", "; ", " / ", ":", " — "])
+@pytest.mark.parametrize("w", ["usd", "USD", "$", "доллар", "долларов", "dollar", "uzs", "сум", "долл."])
+def test_punctuation_between_currency_mark_and_number_goes_to_model(w: str, sep: str) -> None:
+    assert _run(f"такси {w}{sep}20") is None
+    assert _run(f"{w}{sep}20 такси") is None
+
+
+@pytest.mark.parametrize("text", ["такси (usd) 20", "(usd) 20 такси", "такси «доллар»: 20", "такси ($) 20"])
+def test_bracketed_currency_mark_before_number_goes_to_model(text: str) -> None:
+    assert _run(text) is None
+
+
+def test_dollar_sign_with_space_is_usd_on_fast_path() -> None:
+    for text in ("такси $ 20", "такси $20", "$ 20 такси"):
+        op = _run(text)
+        assert op is not None and op.amount == 20 and op.currency == "USD", text
+
+
+@pytest.mark.parametrize("w", ["сумма", "usdt", "ксум"])
+def test_punctuated_non_currency_word_before_number_stays_fast(w: str) -> None:
+    op = _run(f"такси {w}: 20000")
+    assert op is not None and op.amount == 20_000
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["такси 20000 к. врачу", "такси 20000 к «врачу»", "такси 20000 к, домой", "такси 20000 к - врачу", "такси 20000 k. vrachu"],
+)
+def test_spaced_k_then_punctuation_then_word_is_preposition(text: str) -> None:
+    op = _run(text)
+    assert op is not None and op.amount == 20_000, text
+
+
+@pytest.mark.parametrize("text", ["такси 20 к. врачу", "такси 20 к «врачу»", "такси 20 к, домой", "такси 20 k - vrachu"])
+def test_spaced_k_then_punctuation_then_word_below_1000_goes_to_model(text: str) -> None:
+    assert _run(text) is None, text
+
+
+@pytest.mark.parametrize("text", ["такси 20 к", "такси 20 к.", "такси 20 к!", "такси 20 к ...", "такси 20 к 5"])
+def test_spaced_k_at_phrase_end_is_multiplier(text: str) -> None:
+    op = _run(text)
+    if text.endswith("5"):
+        assert op is None
+    else:
+        assert op is not None and op.amount == 20_000, text
+
+
+def test_find_amounts_spaced_k_punctuation_word() -> None:
+    assert [a.value for a in _find_amounts("20000 к «врачу»")] == [20_000]
+    assert [a.value for a in _find_amounts("20000 к. врачу")] == [20_000]
+    assert [a.value for a in _find_amounts("20000 к")] == [20_000_000]

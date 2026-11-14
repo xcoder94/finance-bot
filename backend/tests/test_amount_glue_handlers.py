@@ -96,7 +96,7 @@ CASES = [
     ("такси 20 к врачу", 20_000, False),
     ("taksi 20 k vrachu", 20_000, False),
     ("такси 20 к.", 20_000, True),
-    ("такси 20 к, домой", 20_000, True),
+    ("такси 20 к, домой", 20, False),  # N<1000 + word after punctuation -> model
     ("такси 20 k", 20_000, True),
     # amount7: currency word/sign before the number is not in the sum -> model
     ("такси usd 20", 20, False),
@@ -107,6 +107,18 @@ CASES = [
     ("такси долларов 20", 20, False),
     ("такси dollar 20", 20, False),
     ("такси сум 20000", 20_000, False),
+    # next4d B1: punctuation between currency mark and number -> model
+    ("такси usd: 20", 20, False),
+    ("такси usd - 20", 20, False),
+    ("такси usd-20", 20, False),
+    ("такси usd, 20", 20, False),
+    ("такси (usd) 20", 20, False),
+    ("такси $: 20", 20, False),
+    ("такси доллар: 20", 20, False),
+    # next4d B2: spaced к + punctuation + word is a preposition (N >= 1000)
+    ("такси 20000 к. врачу", 20_000, True),
+    ("такси 20000 к «врачу»", 20_000, True),
+    ("такси 20 к. врачу", 20, False),
     # fast path controls
     ("такси 20000.", 20_000, True),
     ("такси (20000)", 20_000, True),

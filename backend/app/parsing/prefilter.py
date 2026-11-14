@@ -110,10 +110,12 @@ _THOUSAND_RE = re.compile(
 # Uzbek / short magnitude words after a number: "25 ming", "25 минг", "25k", "3 mln".
 # Spaced one-letter "к"/"k" followed by a word is the preposition ("20000 к врачу"), not
 # "thousand": the amount stays plain and "к врачу" stays in the comment. Glued ("20к") is a multiplier.
-_PREPOSITION_K_NOT = r"(?!\s+[kк]\s+[^\W\d_])"
+# A word after it may be separated by any punctuation/quotes ("20000 к. врачу", "20000 к «врачу»").
+_SPACED_K_WORD = r"\s+[kк](?![^\W\d_])[^\w]*[^\W\d_]"
+_PREPOSITION_K_NOT = r"(?!" + _SPACED_K_WORD + r")"
 # ...but only for a number >= 1000 ("20000 к врачу"). Below 1000 it is ambiguous ("обед 50 к с
 # друзьями" = 50 000 or 50?): the fast path saves nothing, the model decides.
-_SPACED_K_WORD_RE = re.compile(r"\s+[kк]\s+[^\W\d_]", re.IGNORECASE)
+_SPACED_K_WORD_RE = re.compile(_SPACED_K_WORD, re.IGNORECASE)
 _THOUSAND_WORD_RE = re.compile(
     _BEFORE + r"(?P<num>" + _NUM + r")" + _PREPOSITION_K_NOT +
     r"\s*(?:ming[^\W\d_]*|минг[^\W\d_]*|k|к)" + _AFTER,
@@ -149,9 +151,10 @@ _ATTACHED_MARK_RE = re.compile(
     re.IGNORECASE,
 )
 # Same on the left: "$ 20", "usd 20", "доллар 20" (currency sign/word before the number, space
-# between; the word must be a whole word: "сумма 20" is not a currency mark).
+# between; the word must be a whole word: "сумма 20" is not a currency mark). Only spaces and
+# punctuation may separate mark and number: "usd: 20", "usd - 20", "usd-20", "(usd) 20", "$: 20".
 _MARK_BEFORE_RE = re.compile(
-    r"(?:\$|(?<![^\W\d_])(?:usd|uzs|сум|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*))\s*$",
+    r"(?:\$|(?<![^\W\d_])(?:usd|uzs|сум|долл\.?|доллар[^\W\d_]*|dollar[^\W\d_]*))[^\w]*$",
     re.IGNORECASE,
 )
 
