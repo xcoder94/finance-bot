@@ -95,3 +95,58 @@ async def test_saved_record_has_amount_and_currency(
         )).one()
         w = await session.get(Wallet, tx.wallet_id)
         assert (tx.amount, w.currency) == (amount, cur)
+
+
+FAST_CASES = [
+    ("такси 20 тыс сум", 20_000, "UZS", "UZS"),
+    ("такси 20 тыс $", 20_000, "USD", "UZS"),
+    ("taksi 20 ming so'm", 20_000, "UZS", "UZS"),
+    ("taksi 20 ming so'm", 20_000, "UZS", "USD"),
+    ("такси 20к сум", 20_000, "UZS", "UZS"),
+    ("такси 2 млн сум", 2_000_000, "UZS", "UZS"),
+    ("такси 20 mln so'm", 20_000_000, "UZS", "USD"),
+    ("такси 20 минг доллар", 20_000, "USD", "UZS"),
+]
+
+
+@pytest.mark.parametrize("text,amount,cur,default_cur", FAST_CASES)
+async def test_magnitude_plus_currency_is_taken_on_fast_path(
+    text: str, amount: int, cur: str, default_cur: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with rollback_session() as session:
+        user, budget = await create_user(session, telegram_id=9_177_602)
+        wallet, _ = await seed_taxi_setup(session, user, budget)
+        usd = make_wallet(budget, name="Долларовый", currency="USD")
+        session.add(usd)
+        await session.flush()
+        user.default_wallet_id = (usd if default_cur == "USD" else wallet).id
+        await session.flush()
+        set_parser_override(FailingParser())
+        monkeypatch.setattr(
+            "bot.quick_entry.handlers.async_session_factory", SessionFactory(session)
+        )
+        message = make_message(telegram_id=user.telegram_id, text=text)
+        await handle_quick_entry_text(message, SimpleNamespace())
+        tx = (await session.scalars(
+            select(Transaction).where(Transaction.family_budget_id == budget.id)
+        )).one()
+        w = await session.get(Wallet, tx.wallet_id)
+        assert (tx.amount, w.currency) == (amount, cur)
+        assert budget.daily_model_calls == 0
+
+
+def test_two_currencies_or_unknown_between_go_to_model() -> None:
+    for text in ["такси 20 тыс сум $", "такси 20 тыс $ usd", "такси 20 тыс бы сум", "такси 20 тыс сум!$"]:
+        assert _run(text).operation is None, text
+
+
+def test_table_is_fast_with_right_currency_where_not_a_preposition() -> None:
+    slow = []
+    for text, amount, cur in _combos():
+        spaced_k = " к " in text or " k " in text
+        if spaced_k and not text.endswith("$"):
+            continue  # "20 к сум" is the preposition rule: model
+        op = _run(text).operation
+        if op is None or (op.amount, op.currency) != (amount, cur):
+            slow.append(text)
+    assert not slow, slow[:8]

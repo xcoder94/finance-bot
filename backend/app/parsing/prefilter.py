@@ -159,9 +159,10 @@ _ATTACHED_MARK_RE = re.compile(
 # Currency word/sign right after a magnitude word ("20 тыс $", "20 ming so'm"): the fast path
 # would drop it, so the phrase goes to the model. Same word list as everywhere above.
 _MARK_AFTER_MAGNITUDE_RE = re.compile(
-    r"\s*(?:\$|(?:" + _SUM_WORD + r"|usd|долл\.?)(?![^\W\d_])|доллар[^\W\d_]*|dollar[^\W\d_]*)",
+    r"\s*(?P<cur>\$|(?:" + _SUM_WORD + r"|usd|долл\.?)(?![^\W\d_])|доллар[^\W\d_]*|dollar[^\W\d_]*)",
     re.IGNORECASE,
 )
+_AFTER_RE = re.compile(_AFTER)
 # A currency word/sign anywhere in the phrase ("$ такси 20", "so'm такси 20000"): if it is not
 # part of the amount, a wallet name or a category, the fast path must not ignore it.
 _ANY_MARK_RE = re.compile(
@@ -219,6 +220,28 @@ def _parse_currency(token: str | None) -> Literal["UZS", "USD"] | None:
     return None
 
 
+def _currency_after_magnitude(
+    text: str, end: int
+) -> tuple[Literal["UZS", "USD"] | None, int]:
+    """Currency right after a magnitude word ("20 тыс сум", "20 ming so'm", "20к $").
+
+    No mark -> (None, end). Exactly one recognised mark with clean neighbours -> (currency,
+    new end). Anything else (two marks, mark with junk glued to it) -> (None, -1): model."""
+    mark = _MARK_AFTER_MAGNITUDE_RE.match(text, end)
+    if mark is None:
+        return None, end
+    new_end = mark.end()
+    if (
+        _AFTER_RE.match(text, new_end) is None
+        or _MARK_AFTER_MAGNITUDE_RE.match(text, new_end) is not None
+    ):
+        return None, -1
+    currency = _parse_currency(mark.group("cur"))
+    if currency is None:
+        return None, -1
+    return currency, new_end
+
+
 def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmount]:
     covered = [False] * len(text)
     amounts: list[_ParsedAmount] = []
@@ -227,10 +250,13 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
         start, end = match.span()
         if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start):
             continue
-        if _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
+        if _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start):
+            continue
+        currency, end = _currency_after_magnitude(text, end)
+        if end < 0 or any(covered[start:end]):
             continue
         value = _normalize_number(match.group("num")) * 1000
-        amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
+        amounts.append(_ParsedAmount(value=value, currency=currency, span=(start, end)))
         for i in range(start, end):
             covered[i] = True
 
@@ -243,10 +269,13 @@ def _find_amounts(text: str, *, magnitude_words: bool = True) -> list[_ParsedAmo
             start, end = match.span()
             if any(covered[start:end]) or _DOLLAR_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start):
                 continue
-            if _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start) or _MARK_AFTER_MAGNITUDE_RE.match(text, end):
+            if _MARK_BEFORE_RE.search(text, max(0, start - _LOOKBACK), start):
+                continue
+            currency, end = _currency_after_magnitude(text, end)
+            if end < 0 or any(covered[start:end]):
                 continue
             value = _normalize_number(match.group("num")) * factor
-            amounts.append(_ParsedAmount(value=value, currency=None, span=(start, end)))
+            amounts.append(_ParsedAmount(value=value, currency=currency, span=(start, end)))
             for i in range(start, end):
                 covered[i] = True
 
